@@ -11,7 +11,7 @@ sourceSets {
         java.setSrcDirs(listOf("test-fixtures"))
     }
     test {
-        java.setSrcDirs(listOf("test", "test-gen"))
+        java.setSrcDirs(listOf("test", pluginConfig.testGenDirectory))
         resources.setSrcDirs(listOf("testData"))
     }
 }

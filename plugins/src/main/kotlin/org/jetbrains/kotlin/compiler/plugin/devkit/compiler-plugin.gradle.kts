@@ -38,7 +38,7 @@ interface PluginConfigExtension {
   val pluginAnnotations: Property<Project>
   val jsRepl: Property<String>
   val generateTestsClass: Property<String>
-  val generatedTestsDir: DirectoryProperty
+  val testGenDirectory: DirectoryProperty
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
@@ -47,7 +47,7 @@ val jsRepl = configExtension.jsRepl.convention(
   javaClass.classLoader.getResourceAsStream("repl.js")?.readAllBytes()?.toString(Charsets.UTF_8)
 )
 val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
-val generatedTestsDir = configExtension.generatedTestsDir.convention(layout.projectDirectory.dir("test-gen"))
+val testGenDirectory = configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
 
 rootProject.childProjects.values.forEach {
   var noMultiplatformProjects = true
@@ -62,11 +62,12 @@ rootProject.childProjects.values.forEach {
 }
 
 sourceSets {
-  test { java.srcDir(generatedTestsDir) }
+  test { java.srcDir(testGenDirectory) }
 }
 
 idea {
-  module.generatedSourceDirs.add(generatedTestsDir.asFile.get())
+  // This is needed until IDEA fixes IDEA-339729.
+  module.generatedSourceDirs.add(testGenDirectory.asFile.get())
 }
 
 dependencies {
@@ -177,12 +178,16 @@ abstract class GenerateTests : JavaExec() {
 val generateTests by tasks.registering(GenerateTests::class) {
   description = "Generate compiler plugin tests"
   testData.from(sourceSets.test.map { it.resources.sourceDirectories })
-  outputs.dir(generatedTestsDir)
+  outputs.dir(testGenDirectory)
     .withPropertyName("generatedTests")
 
   classpath = sourceSets.testFixtures.get().runtimeClasspath
   mainClass = generateTestsClass
   workingDir = rootDir
+  args(
+    testGenDirectory.get().asFile.absolutePath,
+    sourceSets.test.get().resources.sourceDirectories.joinToString(",", transform = File::getAbsolutePath),
+  )
 }
 
 tasks.compileTestKotlin {
