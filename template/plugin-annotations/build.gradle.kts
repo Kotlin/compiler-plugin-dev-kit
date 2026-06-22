@@ -26,13 +26,11 @@ kotlin {
     linuxX64()
 
     macosArm64()
-    macosX64()
 
     mingwX64()
 
     tvosArm64()
     tvosSimulatorArm64()
-    tvosX64()
 
     wasmJs().nodejs()
     wasmWasi().nodejs()
@@ -41,7 +39,6 @@ kotlin {
     watchosArm64()
     watchosDeviceArm64()
     watchosSimulatorArm64()
-    watchosX64()
 
     applyDefaultHierarchyTemplate()
 
