@@ -1,3 +1,5 @@
+package org.jetbrains.kotlin.compiler.plugin.devkit
+
 plugins {
   kotlin("jvm")
   id("com.github.gmazzo.buildconfig")
@@ -41,7 +43,7 @@ rootProject.childProjects.values.forEach {
     }
   }
   var noCompilerPluginProjects = true
-  it.plugins.withId("compiler.plugin") {
+  it.plugins.withId("org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin") {
     if (noCompilerPluginProjects) {
       compilerPlugin.convention(it)
       noCompilerPluginProjects = false

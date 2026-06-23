@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalWasmDsl::class)
+package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -15,6 +15,7 @@ plugins {
   id("idea")
 }
 
+@OptIn(ExperimentalWasmDsl::class)
 project.plugins.apply(D8Plugin::class.java)
 
 sourceSets {
@@ -116,10 +117,10 @@ abstract class JsReplGeneratorTask: GeneratorTask<String>() {
 
   init {
     generator = object: Generator<String> {
-      override fun read(inputFile: File?): String? = inputFile?.readText()
+      override fun read(inputFile: java.io.File?): String? = inputFile?.readText()
       override fun defaultInstance(): String? = defaultRepl.orNull
       override fun configure(`object`: String?) {}
-      override fun write(`object`: String?, outputFile: File?) {
+      override fun write(`object`: String?, outputFile: java.io.File?) {
         if (`object` != null && outputFile != null) outputFile.writeText(`object`)
       }
     }
@@ -132,6 +133,7 @@ val createJsRepl by tasks.registering(JsReplGeneratorTask::class) {
   outputFile = jsReplFile.get().asFile
 }
 
+@OptIn(ExperimentalWasmDsl::class)
 tasks.test {
   dependsOn(testArtifacts)
   dependsOn(annotationsJvmRuntimeClasspath)

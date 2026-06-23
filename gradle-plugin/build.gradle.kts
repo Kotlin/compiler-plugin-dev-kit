@@ -1,5 +1,5 @@
 plugins {
-    id("gradle.plugin.config")
+    kotlin("compiler.plugin.devkit.gradle-plugin")
 }
 
 gradlePlugin {

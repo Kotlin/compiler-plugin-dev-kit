@@ -1,3 +1,3 @@
 plugins {
-    id("compiler.plugin")
+    kotlin("compiler.plugin.devkit.compiler-plugin")
 }
