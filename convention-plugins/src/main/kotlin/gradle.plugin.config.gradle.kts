@@ -27,28 +27,50 @@ interface PluginConfigExtension {
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
+val compilerPlugin = configExtension.compilerPlugin
+val pluginAnnotations = configExtension.pluginAnnotations
+
+rootProject.childProjects.values.forEach {
+  var noMultiplatformProjects = true
+  it.plugins.withId("org.jetbrains.kotlin.multiplatform") {
+    if (noMultiplatformProjects) {
+      pluginAnnotations.convention(it)
+      noMultiplatformProjects = false
+    } else {
+      pluginAnnotations.convention(null)
+    }
+  }
+  var noCompilerPluginProjects = true
+  it.plugins.withId("compiler.plugin") {
+    if (noCompilerPluginProjects) {
+      compilerPlugin.convention(it)
+      noCompilerPluginProjects = false
+    } else {
+      compilerPlugin.convention(null)
+    }
+  }
+}
 
 buildConfig {
   packageName(project.group.toString())
 
   buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 
-  val pluginProject = configExtension.compilerPlugin
   buildConfigField("KOTLIN_PLUGIN_GROUP") {
     type(String::class)
-    expression(pluginProject.map { "\"${it.group}\"" })
+    expression(compilerPlugin.map { "\"${it.group}\"" })
   }
   buildConfigField("KOTLIN_PLUGIN_NAME") {
     type(String::class)
-    expression(pluginProject.map { "\"${it.name}\"" })
+    expression(compilerPlugin.map { "\"${it.name}\"" })
   }
   buildConfigField("KOTLIN_PLUGIN_VERSION") {
     type(String::class)
-    expression(pluginProject.map { "\"${it.version}\"" })
+    expression(compilerPlugin.map { "\"${it.version}\"" })
   }
 
   buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
     type("String")
-    expression(configExtension.pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
+    expression(pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
   }
 }

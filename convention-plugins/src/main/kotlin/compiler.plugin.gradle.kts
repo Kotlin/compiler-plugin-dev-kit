@@ -59,6 +59,19 @@ interface PluginConfigExtension {
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
+val pluginAnnotations = configExtension.pluginAnnotations
+
+rootProject.childProjects.values.forEach {
+  var noMultiplatformProjects = true
+  it.plugins.withId("org.jetbrains.kotlin.multiplatform") {
+    if (noMultiplatformProjects) {
+      pluginAnnotations.convention(it)
+      noMultiplatformProjects = false
+    } else {
+      pluginAnnotations.convention(null)
+    }
+  }
+}
 
 dependencies {
   compileOnly(kotlin("compiler"))
@@ -68,7 +81,7 @@ dependencies {
   testFixturesApi(kotlin("compiler"))
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
-  annotationsRuntimeClasspath(configExtension.pluginAnnotations)
+  annotationsRuntimeClasspath(pluginAnnotations)
 
   // Dependencies required to run the internal test framework.
   testArtifacts(kotlin("stdlib"))

@@ -2,11 +2,6 @@ plugins {
     id("gradle.plugin.config")
 }
 
-pluginConfig {
-    compilerPlugin = project(":compiler-plugin")
-    pluginAnnotations = project(":plugin-annotations")
-}
-
 gradlePlugin {
     plugins {
         create("SimplePlugin") {
