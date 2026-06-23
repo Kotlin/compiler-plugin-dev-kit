@@ -68,9 +68,7 @@ dependencies {
   testFixturesApi(kotlin("compiler"))
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
-  afterEvaluate {
-    annotationsRuntimeClasspath(configExtension.pluginAnnotations.get())
-  }
+  annotationsRuntimeClasspath(configExtension.pluginAnnotations)
 
   // Dependencies required to run the internal test framework.
   testArtifacts(kotlin("stdlib"))

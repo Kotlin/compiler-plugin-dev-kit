@@ -28,22 +28,27 @@ interface PluginConfigExtension {
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
 
-afterEvaluate {
-  buildConfig {
-    packageName(project.group.toString())
+buildConfig {
+  packageName(project.group.toString())
 
-    buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
+  buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 
-    val pluginProject = configExtension.compilerPlugin.get()
-    buildConfigField("String", "KOTLIN_PLUGIN_GROUP", "\"${pluginProject.group}\"")
-    buildConfigField("String", "KOTLIN_PLUGIN_NAME", "\"${pluginProject.name}\"")
-    buildConfigField("String", "KOTLIN_PLUGIN_VERSION", "\"${pluginProject.version}\"")
+  val pluginProject = configExtension.compilerPlugin
+  buildConfigField("KOTLIN_PLUGIN_GROUP") {
+    type(String::class)
+    expression(pluginProject.map { "\"${it.group}\"" })
+  }
+  buildConfigField("KOTLIN_PLUGIN_NAME") {
+    type(String::class)
+    expression(pluginProject.map { "\"${it.name}\"" })
+  }
+  buildConfigField("KOTLIN_PLUGIN_VERSION") {
+    type(String::class)
+    expression(pluginProject.map { "\"${it.version}\"" })
+  }
 
-    val annotationsProject = configExtension.pluginAnnotations.get()
-    buildConfigField(
-      type = "String",
-      name = "ANNOTATIONS_LIBRARY_COORDINATES",
-      expression = "\"${annotationsProject.group}:${annotationsProject.name}:${annotationsProject.version}\""
-    )
+  buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
+    type("String")
+    expression(configExtension.pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
   }
 }
