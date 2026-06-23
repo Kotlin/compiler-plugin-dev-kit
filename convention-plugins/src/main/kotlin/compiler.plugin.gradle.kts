@@ -62,6 +62,7 @@ val pluginAnnotations = configExtension.pluginAnnotations
 val jsRepl = configExtension.jsRepl.convention(
   javaClass.classLoader.getResourceAsStream("repl.js")?.readAllBytes()?.toString(Charsets.UTF_8)
 )
+val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
 
 rootProject.childProjects.values.forEach {
   var noMultiplatformProjects = true
@@ -182,7 +183,7 @@ val generateTests by tasks.registering(JavaExec::class) {
     .withPropertyName("generatedTests")
 
   classpath = sourceSets.testFixtures.get().runtimeClasspath
-  mainClass = configExtension.generateTestsClass
+  mainClass = generateTestsClass
   workingDir = rootDir
 }
 

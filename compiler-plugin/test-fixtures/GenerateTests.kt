@@ -1,5 +1,3 @@
-package org.jetbrains.kotlin.compiler.plugin.template
-
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJsBoxTest
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJvmBoxTest
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJvmDiagnosticTest
