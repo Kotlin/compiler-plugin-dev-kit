@@ -54,6 +54,7 @@ val annotationsJsRuntimeClasspath by configurations.resolvable("annotationsJsRun
 interface PluginConfigExtension {
   val pluginAnnotations: Property<Project>
   val jsRepl: Property<String>
+  val generateTestsClass: Property<String>
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
@@ -181,7 +182,7 @@ val generateTests by tasks.registering(JavaExec::class) {
     .withPropertyName("generatedTests")
 
   classpath = sourceSets.testFixtures.get().runtimeClasspath
-  mainClass.set("org.jetbrains.kotlin.compiler.plugin.template.GenerateTestsKt")
+  mainClass = configExtension.generateTestsClass
   workingDir = rootDir
 }
 
