@@ -1,6 +1,8 @@
-package org.jetbrains.kotlin.compiler.plugin.template.services
+package org.jetbrains.kotlin.compiler.plugin.template.devkit.services
 
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
+import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useConfigurators
+import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useCustomRuntimeClasspathProviders
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.platform.isJs
@@ -13,7 +15,8 @@ import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.targetPlatform
 import java.io.File
 
-fun TestConfigurationBuilder.configureAnnotations() {
+context(_: TestConfigurationBuilder)
+internal fun configureAnnotations() {
     useConfigurators(::PluginAnnotationsProvider)
     useCustomRuntimeClasspathProviders(::PluginAnnotationsClasspathProvider)
 }

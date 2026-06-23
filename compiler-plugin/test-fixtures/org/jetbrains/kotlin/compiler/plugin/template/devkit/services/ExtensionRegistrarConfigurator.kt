@@ -1,24 +1,23 @@
-package org.jetbrains.kotlin.compiler.plugin.template.services
+package org.jetbrains.kotlin.compiler.plugin.template.devkit.services
 
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.template.SimplePluginComponentRegistrar
+import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useConfigurators
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
-fun TestConfigurationBuilder.configurePlugin() {
-    useConfigurators(::ExtensionRegistrarConfigurator)
+context(_: TestConfigurationBuilder)
+internal fun configurePlugin(registrar: CompilerPluginRegistrar) {
+    useConfigurators(registrar::ExtensionRegistrarConfigurator)
     configureAnnotations()
 }
 
-private class ExtensionRegistrarConfigurator(testServices: TestServices) : EnvironmentConfigurator(testServices) {
-    private val registrar = SimplePluginComponentRegistrar()
+private fun CompilerPluginRegistrar.ExtensionRegistrarConfigurator(testServices: TestServices) =
+    object : EnvironmentConfigurator(testServices) {
     override fun CompilerPluginRegistrar.ExtensionStorage.registerCompilerExtensions(
         module: TestModule,
         configuration: CompilerConfiguration
-    ) {
-        with(registrar) { registerExtensions(configuration) }
-    }
+    ) = registerExtensions(configuration)
 }
