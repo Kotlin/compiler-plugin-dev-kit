@@ -1,8 +1,8 @@
-package org.jetbrains.kotlin.compiler.plugin.template.devkit.services
+package org.jetbrains.kotlin.compiler.plugin.devkit.services
 
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
-import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useConfigurators
-import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useCustomRuntimeClasspathProviders
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.useConfigurators
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.useCustomRuntimeClasspathProviders
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.platform.isJs

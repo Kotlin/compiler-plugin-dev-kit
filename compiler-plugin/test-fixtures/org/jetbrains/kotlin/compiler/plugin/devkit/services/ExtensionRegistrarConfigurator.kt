@@ -1,7 +1,7 @@
-package org.jetbrains.kotlin.compiler.plugin.template.devkit.services
+package org.jetbrains.kotlin.compiler.plugin.devkit.services
 
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.template.devkit.runners.useConfigurators
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.useConfigurators
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.TestModule

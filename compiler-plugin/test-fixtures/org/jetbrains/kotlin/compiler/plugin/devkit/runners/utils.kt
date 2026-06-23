@@ -1,6 +1,6 @@
 @file:Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 
-package org.jetbrains.kotlin.compiler.plugin.template.devkit.runners
+package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder

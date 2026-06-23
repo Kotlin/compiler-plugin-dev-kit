@@ -1,4 +1,4 @@
-package org.jetbrains.kotlin.compiler.plugin.template
+package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider

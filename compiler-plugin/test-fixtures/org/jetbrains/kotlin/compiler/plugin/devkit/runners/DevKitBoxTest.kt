@@ -1,7 +1,7 @@
-package org.jetbrains.kotlin.compiler.plugin.template.devkit.runners
+package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.template.devkit.services.configurePlugin
+import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
 import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
