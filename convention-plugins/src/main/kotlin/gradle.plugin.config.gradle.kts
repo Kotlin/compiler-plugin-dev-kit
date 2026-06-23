@@ -56,21 +56,31 @@ buildConfig {
 
   buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 
-  buildConfigField("KOTLIN_PLUGIN_GROUP") {
-    type(String::class)
-    expression(compilerPlugin.map { "\"${it.group}\"" })
-  }
-  buildConfigField("KOTLIN_PLUGIN_NAME") {
-    type(String::class)
-    expression(compilerPlugin.map { "\"${it.name}\"" })
-  }
-  buildConfigField("KOTLIN_PLUGIN_VERSION") {
-    type(String::class)
-    expression(compilerPlugin.map { "\"${it.version}\"" })
+  buildConfigField("KOTLIN_PLUGIN_ARTIFACT") {
+    type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
+    expression(compilerPlugin.map {
+      """
+        org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact(
+          groupId = "${it.group}",
+          artifactId = "${it.name}",
+          version = "${it.version}",
+        )
+      """.trimIndent()
+    })
   }
 
   buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
     type("String")
     expression(pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
+  }
+  buildConfigField("PLUGIN_INFO") {
+    type("org.jetbrains.kotlin.compiler.plugin.template.DevKitPluginInfo")
+    expression("""
+      org.jetbrains.kotlin.compiler.plugin.template.DevKitPluginInfo(
+        id = KOTLIN_PLUGIN_ID,
+        artifact = KOTLIN_PLUGIN_ARTIFACT,
+        libraryCoordinates = ANNOTATIONS_LIBRARY_COORDINATES,
+      )
+    """.trimIndent())
   }
 }
