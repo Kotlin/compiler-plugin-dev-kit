@@ -1,5 +1,5 @@
 plugins {
-    id("plugin.config")
+    id("gradle.plugin.config")
 }
 
 pluginConfig {

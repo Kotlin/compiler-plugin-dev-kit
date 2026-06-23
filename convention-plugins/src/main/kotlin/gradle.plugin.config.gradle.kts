@@ -1,7 +1,8 @@
 plugins {
-  id("org.jetbrains.kotlin.jvm")
+  kotlin("jvm")
   id("com.github.gmazzo.buildconfig")
-  id("java-gradle-plugin")
+  `java-gradle-plugin`
+  `java-test-fixtures`
 }
 
 sourceSets {
