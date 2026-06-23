@@ -1,9 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
-import org.gradle.api.Project
-import org.gradle.api.provider.Property
-import org.gradle.kotlin.dsl.create
-import org.gradle.kotlin.dsl.`java-test-fixtures`
+import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
@@ -56,10 +53,14 @@ val annotationsJsRuntimeClasspath by configurations.resolvable("annotationsJsRun
 
 interface PluginConfigExtension {
   val pluginAnnotations: Property<Project>
+  val jsRepl: Property<String>
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
 val pluginAnnotations = configExtension.pluginAnnotations
+val jsRepl = configExtension.jsRepl.convention(
+  javaClass.classLoader.getResourceAsStream("repl.js")?.readAllBytes()?.toString(Charsets.UTF_8)
+)
 
 rootProject.childProjects.values.forEach {
   var noMultiplatformProjects = true
@@ -104,10 +105,36 @@ buildConfig {
   buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 }
 
+val jsReplFile = layout.buildDirectory.file("js-test-repl/repl.js")
+
+abstract class JsReplGeneratorTask: GeneratorTask<String>() {
+  @get:Input
+  @get:Optional
+  abstract val defaultRepl: Property<String>
+
+  init {
+    generator = object: Generator<String> {
+      override fun read(inputFile: File?): String? = inputFile?.readText()
+      override fun defaultInstance(): String? = defaultRepl.orNull
+      override fun configure(`object`: String?) {}
+      override fun write(`object`: String?, outputFile: File?) {
+        if (`object` != null && outputFile != null) outputFile.writeText(`object`)
+      }
+    }
+  }
+}
+
+val createJsRepl by tasks.registering(JsReplGeneratorTask::class) {
+  description = "Creates a JS Repl for use by the testing framework"
+  defaultRepl = jsRepl
+  outputFile = jsReplFile.get().asFile
+}
+
 tasks.test {
   dependsOn(testArtifacts)
   dependsOn(annotationsJvmRuntimeClasspath)
   dependsOn(annotationsJsRuntimeClasspath)
+  dependsOn(createJsRepl)
 
   useJUnitPlatform()
   workingDir = rootDir
@@ -134,7 +161,7 @@ tasks.test {
   setLibraryProperty("org.jetbrains.kotlin.test.kotlin-test-js", "kotlin-test-js")
 
   systemProperty("javascript.engine.path.V8", d8EnvSpec.executable.get())
-  systemProperty("javascript.engine.path.repl", "${layout.projectDirectory.file("repl.js").asFile}")
+  systemProperty("javascript.engine.path.repl", "${jsReplFile.get().asFile}")
   systemProperty("kotlin.js.test.root.out.dir", "${layout.buildDirectory.get().asFile}/js-test-output")
 }
 
