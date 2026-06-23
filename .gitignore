@@ -1,6 +1,9 @@
 .idea/*
+template/.idea/*
 !.idea/externalDependencies.xml
 !.idea/kotlinTestDataPluginTestDataPaths.xml
+!template/.idea/externalDependencies.xml
+!template/.idea/kotlinTestDataPluginTestDataPaths.xml
 .gradle/
 .kotlin/
 build/

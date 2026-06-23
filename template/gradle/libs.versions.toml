@@ -1,0 +1,10 @@
+[versions]
+# https://github.com/JetBrains/kotlin
+kotlin = "2.4.0"
+
+# https://github.com/Kotlin/binary-compatibility-validator
+kotlin-binaryCompatibilityValidator = "0.16.3"
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "kotlin-binaryCompatibilityValidator"}

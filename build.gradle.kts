@@ -1,8 +1,9 @@
 plugins {
-    alias(libs.plugins.kotlin.multiplatform) apply false
+  `kotlin-dsl`
 }
 
-allprojects {
-    group = "org.jetbrains.kotlin.compiler.plugin.template"
-    version = "0.1.0-SNAPSHOT"
+dependencies {
+  implementation(libs.kotlin.jvm)
+  implementation(libs.buildconfig)
+  implementation(libs.node.gradle)
 }

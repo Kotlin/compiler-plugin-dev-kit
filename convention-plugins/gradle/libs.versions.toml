@@ -1,9 +1,0 @@
-[versions]
-kotlin = "2.4.0"
-buildconfig = "5.6.5"
-node-gradle = "7.0.2"
-
-[libraries]
-kotlin-jvm = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
-buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
-node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }

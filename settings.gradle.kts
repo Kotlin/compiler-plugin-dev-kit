@@ -1,20 +1,13 @@
 pluginManagement {
-    includeBuild("convention-plugins")
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-    
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
 }
 
 dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-    }
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
 }
-
-rootProject.name = "compiler-plugin-template"
-
-include("compiler-plugin")
-include("gradle-plugin")
-include("plugin-annotations")
