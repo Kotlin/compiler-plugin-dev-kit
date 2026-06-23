@@ -14,11 +14,8 @@ open class DevKitDiagnosticTest(
 ) : AbstractFirPhasedDiagnosticTest(parser) {
     override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
 
-    final override fun configure(builder: TestConfigurationBuilder) = super.configure(builder)
-
-    context(builder: TestConfigurationBuilder)
-    open fun config() = with(builder) {
-        configure(this)
+    final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
+        super.configure(builder)
 
         defaultDirectives {
             +FirDiagnosticsDirectives.FIR_DUMP
@@ -26,6 +23,11 @@ open class DevKitDiagnosticTest(
         }
 
         configurePlugin(registrar())
+        config()
+    }
+
+    context(builder: TestConfigurationBuilder)
+    open fun config() {
     }
 }
 

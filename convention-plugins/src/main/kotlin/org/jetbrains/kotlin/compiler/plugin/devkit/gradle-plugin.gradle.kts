@@ -76,9 +76,9 @@ buildConfig {
     expression(pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
   }
   buildConfigField("PLUGIN_INFO") {
-    type("org.jetbrains.kotlin.compiler.plugin.template.DevKitPluginInfo")
+    type("org.jetbrains.kotlin.compiler.plugin.devkit.DevKitPluginInfo")
     expression("""
-      org.jetbrains.kotlin.compiler.plugin.template.DevKitPluginInfo(
+      org.jetbrains.kotlin.compiler.plugin.devkit.DevKitPluginInfo(
         id = KOTLIN_PLUGIN_ID,
         artifact = KOTLIN_PLUGIN_ARTIFACT,
         libraryCoordinates = ANNOTATIONS_LIBRARY_COORDINATES,
