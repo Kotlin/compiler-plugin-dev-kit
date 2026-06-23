@@ -117,10 +117,10 @@ abstract class JsReplGeneratorTask: GeneratorTask<String>() {
 
   init {
     generator = object: Generator<String> {
-      override fun read(inputFile: java.io.File?): String? = inputFile?.readText()
+      override fun read(inputFile: File?): String? = inputFile?.readText()
       override fun defaultInstance(): String? = defaultRepl.orNull
       override fun configure(`object`: String?) {}
-      override fun write(`object`: String?, outputFile: java.io.File?) {
+      override fun write(`object`: String?, outputFile: File?) {
         if (`object` != null && outputFile != null) outputFile.writeText(`object`)
       }
     }
