@@ -100,7 +100,7 @@ buildConfig {
   buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 }
 
-val jsReplFile = layout.buildDirectory.file("js-test-repl/repl.js")
+val jsReplOutputFile = layout.buildDirectory.file("js-test-repl/repl.js")
 
 abstract class JsReplGeneratorTask: GeneratorTask<String>() {
   @get:Input
@@ -122,7 +122,7 @@ abstract class JsReplGeneratorTask: GeneratorTask<String>() {
 val createJsRepl by tasks.registering(JsReplGeneratorTask::class) {
   description = "Creates a JS Repl for use by the testing framework"
   defaultRepl = jsRepl
-  outputFile = jsReplFile.get().asFile
+  outputFile = jsReplOutputFile.get().asFile
 }
 
 @OptIn(ExperimentalWasmDsl::class)
@@ -157,7 +157,7 @@ tasks.test {
   setLibraryProperty("org.jetbrains.kotlin.test.kotlin-test-js", "kotlin-test-js")
 
   systemProperty("javascript.engine.path.V8", d8EnvSpec.executable.get())
-  systemProperty("javascript.engine.path.repl", "${jsReplFile.get().asFile}")
+  systemProperty("javascript.engine.path.repl", "${jsReplOutputFile.get().asFile}")
   systemProperty("kotlin.js.test.root.out.dir", "${layout.buildDirectory.get().asFile}/js-test-output")
 }
 
