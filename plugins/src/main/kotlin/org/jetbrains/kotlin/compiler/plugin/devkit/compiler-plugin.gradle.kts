@@ -16,6 +16,12 @@ plugins {
   id("idea")
 }
 
+repositories {
+  mavenCentral()
+  maven("https://redirector.kotlinlang.org/maven/bootstrap")
+  maven("https://redirector.kotlinlang.org/maven/dev/")
+}
+
 @OptIn(ExperimentalWasmDsl::class)
 project.plugins.apply(D8Plugin::class.java)
 
