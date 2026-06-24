@@ -49,9 +49,7 @@ interface PluginConfigExtension {
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
 val pluginAnnotations = configExtension.pluginAnnotations
-val jsRepl = configExtension.jsRepl.convention(
-  javaClass.classLoader.getResourceAsStream("repl.js")?.readAllBytes()?.toString(Charsets.UTF_8)
-)
+val jsRepl = configExtension.jsRepl.convention(javaClass.classLoader.getResource("repl.js")?.readText())
 val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
 val testGenDirectory = configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
 val extraKotlinVersionsToTestAgainst = configExtension.extraKotlinVersionsToTestAgainst
@@ -69,39 +67,46 @@ rootProject.childProjects.values.forEach {
 }
 
 val testArtifacts: Configuration by configurations.creating
-dependencies { configureTestArtifacts { testArtifacts(it) } }
+dependencies {
+  // Dependencies required to run the internal test framework.
+  testArtifacts(kotlin("stdlib"))
+  testArtifacts(kotlin("stdlib-jdk8"))
+  testArtifacts(kotlin("reflect"))
+  testArtifacts(kotlin("test"))
+  testArtifacts(kotlin("script-runtime"))
+  testArtifacts(kotlin("annotations-jvm"))
+  testArtifacts(kotlin("stdlib-js"))
+  testArtifacts(kotlin("test-js"))
+}
 
 tasks.test { configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath) }
 
 val KotlinToolingVersion.versionString get() = toString()
 
-extraKotlinVersionsToTestAgainst.all {
-  val testArtifacts = configurations.create("testArtifacts$versionString")
-  val testClasspath =
-    configurations.create("testClasspath$versionString") { extendsFrom(configurations.testRuntimeClasspath.get()) }
-
-  val annotationsJvmRuntimeClasspath by configurations.resolvable("annotationsJvmRuntimeClasspath$versionString") {
-    extendsFrom(annotationsRuntimeClasspath)
+@Suppress("UnstableApiUsage")
+fun Configuration.withKotlinVersion(
+  version: KotlinToolingVersion,
+  action: ResolvableConfiguration.() -> Unit = {}
+) = configurations.resolvable("$name${version.versionString}") {
+  extendsFrom(this@withKotlinVersion)
+  resolutionStrategy.eachDependency {
+    if (this.requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
   }
-  val annotationsJsRuntimeClasspath by configurations.resolvable("annotationsJsRuntimeClasspath$versionString") {
-    extendsFrom(annotationsRuntimeClasspath)
+  action()
+}
+
+extraKotlinVersionsToTestAgainst.all {
+  val testArtifacts by testArtifacts.withKotlinVersion(this)
+  val testClasspath by configurations.testRuntimeClasspath.get().withKotlinVersion(this)
+
+  val annotationsJvmRuntimeClasspath by annotationsJvmRuntimeClasspath.withKotlinVersion(this)
+  val annotationsJsRuntimeClasspath by annotationsJsRuntimeClasspath.withKotlinVersion(this) {
     attributes {
       attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
       attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
     }
   }
 
-  dependencies {
-    configureTestArtifacts(versionString) {
-      testArtifacts(it)
-      annotationsJvmRuntimeClasspath.resolutionStrategy.force(it)
-      annotationsJsRuntimeClasspath.resolutionStrategy.force(it)
-    }
-    configureTestClasspath(versionString) {
-      testClasspath(it)
-      testClasspath.resolutionStrategy.force(it)
-    }
-  }
   tasks.register<Test>("test$versionString") {
     description = "Run tests for $versionString"
     group = "verification"
@@ -120,33 +125,16 @@ idea {
   module.generatedSourceDirs.add(testGenDirectory.asFile.get())
 }
 
-inline fun DependencyHandlerScope.configureTestClasspath(version: String? = null, testClasspath: (Any) -> Unit) {
-  testClasspath(kotlin("stdlib", version))
-  testClasspath(kotlin("test-junit5", version))
-  testClasspath(kotlin("compiler-internal-test-framework", version))
-  testClasspath(kotlin("compiler", version))
-}
-
 dependencies {
   compileOnly(kotlin("compiler"))
 
-  configureTestClasspath { testFixturesApi(it) }
+  testFixturesApi(kotlin("stdlib"))
+  testFixturesApi(kotlin("test-junit5"))
+  testFixturesApi(kotlin("compiler-internal-test-framework"))
+  testFixturesApi(kotlin("compiler"))
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
   annotationsRuntimeClasspath(pluginAnnotations)
-}
-
-fun DependencyHandlerScope.configureTestArtifacts(version: String? = null, testArtifacts: (Any) -> Unit) {
-  // Dependencies required to run the internal test framework.
-  testArtifacts(kotlin("stdlib", version))
-  testArtifacts(kotlin("stdlib-jdk8", version))
-  testArtifacts(kotlin("reflect", version))
-  testArtifacts(kotlin("test", version))
-  testArtifacts(kotlin("script-runtime", version))
-  testArtifacts(kotlin("annotations-jvm", version))
-
-  testArtifacts(kotlin("stdlib-js", version))
-  testArtifacts(kotlin("test-js", version))
 }
 
 buildConfig {
