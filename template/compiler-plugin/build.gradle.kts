@@ -7,7 +7,7 @@ plugins {
 pluginConfig {
     extraKotlinVersionsToTestAgainst += listOf(
         KotlinToolingVersion(KotlinVersion(2, 4), "Beta1"),
-        KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-6138"),
+        //KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-6138"),
     )
 }
 

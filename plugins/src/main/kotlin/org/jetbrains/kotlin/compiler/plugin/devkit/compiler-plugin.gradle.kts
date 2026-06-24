@@ -25,12 +25,15 @@ repositories {
 @OptIn(ExperimentalWasmDsl::class)
 project.plugins.apply(D8Plugin::class.java)
 
+@Suppress("UnstableApiUsage")
 val annotationsRuntimeClasspath by configurations.dependencyScope("annotationsRuntimeClasspath") {
   isTransitive = false
 }
+@Suppress("UnstableApiUsage")
 val annotationsJvmRuntimeClasspath by configurations.resolvable("annotationsJvmRuntimeClasspath") {
   extendsFrom(annotationsRuntimeClasspath)
 }
+@Suppress("UnstableApiUsage")
 val annotationsJsRuntimeClasspath by configurations.resolvable("annotationsJsRuntimeClasspath") {
   extendsFrom(annotationsRuntimeClasspath)
   attributes {
@@ -107,13 +110,13 @@ extraKotlinVersionsToTestAgainst.all {
     }
   }
 
-  tasks.register<Test>("test$versionString") {
+  tasks.check.get().dependsOn(tasks.register<Test>("test$versionString") {
     description = "Run tests for $versionString"
     group = "verification"
     testClassesDirs = tasks.test.get().testClassesDirs
     classpath = testClasspath.asFileTree + sourceSets.test.get().output
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
-  }
+  })
 }
 
 sourceSets {
