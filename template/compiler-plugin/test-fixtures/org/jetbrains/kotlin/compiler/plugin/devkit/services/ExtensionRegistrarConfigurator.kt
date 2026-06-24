@@ -1,15 +1,13 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.services
 
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.devkit.runners.useConfigurators
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
-context(_: TestConfigurationBuilder)
-internal fun configurePlugin(registrar: CompilerPluginRegistrar) {
+internal fun TestConfigurationBuilder.configurePlugin(registrar: CompilerPluginRegistrar) {
     useConfigurators(registrar::ExtensionRegistrarConfigurator)
     configureAnnotations()
 }

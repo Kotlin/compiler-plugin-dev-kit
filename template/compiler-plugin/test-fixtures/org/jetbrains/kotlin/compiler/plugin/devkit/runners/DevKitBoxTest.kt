@@ -15,6 +15,12 @@ open class DevKitJvmBoxTest(
     private val registrar: () -> CompilerPluginRegistrar,
     parser: FirParser = FirParser.LightTree
 ) : AbstractFirBlackBoxCodegenTestBase(parser) {
+    private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
+
+    protected fun configure(configuration: TestConfigurationBuilder.() -> Unit) {
+        config.add(configuration)
+    }
+
     override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
 
     final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
@@ -26,11 +32,7 @@ open class DevKitJvmBoxTest(
         }
 
         configurePlugin(registrar())
-        config()
-    }
-
-    context(builder: TestConfigurationBuilder)
-    open fun config() {
+        config.forEach { it() }
     }
 }
 
@@ -44,6 +46,12 @@ open class DevKitJsBoxTest(
     testGroupOutputDirPrefix = testGroupOutputDirPrefix,
     parser = parser,
 ) {
+    private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
+
+    protected fun configure(configuration: TestConfigurationBuilder.() -> Unit) {
+        config.add(configuration)
+    }
+
     override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
 
     final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
@@ -52,11 +60,7 @@ open class DevKitJsBoxTest(
         defaultDirectives { boxTestDefaults() }
 
         configurePlugin(registrar())
-        config()
-    }
-
-    context(builder: TestConfigurationBuilder)
-    open fun config() {
+        config.forEach { it() }
     }
 }
 

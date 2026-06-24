@@ -12,6 +12,12 @@ open class DevKitDiagnosticTest(
     private val registrar: () -> CompilerPluginRegistrar,
     parser: FirParser = FirParser.LightTree
 ) : AbstractFirPhasedDiagnosticTest(parser) {
+    private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
+
+    protected fun configure(configuration: TestConfigurationBuilder.() -> Unit) {
+        config.add(configuration)
+    }
+
     override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
 
     final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
@@ -23,11 +29,7 @@ open class DevKitDiagnosticTest(
         }
 
         configurePlugin(registrar())
-        config()
-    }
-
-    context(builder: TestConfigurationBuilder)
-    open fun config() {
+        config.forEach { it() }
     }
 }
 
@@ -36,9 +38,9 @@ open class DevKitJvmDiagnosticTest(
     registrar: () -> CompilerPluginRegistrar,
     parser: FirParser = FirParser.LightTree
 ) : DevKitDiagnosticTest(registrar, parser) {
-    context(builder: TestConfigurationBuilder)
-    override fun config() {
-        super.config()
-        defaultDirectives { jvmDefaults() }
+    init {
+        configure {
+            defaultDirectives { jvmDefaults() }
+        }
     }
 }
