@@ -98,6 +98,7 @@ extraKotlinVersionsToTestAgainst.all {
   }
   tasks.register<Test>("test$versionString") {
     description = "Run tests for $versionString"
+    group = "verification"
     testClassesDirs = tasks.test.get().testClassesDirs
     classpath = testClasspath.asFileTree + sourceSets.test.get().output
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
