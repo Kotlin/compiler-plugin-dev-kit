@@ -1,5 +1,11 @@
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
 plugins {
     kotlin("compiler.plugin.devkit.compiler-plugin")
+}
+
+pluginConfig {
+    extraKotlinVersionsToTestAgainst.add(KotlinToolingVersion(KotlinVersion(2, 4), "Beta1"))
 }
 
 sourceSets {

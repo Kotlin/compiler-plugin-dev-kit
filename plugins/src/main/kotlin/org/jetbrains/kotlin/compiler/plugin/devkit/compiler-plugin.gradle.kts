@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
   kotlin("jvm")
@@ -17,8 +18,6 @@ plugins {
 
 @OptIn(ExperimentalWasmDsl::class)
 project.plugins.apply(D8Plugin::class.java)
-
-val testArtifacts: Configuration by configurations.creating
 
 val annotationsRuntimeClasspath by configurations.dependencyScope("annotationsRuntimeClasspath") {
   isTransitive = false
@@ -39,6 +38,7 @@ interface PluginConfigExtension {
   val jsRepl: Property<String>
   val generateTestsClass: Property<String>
   val testGenDirectory: DirectoryProperty
+  val extraKotlinVersionsToTestAgainst: DomainObjectSet<KotlinToolingVersion>
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
@@ -48,6 +48,7 @@ val jsRepl = configExtension.jsRepl.convention(
 )
 val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
 val testGenDirectory = configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
+val extraKotlinVersionsToTestAgainst = configExtension.extraKotlinVersionsToTestAgainst
 
 rootProject.childProjects.values.forEach {
   var noMultiplatformProjects = true
@@ -61,6 +62,48 @@ rootProject.childProjects.values.forEach {
   }
 }
 
+val testArtifacts: Configuration by configurations.creating
+dependencies { configureTestArtifacts { testArtifacts(it) } }
+
+tasks.test { configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath) }
+
+val KotlinToolingVersion.versionString get() = toString()
+
+extraKotlinVersionsToTestAgainst.all {
+  val testArtifacts = configurations.create("testArtifacts$versionString")
+  val testClasspath =
+    configurations.create("testClasspath$versionString") { extendsFrom(configurations.testRuntimeClasspath.get()) }
+
+  val annotationsJvmRuntimeClasspath by configurations.resolvable("annotationsJvmRuntimeClasspath$versionString") {
+    extendsFrom(annotationsRuntimeClasspath)
+  }
+  val annotationsJsRuntimeClasspath by configurations.resolvable("annotationsJsRuntimeClasspath$versionString") {
+    extendsFrom(annotationsRuntimeClasspath)
+    attributes {
+      attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+      attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
+    }
+  }
+
+  dependencies {
+    configureTestArtifacts(versionString) {
+      testArtifacts(it)
+      annotationsJvmRuntimeClasspath.resolutionStrategy.force(it)
+      annotationsJsRuntimeClasspath.resolutionStrategy.force(it)
+    }
+    configureTestClasspath(versionString) {
+      testClasspath(it)
+      testClasspath.resolutionStrategy.force(it)
+    }
+  }
+  tasks.register<Test>("test$versionString") {
+    description = "Run tests for $versionString"
+    testClassesDirs = tasks.test.get().testClassesDirs
+    classpath = testClasspath.asFileTree + sourceSets.test.get().output
+    configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
+  }
+}
+
 sourceSets {
   test { java.srcDir(testGenDirectory) }
 }
@@ -70,26 +113,33 @@ idea {
   module.generatedSourceDirs.add(testGenDirectory.asFile.get())
 }
 
+inline fun DependencyHandlerScope.configureTestClasspath(version: String? = null, testClasspath: (Any) -> Unit) {
+  testClasspath(kotlin("stdlib", version))
+  testClasspath(kotlin("test-junit5", version))
+  testClasspath(kotlin("compiler-internal-test-framework", version))
+  testClasspath(kotlin("compiler", version))
+}
+
 dependencies {
   compileOnly(kotlin("compiler"))
 
-  testFixturesApi(kotlin("test-junit5"))
-  testFixturesApi(kotlin("compiler-internal-test-framework"))
-  testFixturesApi(kotlin("compiler"))
+  configureTestClasspath { testFixturesApi(it) }
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
   annotationsRuntimeClasspath(pluginAnnotations)
+}
 
+fun DependencyHandlerScope.configureTestArtifacts(version: String? = null, testArtifacts: (Any) -> Unit) {
   // Dependencies required to run the internal test framework.
-  testArtifacts(kotlin("stdlib"))
-  testArtifacts(kotlin("stdlib-jdk8"))
-  testArtifacts(kotlin("reflect"))
-  testArtifacts(kotlin("test"))
-  testArtifacts(kotlin("script-runtime"))
-  testArtifacts(kotlin("annotations-jvm"))
+  testArtifacts(kotlin("stdlib", version))
+  testArtifacts(kotlin("stdlib-jdk8", version))
+  testArtifacts(kotlin("reflect", version))
+  testArtifacts(kotlin("test", version))
+  testArtifacts(kotlin("script-runtime", version))
+  testArtifacts(kotlin("annotations-jvm", version))
 
-  testArtifacts(kotlin("stdlib-js"))
-  testArtifacts(kotlin("test-js"))
+  testArtifacts(kotlin("stdlib-js", version))
+  testArtifacts(kotlin("test-js", version))
 }
 
 buildConfig {
@@ -127,8 +177,7 @@ val createJsRepl by tasks.registering(JsReplGeneratorTask::class) {
 }
 
 @OptIn(ExperimentalWasmDsl::class)
-tasks.test {
-  dependsOn(testArtifacts)
+fun Test.configure(testArtifacts: Configuration, annotationsJvmRuntimeClasspath: Configuration, annotationsJsRuntimeClasspath: Configuration) {
   dependsOn(annotationsJvmRuntimeClasspath)
   dependsOn(annotationsJsRuntimeClasspath)
   dependsOn(createJsRepl)
@@ -140,12 +189,12 @@ tasks.test {
   systemProperty("annotationsRuntime.js.classpath", annotationsJsRuntimeClasspath.asPath)
 
   // Properties required to run the internal test framework.
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-stdlib", "kotlin-stdlib")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-stdlib-jdk8", "kotlin-stdlib-jdk8")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-reflect", "kotlin-reflect")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-test", "kotlin-test")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-script-runtime", "kotlin-script-runtime")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-annotations-jvm", "kotlin-annotations-jvm")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-stdlib", "kotlin-stdlib")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-stdlib-jdk8", "kotlin-stdlib-jdk8")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-reflect", "kotlin-reflect")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-test", "kotlin-test")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-script-runtime", "kotlin-script-runtime")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-annotations-jvm", "kotlin-annotations-jvm")
 
   systemProperty("idea.ignore.disabled.plugins", "true")
   systemProperty("idea.home.path", rootDir)
@@ -154,8 +203,8 @@ tasks.test {
   val d8EnvSpec = project.the<D8EnvSpec>()
   with(d8EnvSpec) { dependsOn(project.d8SetupTaskProvider) }
 
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-stdlib-js", "kotlin-stdlib-js")
-  setLibraryProperty("org.jetbrains.kotlin.test.kotlin-test-js", "kotlin-test-js")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-stdlib-js", "kotlin-stdlib-js")
+  setLibraryProperty(testArtifacts, "org.jetbrains.kotlin.test.kotlin-test-js", "kotlin-test-js")
 
   systemProperty("javascript.engine.path.V8", d8EnvSpec.executable.get())
   systemProperty("javascript.engine.path.repl", "${jsReplOutputFile.get().asFile}")
@@ -194,7 +243,7 @@ tasks.compileTestKotlin {
   dependsOn(generateTests)
 }
 
-fun Test.setLibraryProperty(propName: String, jarName: String) {
+fun Test.setLibraryProperty(testArtifacts: Configuration, propName: String, jarName: String) {
   val path = testArtifacts.files
     .find { """$jarName-\d.*""".toRegex().matches(it.name) }
     ?.absolutePath
