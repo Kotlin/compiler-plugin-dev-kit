@@ -26,11 +26,9 @@ abstract class DevKitCompilerGradlePlugin(val info: DevKitPluginInfo) :
     ): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.target.project
 
-        kotlinCompilation.dependencies { implementation(info.libraryCoordinates) }
-        if (
-            kotlinCompilation.implementationConfigurationName == "metadataCompilationImplementation"
-        ) {
-            project.dependencies.add("commonMainImplementation", info.libraryCoordinates)
+        kotlinCompilation.defaultSourceSet.dependencies {
+            // Add annotations library to all compilations.
+            implementation(info.libraryCoordinates)
         }
 
         return project.applyToCompilation(kotlinCompilation)
