@@ -18,24 +18,6 @@ plugins {
 @OptIn(ExperimentalWasmDsl::class)
 project.plugins.apply(D8Plugin::class.java)
 
-sourceSets {
-  main {
-    java.setSrcDirs(listOf("src"))
-    resources.setSrcDirs(listOf("resources"))
-  }
-  testFixtures {
-    java.setSrcDirs(listOf("test-fixtures"))
-  }
-  test {
-    java.setSrcDirs(listOf("test", "test-gen"))
-    resources.setSrcDirs(listOf("testData"))
-  }
-}
-
-idea {
-  module.generatedSourceDirs.add(projectDir.resolve("test-gen"))
-}
-
 val testArtifacts: Configuration by configurations.creating
 
 val annotationsRuntimeClasspath by configurations.dependencyScope("annotationsRuntimeClasspath") {
@@ -56,6 +38,7 @@ interface PluginConfigExtension {
   val pluginAnnotations: Property<Project>
   val jsRepl: Property<String>
   val generateTestsClass: Property<String>
+  val generatedTestsDir: DirectoryProperty
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
@@ -64,6 +47,7 @@ val jsRepl = configExtension.jsRepl.convention(
   javaClass.classLoader.getResourceAsStream("repl.js")?.readAllBytes()?.toString(Charsets.UTF_8)
 )
 val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
+val generatedTestsDir = configExtension.generatedTestsDir.convention(layout.projectDirectory.dir("test-gen"))
 
 rootProject.childProjects.values.forEach {
   var noMultiplatformProjects = true
@@ -75,6 +59,14 @@ rootProject.childProjects.values.forEach {
       pluginAnnotations.convention(null)
     }
   }
+}
+
+sourceSets {
+  test { java.srcDir(generatedTestsDir) }
+}
+
+idea {
+  module.generatedSourceDirs.add(generatedTestsDir.asFile.get())
 }
 
 dependencies {
@@ -176,12 +168,16 @@ kotlin {
   }
 }
 
-val generateTests by tasks.registering(JavaExec::class) {
+abstract class GenerateTests : JavaExec() {
+  @InputFiles
+  val testData: ConfigurableFileCollection = project.files()
+}
+
+
+val generateTests by tasks.registering(GenerateTests::class) {
   description = "Generate compiler plugin tests"
-  inputs.dir(layout.projectDirectory.dir("testData"))
-    .withPropertyName("testData")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-  outputs.dir(layout.projectDirectory.dir("test-gen"))
+  testData.from(sourceSets.test.map { it.resources.sourceDirectories })
+  outputs.dir(generatedTestsDir)
     .withPropertyName("generatedTests")
 
   classpath = sourceSets.testFixtures.get().runtimeClasspath

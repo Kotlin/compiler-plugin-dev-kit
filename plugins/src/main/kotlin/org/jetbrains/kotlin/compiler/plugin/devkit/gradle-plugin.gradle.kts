@@ -7,17 +7,6 @@ plugins {
   `java-test-fixtures`
 }
 
-sourceSets {
-  main {
-    java.setSrcDirs(listOf("src"))
-    resources.setSrcDirs(listOf("resources"))
-  }
-  test {
-    java.setSrcDirs(listOf("test"))
-    resources.setSrcDirs(listOf("testResources"))
-  }
-}
-
 dependencies {
   implementation(kotlin("gradle-plugin-api"))
   testImplementation(kotlin("test-junit5"))
