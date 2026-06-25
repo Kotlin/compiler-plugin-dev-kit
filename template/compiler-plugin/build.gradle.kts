@@ -23,4 +23,9 @@ sourceSets {
         java.setSrcDirs(listOf("test", pluginConfig.testGenDirectory))
         resources.setSrcDirs(listOf("testData"))
     }
+    // TODO some programmatic way to identify these version source sets
+    named("k240_beta1") {
+        java.setSrcDirs(listOf("k240_beta1"))
+        resources.setSrcDirs(listOf("k240_beta1_resources"))
+    }
 }

@@ -1,5 +1,11 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.gradle.api.internal.project.ProjectInternal
+import org.gradle.api.plugins.internal.JavaConfigurationVariantMapping
+import org.gradle.api.plugins.internal.JavaPluginHelper
+import org.gradle.api.plugins.jvm.internal.DefaultJvmFeature
+import org.gradle.internal.component.external.model.ProjectDerivedCapability
+import org.gradle.jvm.component.internal.DefaultJvmSoftwareComponent
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -7,6 +13,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
 
 plugins {
   kotlin("jvm")
@@ -86,19 +93,59 @@ tasks.test { configure(testArtifacts, annotationsJvmRuntimeClasspath, annotation
 
 val KotlinToolingVersion.versionString get() = toString()
 
+// Uses same convention as Metro
+// https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
+val KotlinToolingVersion.baseVersionName get() = versionString.replace(".", "").replace("-", "_").lowercase()
+val KotlinToolingVersion.versionName get() = "k$baseVersionName"
+val KotlinToolingVersion.capitalizedVersionName get() = "K$baseVersionName"
+
+fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachDependency {
+  if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
+}
+
 @Suppress("UnstableApiUsage")
 fun Configuration.withKotlinVersion(
   version: KotlinToolingVersion,
   action: ResolvableConfiguration.() -> Unit = {}
-) = configurations.resolvable("$name${version.versionString}") {
+) = configurations.resolvable("$name${version.capitalizedVersionName}") {
   extendsFrom(this@withKotlinVersion)
-  resolutionStrategy.eachDependency {
-    if (this.requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
-  }
+  resolutionStrategy.forceKotlinVersion(version)
   action()
 }
 
 extraKotlinVersionsToTestAgainst.all {
+  // Based on Gradle test-fixtures sourceSet setup
+  // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
+  val versionSourceSet = sourceSets.maybeCreate(versionName)
+  val projectInternal = project as ProjectInternal
+  val feature = DefaultJvmFeature(
+    versionName,
+    versionSourceSet,
+    setOf(ProjectDerivedCapability(projectInternal, versionName)),
+    projectInternal,
+    false,
+    false
+  ).apply { withApi() }
+  // override versions
+  // TODO which of these are actually needed?
+  feature.implementationConfiguration.resolutionStrategy.forceKotlinVersion(this)
+  feature.compileOnlyConfiguration.resolutionStrategy.forceKotlinVersion(this)
+  feature.compileClasspathConfiguration.resolutionStrategy.forceKotlinVersion(this)
+  feature.runtimeClasspathConfiguration.resolutionStrategy.forceKotlinVersion(this)
+
+  // add feature
+  val component = JavaPluginHelper.getJavaComponent(project) as DefaultJvmSoftwareComponent
+  component.features.add(feature)
+  component.addVariantsFromConfiguration(
+    feature.runtimeElementsConfiguration,
+    JavaConfigurationVariantMapping("runtime", true, feature.runtimeClasspathConfiguration)
+  )
+  // versionSourceSet depends on the project and the compiler
+  dependencies {
+    feature.apiConfiguration(dependencyFactory.create(project))
+    feature.compileOnlyConfiguration(kotlin("compiler"))
+  }
+
   val testArtifacts by testArtifacts.withKotlinVersion(this)
   val testClasspath by configurations.testRuntimeClasspath.get().withKotlinVersion(this)
 
@@ -110,11 +157,12 @@ extraKotlinVersionsToTestAgainst.all {
     }
   }
 
-  tasks.check.get().dependsOn(tasks.register<Test>("test$versionString") {
+  tasks.check.get().dependsOn(tasks.register<Test>("test$capitalizedVersionName") {
     description = "Run tests for $versionString"
     group = "verification"
     testClassesDirs = tasks.test.get().testClassesDirs
-    classpath = testClasspath.asFileTree + sourceSets.test.get().output
+    // Include testRuntimeClasspath, test classes themselves, and version-specific code
+    classpath = testClasspath.asFileTree + sourceSets.test.get().output + versionSourceSet.output
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
   })
 }

@@ -13,6 +13,9 @@ class SimplePluginComponentRegistrar : CompilerPluginRegistrar() {
         get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
+        // CompatContext implementation depends on the version you're running!
+        // Try uncommenting the following line, and compare `test` and `testK240_beta1`
+        //require(CompatContext.context.isInBeta)
         FirExtensionRegistrarAdapter.registerExtension(SimplePluginRegistrar())
         IrGenerationExtension.registerExtension(SimpleIrGenerationExtension())
     }
