@@ -4,6 +4,7 @@ import org.gradle.api.internal.project.ProjectInternal
 import org.gradle.api.plugins.internal.JavaConfigurationVariantMapping
 import org.gradle.api.plugins.internal.JavaPluginHelper
 import org.gradle.api.plugins.jvm.internal.DefaultJvmFeature
+import org.gradle.api.plugins.jvm.internal.JvmFeatureInternal
 import org.gradle.internal.component.external.model.ProjectDerivedCapability
 import org.gradle.jvm.component.internal.DefaultJvmSoftwareComponent
 import org.gradle.plugins.ide.internal.generator.generator.Generator
@@ -113,38 +114,41 @@ fun Configuration.withKotlinVersion(
   action()
 }
 
-extraKotlinVersionsToTestAgainst.all {
-  // Based on Gradle test-fixtures sourceSet setup
-  // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
-  val versionSourceSet = sourceSets.maybeCreate(versionName)
+// Based on Gradle test-fixtures sourceSet setup
+// https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
+private fun makeKotlinVersionFeature(name: String, version: KotlinToolingVersion): JvmFeatureInternal {
   val projectInternal = project as ProjectInternal
-  val feature = DefaultJvmFeature(
-    versionName,
-    versionSourceSet,
-    setOf(ProjectDerivedCapability(projectInternal, versionName)),
+  return DefaultJvmFeature(
+    name,
+    sourceSets.maybeCreate(name),
+    setOf(ProjectDerivedCapability(projectInternal, name)),
     projectInternal,
     false,
     false
-  ).apply { withApi() }
-  // override versions
-  // TODO which of these are actually needed?
-  feature.implementationConfiguration.resolutionStrategy.forceKotlinVersion(this)
-  feature.compileOnlyConfiguration.resolutionStrategy.forceKotlinVersion(this)
-  feature.compileClasspathConfiguration.resolutionStrategy.forceKotlinVersion(this)
-  feature.runtimeClasspathConfiguration.resolutionStrategy.forceKotlinVersion(this)
-
-  // add feature
-  val component = JavaPluginHelper.getJavaComponent(project) as DefaultJvmSoftwareComponent
-  component.features.add(feature)
-  component.addVariantsFromConfiguration(
-    feature.runtimeElementsConfiguration,
-    JavaConfigurationVariantMapping("runtime", true, feature.runtimeClasspathConfiguration)
-  )
-  // versionSourceSet depends on the project and the compiler
-  dependencies {
-    feature.apiConfiguration(dependencyFactory.create(project))
-    feature.compileOnlyConfiguration(kotlin("compiler"))
+  ).apply {
+    // override versions
+    // TODO which of these are actually needed?
+    implementationConfiguration.resolutionStrategy.forceKotlinVersion(version)
+    compileOnlyConfiguration.resolutionStrategy.forceKotlinVersion(version)
+    compileClasspathConfiguration.resolutionStrategy.forceKotlinVersion(version)
+    runtimeClasspathConfiguration.resolutionStrategy.forceKotlinVersion(version)
+    // add feature
+    val component = JavaPluginHelper.getJavaComponent(project) as DefaultJvmSoftwareComponent
+    component.features.add(this)
+    component.addVariantsFromConfiguration(
+      runtimeElementsConfiguration,
+      JavaConfigurationVariantMapping("runtime", true, runtimeClasspathConfiguration)
+    )
+    // sourceSet depends on the project and the compiler
+    dependencies {
+      implementationConfiguration(dependencyFactory.create(project))
+      compileOnlyConfiguration(kotlin("compiler"))
+    }
   }
+}
+
+extraKotlinVersionsToTestAgainst.all {
+  val mainFeature = makeKotlinVersionFeature(versionName, this)
 
   val testArtifacts by testArtifacts.withKotlinVersion(this)
   val testClasspath by configurations.testRuntimeClasspath.get().withKotlinVersion(this)
@@ -162,7 +166,7 @@ extraKotlinVersionsToTestAgainst.all {
     group = "verification"
     testClassesDirs = tasks.test.get().testClassesDirs
     // Include testRuntimeClasspath, test classes themselves, and version-specific code
-    classpath = testClasspath.asFileTree + sourceSets.test.get().output + versionSourceSet.output
+    classpath = testClasspath.asFileTree + sourceSets.test.get().output + mainFeature.sourceSet.output
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
   })
 }
