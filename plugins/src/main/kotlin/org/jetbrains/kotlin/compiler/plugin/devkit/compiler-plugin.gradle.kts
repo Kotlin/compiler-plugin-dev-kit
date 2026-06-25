@@ -92,6 +92,32 @@ dependencies {
 
 tasks.test { configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath) }
 
+abstract class GenerateTests : JavaExec() {
+  @InputFiles
+  val testData: ConfigurableFileCollection = project.files()
+}
+
+fun GenerateTests.addTestSourceSet(set: SourceSet) {
+  testData.from(set.resources.sourceDirectories)
+  args(
+    testGenDirectory.dir(set.name).get().asFile.absolutePath,
+    set.resources.sourceDirectories.joinToString(",", transform = File::getAbsolutePath)
+  )
+}
+
+val generateTests by tasks.registering(GenerateTests::class) {
+  description = "Generate compiler plugin tests"
+  addTestSourceSet(sourceSets.test.get())
+  outputs.dir(testGenDirectory)
+    .withPropertyName("generatedTests")
+
+  classpath = sourceSets.testFixtures.get().runtimeClasspath
+  mainClass = generateTestsClass
+  workingDir = rootDir
+}
+
+tasks.compileTestKotlin { dependsOn(generateTests) }
+
 val KotlinToolingVersion.versionString get() = toString()
 
 // Uses same convention as Metro
@@ -139,16 +165,31 @@ private fun makeKotlinVersionFeature(name: String, version: KotlinToolingVersion
       runtimeElementsConfiguration,
       JavaConfigurationVariantMapping("runtime", true, runtimeClasspathConfiguration)
     )
-    // sourceSet depends on the project and the compiler
-    dependencies {
-      implementationConfiguration(dependencyFactory.create(project))
-      compileOnlyConfiguration(kotlin("compiler"))
-    }
   }
 }
 
 extraKotlinVersionsToTestAgainst.all {
   val mainFeature = makeKotlinVersionFeature(versionName, this)
+  val testVersion = "${versionName}Test"
+  val testFeature = makeKotlinVersionFeature(testVersion, this)
+  testFeature.sourceSet.addTestGenDir()
+  // TODO get IDEA to recognise its directories as test source set
+
+  dependencies {
+    // sourceSet depends on the compiler
+    // TODO check that IDEA and runtime recognize dependencies
+    mainFeature.compileOnlyConfiguration(kotlin("compiler"))
+    mainFeature.implementationConfiguration(dependencyFactory.create(project))
+    testFeature.implementationConfiguration(
+      dependencyFactory.create(project).capabilities {
+        @Suppress("UnstableApiUsage")
+        requireFeature(versionName)
+      })
+    testFeature.implementationConfiguration(testFixtures(dependencyFactory.create(project)))
+  }
+
+  generateTests { addTestSourceSet(testFeature.sourceSet) }
+  testFeature.compileJavaTask { dependsOn(generateTests) }
 
   val testArtifacts by testArtifacts.withKotlinVersion(this)
   val testClasspath by configurations.testRuntimeClasspath.get().withKotlinVersion(this)
@@ -164,20 +205,23 @@ extraKotlinVersionsToTestAgainst.all {
   tasks.check.get().dependsOn(tasks.register<Test>("test$capitalizedVersionName") {
     description = "Run tests for $versionString"
     group = "verification"
-    testClassesDirs = tasks.test.get().testClassesDirs
+    testClassesDirs = tasks.test.get().testClassesDirs + testFeature.sourceSet.output
     // Include testRuntimeClasspath, test classes themselves, and version-specific code
-    classpath = testClasspath.asFileTree + sourceSets.test.get().output + mainFeature.sourceSet.output
+    classpath = testClasspath.asFileTree
+    for (sourceSet in listOf(sourceSets.test.get(), mainFeature.sourceSet, testFeature.sourceSet))
+      classpath += sourceSet.output
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
   })
 }
 
 sourceSets {
-  test { java.srcDir(testGenDirectory) }
+  test { addTestGenDir() }
 }
 
-idea {
+fun SourceSet.addTestGenDir() = testGenDirectory.dir(name).let {
+  java.srcDir(it)
   // This is needed until IDEA fixes IDEA-339729.
-  module.generatedSourceDirs.add(testGenDirectory.asFile.get())
+  idea.module.generatedSourceDirs.add(it.get().asFile)
 }
 
 dependencies {
@@ -266,31 +310,6 @@ kotlin {
     optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
     optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
   }
-}
-
-abstract class GenerateTests : JavaExec() {
-  @InputFiles
-  val testData: ConfigurableFileCollection = project.files()
-}
-
-
-val generateTests by tasks.registering(GenerateTests::class) {
-  description = "Generate compiler plugin tests"
-  testData.from(sourceSets.test.map { it.resources.sourceDirectories })
-  outputs.dir(testGenDirectory)
-    .withPropertyName("generatedTests")
-
-  classpath = sourceSets.testFixtures.get().runtimeClasspath
-  mainClass = generateTestsClass
-  workingDir = rootDir
-  args(
-    testGenDirectory.get().asFile.absolutePath,
-    sourceSets.test.get().resources.sourceDirectories.joinToString(",", transform = File::getAbsolutePath),
-  )
-}
-
-tasks.compileTestKotlin {
-  dependsOn(generateTests)
 }
 
 fun Test.setLibraryProperty(testArtifacts: Configuration, propName: String, jarName: String) {
