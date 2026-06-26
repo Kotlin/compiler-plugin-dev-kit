@@ -1,5 +1,5 @@
 pluginManagement {
-    includeBuild("..")
+    includeBuild("../plugins")
     repositories {
         mavenCentral()
         gradlePluginPortal()
@@ -8,6 +8,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+    includeBuild("..")
     repositories {
         mavenCentral()
     }

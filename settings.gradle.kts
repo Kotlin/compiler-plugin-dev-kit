@@ -1,4 +1,5 @@
 pluginManagement {
+  includeBuild("plugins")
   repositories {
     gradlePluginPortal()
     mavenCentral()
@@ -12,4 +13,5 @@ dependencyResolutionManagement {
   }
 }
 
-include("plugins")
+include("compiler-plugin-runtime")
+include("gradle-plugin-runtime")

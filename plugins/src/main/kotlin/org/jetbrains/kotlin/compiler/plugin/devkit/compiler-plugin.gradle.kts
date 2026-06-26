@@ -203,11 +203,14 @@ fun SourceSet.addTestGenDir() = testGenDirectory.dir(name).let {
 
 dependencies {
   compileOnly(kotlin("compiler"))
+  val devKitGroup = "org.jetbrains.kotlin.compiler.plugin.devkit"
+  if (group != devKitGroup) implementation("$devKitGroup:compiler-plugin-runtime")
 
   testFixturesApi(kotlin("stdlib"))
   testFixturesApi(kotlin("test-junit5"))
   testFixturesApi(kotlin("compiler-internal-test-framework"))
   testFixturesApi(kotlin("compiler"))
+  if (group != devKitGroup) testFixturesApi(testFixtures("$devKitGroup:compiler-plugin-runtime"))
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
   annotationsRuntimeClasspath(pluginAnnotations)

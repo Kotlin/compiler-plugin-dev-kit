@@ -9,6 +9,7 @@ plugins {
 
 dependencies {
   implementation(kotlin("gradle-plugin-api"))
+  implementation("org.jetbrains.kotlin.compiler.plugin.devkit:gradle-plugin-runtime")
   testImplementation(kotlin("test-junit5"))
 }
 
