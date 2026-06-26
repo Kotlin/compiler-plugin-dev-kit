@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
   kotlin("jvm")
+  `jvm-test-suite`
   id("com.github.gmazzo.buildconfig")
   `java-test-fixtures`
   id("com.github.node-gradle.node")
@@ -140,24 +141,26 @@ fun Configuration.withKotlinVersion(
   action()
 }
 
+private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = configurations {
+  // TODO which of these are actually needed?
+  named(implementationConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
+  named(compileOnlyConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
+  named(compileClasspathConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
+  named(runtimeClasspathConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
+}
+
 // Based on Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
-private fun makeKotlinVersionFeature(name: String, version: KotlinToolingVersion): JvmFeatureInternal {
+private fun makeJavaFeature(sourceSet: SourceSet): JvmFeatureInternal {
   val projectInternal = project as ProjectInternal
   return DefaultJvmFeature(
-    name,
-    sourceSets.maybeCreate(name),
-    setOf(ProjectDerivedCapability(projectInternal, name)),
+    sourceSet.name,
+    sourceSet,
+    setOf(ProjectDerivedCapability(projectInternal, sourceSet.name)),
     projectInternal,
     false,
     false
   ).apply {
-    // override versions
-    // TODO which of these are actually needed?
-    implementationConfiguration.resolutionStrategy.forceKotlinVersion(version)
-    compileOnlyConfiguration.resolutionStrategy.forceKotlinVersion(version)
-    compileClasspathConfiguration.resolutionStrategy.forceKotlinVersion(version)
-    runtimeClasspathConfiguration.resolutionStrategy.forceKotlinVersion(version)
     // add feature
     val component = JavaPluginHelper.getJavaComponent(project) as DefaultJvmSoftwareComponent
     component.features.add(this)
@@ -168,28 +171,16 @@ private fun makeKotlinVersionFeature(name: String, version: KotlinToolingVersion
   }
 }
 
+@Suppress("UnstableApiUsage")
 extraKotlinVersionsToTestAgainst.all {
-  val mainFeature = makeKotlinVersionFeature(versionName, this)
-  val testVersion = "${versionName}Test"
-  val testFeature = makeKotlinVersionFeature(testVersion, this)
-  testFeature.sourceSet.addTestGenDir()
-  // TODO get IDEA to recognise its directories as test source set
-
+  val mainFeature = makeJavaFeature(sourceSets.maybeCreate(versionName))
+  mainFeature.sourceSet.forceKotlinVersion(this)
   dependencies {
     // sourceSet depends on the compiler
     // TODO check that IDEA and runtime recognize dependencies
     mainFeature.compileOnlyConfiguration(kotlin("compiler"))
     mainFeature.implementationConfiguration(dependencyFactory.create(project))
-    testFeature.implementationConfiguration(
-      dependencyFactory.create(project).capabilities {
-        @Suppress("UnstableApiUsage")
-        requireFeature(versionName) // depend on mainFeature
-      })
-    testFeature.implementationConfiguration(testFixtures(dependencyFactory.create(project)))
   }
-
-  generateTests { addTestSourceSet(testFeature.sourceSet) }
-  testFeature.compileJavaTask { dependsOn(generateTests) }
 
   val testArtifacts by testArtifacts.withKotlinVersion(this)
 
@@ -201,14 +192,31 @@ extraKotlinVersionsToTestAgainst.all {
     }
   }
 
-  tasks.check.get().dependsOn(tasks.register<Test>("test$capitalizedVersionName") {
-    description = "Run tests for $versionString"
-    group = "verification"
-    // Include common and version-specific tests
-    testClassesDirs = sourceSets.test.get().output + testFeature.sourceSet.output
-    classpath = sourceSets.test.get().output + testFeature.sourceSet.runtimeClasspath
-    configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
-  })
+  testing.suites.register<JvmTestSuite>("${versionName}Test") {
+    dependencies {
+      implementation(dependencyFactory.create(project).capabilities {
+        requireFeature(versionName) // depend on mainFeature
+      })
+      implementation(testFixtures(dependencyFactory.create(project)))
+    }
+    sources {
+      addTestGenDir()
+      forceKotlinVersion(this@all)
+      generateTests { addTestSourceSet(this@sources) }
+      tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
+    }
+
+    targets.all {
+      testTask {
+        // Include common and version-specific tests
+        testClassesDirs = sourceSets.test.get().output + testClassesDirs
+        classpath = sourceSets.test.get().output + classpath
+        configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
+      }
+    }
+
+    tasks.check { dependsOn(this@register) }
+  }
 }
 
 sourceSets {
