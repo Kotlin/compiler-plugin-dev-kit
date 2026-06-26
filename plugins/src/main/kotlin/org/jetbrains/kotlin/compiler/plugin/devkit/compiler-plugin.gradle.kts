@@ -183,7 +183,7 @@ extraKotlinVersionsToTestAgainst.all {
     testFeature.implementationConfiguration(
       dependencyFactory.create(project).capabilities {
         @Suppress("UnstableApiUsage")
-        requireFeature(versionName)
+        requireFeature(versionName) // depend on mainFeature
       })
     testFeature.implementationConfiguration(testFixtures(dependencyFactory.create(project)))
   }
@@ -192,7 +192,6 @@ extraKotlinVersionsToTestAgainst.all {
   testFeature.compileJavaTask { dependsOn(generateTests) }
 
   val testArtifacts by testArtifacts.withKotlinVersion(this)
-  val testClasspath by configurations.testRuntimeClasspath.get().withKotlinVersion(this)
 
   val annotationsJvmRuntimeClasspath by annotationsJvmRuntimeClasspath.withKotlinVersion(this)
   val annotationsJsRuntimeClasspath by annotationsJsRuntimeClasspath.withKotlinVersion(this) {
@@ -205,11 +204,9 @@ extraKotlinVersionsToTestAgainst.all {
   tasks.check.get().dependsOn(tasks.register<Test>("test$capitalizedVersionName") {
     description = "Run tests for $versionString"
     group = "verification"
-    testClassesDirs = tasks.test.get().testClassesDirs + testFeature.sourceSet.output
-    // Include testRuntimeClasspath, test classes themselves, and version-specific code
-    classpath = testClasspath.asFileTree
-    for (sourceSet in listOf(sourceSets.test.get(), mainFeature.sourceSet, testFeature.sourceSet))
-      classpath += sourceSet.output
+    // Include common and version-specific tests
+    testClassesDirs = sourceSets.test.get().output + testFeature.sourceSet.output
+    classpath = sourceSets.test.get().output + testFeature.sourceSet.runtimeClasspath
     configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
   })
 }
