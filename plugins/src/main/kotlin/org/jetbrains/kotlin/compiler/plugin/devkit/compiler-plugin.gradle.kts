@@ -152,7 +152,7 @@ extraKotlinVersionsToTestAgainst.all {
     project.java.registerFeature(featureName) { usingSourceSet(this@register) }
     dependencies {
       compileOnlyConfigurationName(kotlin("compiler"))
-      implementationConfigurationName(dependencyFactory.create(project))
+      implementationConfigurationName(project())
     }
   }
 
@@ -168,8 +168,8 @@ extraKotlinVersionsToTestAgainst.all {
 
   testing.suites.register<JvmTestSuite>("${versionName}Test") {
     dependencies {
-      implementation(dependencyFactory.create(project).capabilities { requireFeature(featureName) })
-      implementation(testFixtures(dependencyFactory.create(project)))
+      implementation(project().capabilities { requireFeature(featureName) })
+      implementation(testFixtures(project()))
     }
     sources {
       addTestGenDir()
