@@ -17,7 +17,9 @@ class SimpleIrBodyGenerator(pluginContext: IrPluginContext) : AbstractTransforme
     }
 
     override fun generateBodyForFunction(function: IrSimpleFunction, key: GeneratedDeclarationKey?): IrBody {
-        require(function.name == SimpleClassGenerator.FOO_ID.callableName)
+        require(
+            function.name in listOf(SimpleClassGenerator.FOO_ID, SimpleClassGenerator.BAR_ID).map { it.callableName }
+        )
         val const = IrConstImpl(-1, -1, irBuiltIns.stringType, IrConstKind.String, value = "Hello world")
         val returnStatement = IrReturnImpl(-1, -1, irBuiltIns.nothingType, function.symbol, const)
         return irFactory.createBlockBody(-1, -1, listOf(returnStatement))

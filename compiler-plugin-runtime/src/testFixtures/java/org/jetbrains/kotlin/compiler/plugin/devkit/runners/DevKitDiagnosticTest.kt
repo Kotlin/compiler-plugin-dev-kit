@@ -24,6 +24,7 @@ open class DevKitDiagnosticTest(
         super.configure(builder)
 
         defaultDirectives {
+            versionDumpClassifier()
             +FirDiagnosticsDirectives.FIR_DUMP
             +FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
         }

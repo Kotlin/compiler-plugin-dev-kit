@@ -1,4 +1,4 @@
-FILE: simple_beta.kt
+FILE: simple.kt
     package foo.bar
 
     @R|org/jetbrains/kotlin/compiler/plugin/template/SomeAnnotation|() public final fun box(): R|kotlin/String| {
@@ -18,6 +18,8 @@ FILE: foo/bar/MyClass.kt
 
     public final class MyClass : R|kotlin/Any| {
         public final fun foo(): R|kotlin/String|
+
+        public final fun bar(): R|kotlin/String|
 
         public constructor(): R|foo/bar/MyClass|
 

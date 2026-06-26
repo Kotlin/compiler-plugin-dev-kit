@@ -3,14 +3,17 @@ pluginManagement {
     repositories {
         mavenCentral()
         gradlePluginPortal()
+        maven("https://redirector.kotlinlang.org/maven/bootstrap")
+        maven("https://redirector.kotlinlang.org/maven/dev/")
     }
-    
 }
 
 dependencyResolutionManagement {
     includeBuild("..")
     repositories {
         mavenCentral()
+        maven("https://redirector.kotlinlang.org/maven/bootstrap")
+        maven("https://redirector.kotlinlang.org/maven/dev/")
     }
 }
 

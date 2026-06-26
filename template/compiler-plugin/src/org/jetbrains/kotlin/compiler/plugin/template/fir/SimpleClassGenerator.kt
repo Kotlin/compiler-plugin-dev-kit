@@ -1,6 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.template.fir
 
 import org.jetbrains.kotlin.GeneratedDeclarationKey
+import org.jetbrains.kotlin.compiler.plugin.template.CompatContext
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.extensions.ExperimentalTopLevelDeclarationsGenerationApi
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
@@ -26,6 +27,7 @@ class SimpleClassGenerator(session: FirSession) : FirDeclarationGenerationExtens
         val MY_CLASS_ID = ClassId(FqName.fromSegments(listOf("foo", "bar")), Name.identifier("MyClass"))
 
         val FOO_ID = CallableId(MY_CLASS_ID, Name.identifier("foo"))
+        val BAR_ID = CallableId(MY_CLASS_ID, Name.identifier("bar"))
     }
 
     @ExperimentalTopLevelDeclarationsGenerationApi
@@ -52,8 +54,10 @@ class SimpleClassGenerator(session: FirSession) : FirDeclarationGenerationExtens
     }
 
     override fun getCallableNamesForClass(classSymbol: FirClassSymbol<*>, context: MemberGenerationContext): Set<Name> {
-        return if (classSymbol.classId == MY_CLASS_ID) {
-            setOf(FOO_ID.callableName, SpecialNames.INIT)
+        return if (classSymbol.classId == MY_CLASS_ID) buildSet {
+            add(FOO_ID.callableName)
+            if (CompatContext.context.generateBar) add(BAR_ID.callableName)
+            add(SpecialNames.INIT)
         } else {
             emptySet()
         }

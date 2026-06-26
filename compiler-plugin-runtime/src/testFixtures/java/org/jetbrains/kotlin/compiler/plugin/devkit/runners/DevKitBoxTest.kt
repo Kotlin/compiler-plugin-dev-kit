@@ -31,8 +31,8 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
 import org.jetbrains.kotlin.test.model.ResultingArtifact
+import org.jetbrains.kotlin.test.runners.AbstractFirBlackBoxCodegenTestSpecBase
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
-import org.jetbrains.kotlin.test.runners.codegen.AbstractFirBlackBoxCodegenTestBase
 import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import java.lang.Boolean.getBoolean
@@ -40,7 +40,7 @@ import java.lang.Boolean.getBoolean
 open class DevKitJvmBoxTest(
     private val registrar: () -> CompilerPluginRegistrar,
     parser: FirParser = FirParser.LightTree
-) : AbstractFirBlackBoxCodegenTestBase(parser) {
+) : AbstractFirBlackBoxCodegenTestSpecBase(parser) {
     private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
 
     protected fun configure(configuration: TestConfigurationBuilder.() -> Unit) {
@@ -53,6 +53,7 @@ open class DevKitJvmBoxTest(
         super.configure(builder)
 
         defaultDirectives {
+            versionDumpClassifier()
             boxTestDefaults()
             jvmDefaults()
         }
@@ -101,7 +102,10 @@ open class DevKitJsBoxTest(
                 ::JsIrRecompiledArtifactsIdentityHandler,
             )
         }
-        defaultDirectives { boxTestDefaults() }
+        defaultDirectives {
+            versionDumpClassifier()
+            boxTestDefaults()
+        }
 
         configurePlugin(registrar())
         config.forEach { it() }

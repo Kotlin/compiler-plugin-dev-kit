@@ -2,7 +2,7 @@ FILE: simple_beta.kt
     package foo.bar
 
     @R|org/jetbrains/kotlin/compiler/plugin/template/SomeAnnotation|() public final fun test(): R|kotlin/Unit| {
-        lval s: R|kotlin/String| = R|foo/bar/MyClass|().R|foo/bar/MyClass.foo|()
+        lval s: R|kotlin/String| = R|foo/bar/MyClass|().R|foo/bar/MyClass.bar|()
         R|<local>/s|.<Unresolved name: inc>#()
     }
 FILE: foo/bar/MyClass.kt
@@ -10,6 +10,8 @@ FILE: foo/bar/MyClass.kt
 
     public final class MyClass : R|kotlin/Any| {
         public final fun foo(): R|kotlin/String|
+
+        public final fun bar(): R|kotlin/String|
 
         public constructor(): R|foo/bar/MyClass|
 

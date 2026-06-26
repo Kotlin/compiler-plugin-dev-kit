@@ -1,4 +1,4 @@
-FILE fqName:foo.bar fileName:/simple_beta.kt
+FILE fqName:foo.bar fileName:/simple.kt
   FUN name:box visibility:public modality:FINAL returnType:kotlin.String
     annotations:
       SomeAnnotation
@@ -40,6 +40,11 @@ FILE fqName:foo.bar fileName:foo/bar/MyClass.kt
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
+    FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.fir.SimpleClassGenerator.Key] name:bar visibility:public modality:FINAL returnType:kotlin.String
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:foo.bar.MyClass
+      BLOCK_BODY
+        RETURN type=kotlin.Nothing from='public final fun bar (): kotlin.String declared in foo.bar.MyClass'
+          CONST String type=kotlin.String value="Hello world"
     FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.fir.SimpleClassGenerator.Key] name:foo visibility:public modality:FINAL returnType:kotlin.String
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:foo.bar.MyClass
       BLOCK_BODY
