@@ -28,18 +28,15 @@ repositories {
 
 @OptIn(ExperimentalWasmDsl::class) project.plugins.apply(D8Plugin::class.java)
 
-@Suppress("UnstableApiUsage")
-val annotationsRuntimeClasspath by
+val annotationsRuntimeClasspath =
     configurations.dependencyScope("annotationsRuntimeClasspath") {
         isTransitive = false
     }
-@Suppress("UnstableApiUsage")
-val annotationsJvmRuntimeClasspath by
+val annotationsJvmRuntimeClasspath =
     configurations.resolvable("annotationsJvmRuntimeClasspath") {
         extendsFrom(annotationsRuntimeClasspath)
     }
-@Suppress("UnstableApiUsage")
-val annotationsJsRuntimeClasspath by
+val annotationsJsRuntimeClasspath =
     configurations.resolvable("annotationsJsRuntimeClasspath") {
         extendsFrom(annotationsRuntimeClasspath)
         attributes {
@@ -77,7 +74,7 @@ rootProject.childProjects.values.forEach {
     }
 }
 
-val testArtifacts: Configuration by configurations.creating
+val testArtifacts: Configuration = configurations.create("testArtifacts")
 
 dependencies {
     // Dependencies required to run the internal test framework.
@@ -92,7 +89,11 @@ dependencies {
 }
 
 tasks.test {
-    configure(testArtifacts, annotationsJvmRuntimeClasspath, annotationsJsRuntimeClasspath)
+    configure(
+        testArtifacts,
+        annotationsJvmRuntimeClasspath.get(),
+        annotationsJsRuntimeClasspath.get(),
+    )
 }
 
 abstract class GenerateTests : JavaExec() {
@@ -107,8 +108,8 @@ fun GenerateTests.addTestSourceSet(set: SourceSet) {
     )
 }
 
-val generateTests by
-    tasks.registering(GenerateTests::class) {
+val generateTests =
+    tasks.register("generateTests", GenerateTests::class) {
         description = "Generate compiler plugin tests"
         addTestSourceSet(sourceSets.test.get())
         outputs.dir(testGenDirectory).withPropertyName("generatedTests")
@@ -138,7 +139,6 @@ fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachD
     if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
 }
 
-@Suppress("UnstableApiUsage")
 fun Configuration.withKotlinVersion(
     version: KotlinToolingVersion,
     action: ResolvableConfiguration.() -> Unit = {},
@@ -159,7 +159,6 @@ private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = config
 
 // Based on Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
-@Suppress("UnstableApiUsage")
 extraKotlinVersionsToTestAgainst.all {
     sourceSets.register(versionName) {
         forceKotlinVersion(this@all)
@@ -170,16 +169,19 @@ extraKotlinVersionsToTestAgainst.all {
         }
     }
 
-    val testArtifacts by testArtifacts.withKotlinVersion(this)
+    val testArtifacts = testArtifacts.withKotlinVersion(this)
 
-    val annotationsJvmRuntimeClasspath by annotationsJvmRuntimeClasspath.withKotlinVersion(this)
-    val annotationsJsRuntimeClasspath by
-        annotationsJsRuntimeClasspath.withKotlinVersion(this) {
+    val annotationsJvmRuntimeClasspath = annotationsJvmRuntimeClasspath.flatMap {
+        it.withKotlinVersion(this)
+    }
+    val annotationsJsRuntimeClasspath = annotationsJsRuntimeClasspath.flatMap {
+        it.withKotlinVersion(this) {
             attributes {
                 attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
                 attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
             }
         }
+    }
 
     testing.suites.register<JvmTestSuite>("${versionName}Test") {
         dependencies {
@@ -199,9 +201,9 @@ extraKotlinVersionsToTestAgainst.all {
                 testClassesDirs = sourceSets.test.get().output + testClassesDirs
                 classpath = sourceSets.test.get().output + classpath
                 configure(
-                    testArtifacts,
-                    annotationsJvmRuntimeClasspath,
-                    annotationsJsRuntimeClasspath,
+                    testArtifacts.get(),
+                    annotationsJvmRuntimeClasspath.get(),
+                    annotationsJsRuntimeClasspath.get(),
                 )
             }
         }
@@ -292,8 +294,8 @@ abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     }
 }
 
-val createJsRepl by
-    tasks.registering(JsReplGeneratorTask::class) {
+val createJsRepl =
+    tasks.register("createJsRepl", JsReplGeneratorTask::class) {
         description = "Creates a JS Repl for use by the testing framework"
         defaultRepl = jsRepl
         outputFile = jsReplOutputFile.get().asFile
