@@ -3,16 +3,19 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 
 
 plugins {
   kotlin("jvm")
   `jvm-test-suite`
   id("com.github.gmazzo.buildconfig")
+  id("ru.vyarus.animalsniffer")
   `java-test-fixtures`
   id("com.github.node-gradle.node")
   id("idea")
@@ -189,6 +192,23 @@ extraKotlinVersionsToTestAgainst.all {
 
     tasks.check { dependsOn(this@register) }
   }
+  generateSignature()
+}
+
+fun KotlinToolingVersion.generateSignature() {
+  val signature = configurations.create("${versionName}Signature")
+  dependencies {
+    // TODO add all Kotlin lib signatures, not just compiler
+    signature(kotlin("compiler", versionString))
+    signature(kotlin("compiler-internal-test-framework", versionString))
+  }
+  val signatureGenTask = tasks.register<BuildSignatureTask>("${versionName}Signature") {
+    signatures(configurations.signature)
+    files(signature)
+  }
+  animalsniffer {
+    signatures += files(signatureGenTask.map { it.outputFiles })
+  }
 }
 
 sourceSets {
@@ -214,6 +234,14 @@ dependencies {
   testFixturesRuntimeOnly("junit:junit:4.13.2") // TODO don't force junit version
 
   annotationsRuntimeClasspath(pluginAnnotations)
+}
+
+kotlinToolingVersion.generateSignature()
+
+animalsniffer {
+  excludeJars("kotlin-compiler*")
+  ignore("java.*", "javax.*", "org.omg.*", "org.w3c.dom.*")
+  checkTestSources = true
 }
 
 buildConfig {
