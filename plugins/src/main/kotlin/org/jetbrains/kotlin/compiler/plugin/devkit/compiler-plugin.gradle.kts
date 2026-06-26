@@ -1,12 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.gradle.api.internal.project.ProjectInternal
-import org.gradle.api.plugins.internal.JavaConfigurationVariantMapping
-import org.gradle.api.plugins.internal.JavaPluginHelper
-import org.gradle.api.plugins.jvm.internal.DefaultJvmFeature
-import org.gradle.api.plugins.jvm.internal.JvmFeatureInternal
-import org.gradle.internal.component.external.model.ProjectDerivedCapability
-import org.gradle.jvm.component.internal.DefaultJvmSoftwareComponent
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -126,6 +119,7 @@ val KotlinToolingVersion.versionString get() = toString()
 val KotlinToolingVersion.baseVersionName get() = versionString.replace(".", "").replace("-", "_").lowercase()
 val KotlinToolingVersion.versionName get() = "k$baseVersionName"
 val KotlinToolingVersion.capitalizedVersionName get() = "K$baseVersionName"
+val KotlinToolingVersion.featureName get() = versionName.replace("_", "")
 
 fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachDependency {
   if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
@@ -151,35 +145,15 @@ private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = config
 
 // Based on Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
-private fun makeJavaFeature(sourceSet: SourceSet): JvmFeatureInternal {
-  val projectInternal = project as ProjectInternal
-  return DefaultJvmFeature(
-    sourceSet.name,
-    sourceSet,
-    setOf(ProjectDerivedCapability(projectInternal, sourceSet.name)),
-    projectInternal,
-    false,
-    false
-  ).apply {
-    // add feature
-    val component = JavaPluginHelper.getJavaComponent(project) as DefaultJvmSoftwareComponent
-    component.features.add(this)
-    component.addVariantsFromConfiguration(
-      runtimeElementsConfiguration,
-      JavaConfigurationVariantMapping("runtime", true, runtimeClasspathConfiguration)
-    )
-  }
-}
-
 @Suppress("UnstableApiUsage")
 extraKotlinVersionsToTestAgainst.all {
-  val mainFeature = makeJavaFeature(sourceSets.maybeCreate(versionName))
-  mainFeature.sourceSet.forceKotlinVersion(this)
-  dependencies {
-    // sourceSet depends on the compiler
-    // TODO check that IDEA and runtime recognize dependencies
-    mainFeature.compileOnlyConfiguration(kotlin("compiler"))
-    mainFeature.implementationConfiguration(dependencyFactory.create(project))
+  sourceSets.register(versionName) {
+    forceKotlinVersion(this@all)
+    project.java.registerFeature(featureName) { usingSourceSet(this@register) }
+    dependencies {
+      compileOnlyConfigurationName(kotlin("compiler"))
+      implementationConfigurationName(dependencyFactory.create(project))
+    }
   }
 
   val testArtifacts by testArtifacts.withKotlinVersion(this)
@@ -194,9 +168,7 @@ extraKotlinVersionsToTestAgainst.all {
 
   testing.suites.register<JvmTestSuite>("${versionName}Test") {
     dependencies {
-      implementation(dependencyFactory.create(project).capabilities {
-        requireFeature(versionName) // depend on mainFeature
-      })
+      implementation(dependencyFactory.create(project).capabilities { requireFeature(featureName) })
       implementation(testFixtures(dependencyFactory.create(project)))
     }
     sources {
