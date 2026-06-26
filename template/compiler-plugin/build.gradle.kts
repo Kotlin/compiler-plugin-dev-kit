@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.pluginConfig
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -19,17 +20,29 @@ sourceSets {
     testFixtures {
         java.setSrcDirs(listOf("test-fixtures"))
     }
-    test { shortenTestDirs() }
-    // TODO some programmatic way to identify these version source sets
-    named("k240_beta1") {
-        java.setSrcDirs(listOf(name))
-        resources.setSrcDirs(listOf("${name}_resources"))
+    test {
+        java.setSrcDirs(listOf("test", pluginConfig.testGenDirectory.dir(name)))
+        resources.setSrcDirs(listOf("testData"))
     }
 
-    named("k240_beta1Test") { shortenTestDirs() }
+    all {
+        if (name.endsWith("Test")) return@all
+        if (this in listOf(main, testFixtures, test).map { it.get() }) return@all
+        java.setSrcDirs(listOf("$name/src"))
+        resources.setSrcDirs(listOf("${name}/resources"))
+    }
 }
 
-fun SourceSet.shortenTestDirs() {
-    java.setSrcDirs(listOf(name, pluginConfig.testGenDirectory.dir(name)))
-    resources.setSrcDirs(listOf("${name}Data"))
+@Suppress("UnstableApiUsage")
+testing {
+    suites {
+        withType<JvmTestSuite> {
+            sources {
+                if (this == sourceSets.test.get()) return@sources
+                val folder = name.removeSuffix("Test")
+                java.setSrcDirs(listOf("$folder/test", pluginConfig.testGenDirectory.dir(name)))
+                resources.setSrcDirs(listOf("$folder/testData"))
+            }
+        }
+    }
 }
