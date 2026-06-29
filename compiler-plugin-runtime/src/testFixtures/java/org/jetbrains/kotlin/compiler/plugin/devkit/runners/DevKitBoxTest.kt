@@ -1,25 +1,16 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import java.lang.Boolean.getBoolean
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
 import org.jetbrains.kotlin.config.LanguageFeature
-import org.jetbrains.kotlin.js.test.handlers.JsAstHandler
-import org.jetbrains.kotlin.js.test.handlers.JsBoxRunner
-import org.jetbrains.kotlin.js.test.handlers.JsIrRecompiledArtifactsIdentityHandler
-import org.jetbrains.kotlin.js.test.handlers.JsSourceMapPathRewriter
-import org.jetbrains.kotlin.js.test.handlers.NodeJsGeneratorHandler
+import org.jetbrains.kotlin.js.test.handlers.*
 import org.jetbrains.kotlin.js.test.runners.AbstractJsBlackBoxCodegenTestBase.JsBackendFacades
 import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsBackendFirstStageTest
 import org.jetbrains.kotlin.js.test.runners.setUpDefaultDirectivesForJsBoxTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
-import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
-import org.jetbrains.kotlin.test.builders.configureJsArtifactsHandlersStep
-import org.jetbrains.kotlin.test.builders.configureLoweredIrHandlersStep
-import org.jetbrains.kotlin.test.builders.deserializedIrHandlersStep
-import org.jetbrains.kotlin.test.builders.jsArtifactsHandlersStep
+import org.jetbrains.kotlin.test.builders.*
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.DIAGNOSTICS
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
@@ -35,11 +26,10 @@ import org.jetbrains.kotlin.test.runners.AbstractFirBlackBoxCodegenTestSpecBase
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
 import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
-import java.lang.Boolean.getBoolean
 
 open class DevKitJvmBoxTest(
     private val registrar: () -> CompilerPluginRegistrar,
-    parser: FirParser = FirParser.LightTree
+    parser: FirParser = FirParser.LightTree,
 ) : AbstractFirBlackBoxCodegenTestSpecBase(parser) {
     private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
 
@@ -47,20 +37,22 @@ open class DevKitJvmBoxTest(
         config.add(configuration)
     }
 
-    override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
+    override fun createKotlinStandardLibrariesPathProvider() =
+        EnvironmentBasedStandardLibrariesPathProvider
 
-    final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
-        super.configure(builder)
+    final override fun configure(builder: TestConfigurationBuilder) =
+        with(builder) {
+            super.configure(builder)
 
-        defaultDirectives {
-            versionDumpClassifier()
-            boxTestDefaults()
-            jvmDefaults()
+            defaultDirectives {
+                versionDumpClassifier()
+                boxTestDefaults()
+                jvmDefaults()
+            }
+
+            configurePlugin(registrar())
+            config.forEach { it() }
         }
-
-        configurePlugin(registrar())
-        config.forEach { it() }
-    }
 }
 
 open class DevKitJsBoxTest(
@@ -74,44 +66,46 @@ open class DevKitJsBoxTest(
         config.add(configuration)
     }
 
-    override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
+    override fun createKotlinStandardLibrariesPathProvider() =
+        EnvironmentBasedStandardLibrariesPathProvider
 
-    final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
-        // From AbstractJsBlackBoxCodegenTestBase
-        commonConfigurationForJsBlackBoxCodegenTest()
-        if (enableBoxHandlers) configureJsBoxHandlersWithoutTs()
-        // From AbstractJsTest
-        setUpDefaultDirectivesForJsBoxTest(parser)
-        configureFirHandlersStep {
-            useHandlers(
-                ::FirDumpHandler,
-                ::FirCfgDumpHandler,
-                ::FirCfgConsistencyHandler,
-                ::FirResolvedTypesVerifier,
-            )
-        }
-        defaultDirectives {
-            LANGUAGE with listOf(
-                "-${LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization.name}",
-                "-${LanguageFeature.IrCrossModuleInlinerBeforeKlibSerialization.name}"
-            )
+    final override fun configure(builder: TestConfigurationBuilder) =
+        with(builder) {
+            // From AbstractJsBlackBoxCodegenTestBase
+            commonConfigurationForJsBlackBoxCodegenTest()
+            if (enableBoxHandlers) configureJsBoxHandlersWithoutTs()
+            // From AbstractJsTest
+            setUpDefaultDirectivesForJsBoxTest(parser)
+            configureFirHandlersStep {
+                useHandlers(
+                    ::FirDumpHandler,
+                    ::FirCfgDumpHandler,
+                    ::FirCfgConsistencyHandler,
+                    ::FirResolvedTypesVerifier,
+                )
+            }
+            defaultDirectives {
+                LANGUAGE with
+                    listOf(
+                        "-${LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization.name}",
+                        "-${LanguageFeature.IrCrossModuleInlinerBeforeKlibSerialization.name}",
+                    )
+            }
+
+            configureJsArtifactsHandlersStep {
+                useHandlers(::JsIrRecompiledArtifactsIdentityHandler)
+            }
+            defaultDirectives {
+                versionDumpClassifier()
+                boxTestDefaults()
+            }
+
+            configurePlugin(registrar())
+            config.forEach { it() }
         }
 
-        configureJsArtifactsHandlersStep {
-            useHandlers(
-                ::JsIrRecompiledArtifactsIdentityHandler,
-            )
-        }
-        defaultDirectives {
-            versionDumpClassifier()
-            boxTestDefaults()
-        }
-
-        configurePlugin(registrar())
-        config.forEach { it() }
-    }
-
-    open val backendFacades: JsBackendFacades get() = JsBackendFacades.WithRecompilation
+    open val backendFacades: JsBackendFacades
+        get() = JsBackendFacades.WithRecompilation
 
     protected open val customIgnoreDirective: ValueDirective<TargetBackend>?
         get() = null
@@ -141,19 +135,23 @@ private fun RegisteredDirectivesBuilder.boxTestDefaults() {
 }
 
 /**
- * Sets up configuration for JS second compilation phase (compilation from KLib to JS code).
- * First compilation phase should be set up separately with [commonConfigurationForJsBackendFirstStageTest].
- * The configuration includes all minimally required services, handlers and defaults for such tests.
+ * Sets up configuration for JS second compilation phase (compilation from KLib to JS code). First
+ * compilation phase should be set up separately with
+ * [commonConfigurationForJsBackendFirstStageTest]. The configuration includes all minimally
+ * required services, handlers and defaults for such tests.
  */
-private fun <FO : ResultingArtifact.FrontendOutput<FO>> TestConfigurationBuilder.commonConfigurationForJsBackendSecondStageTestWithoutTestDir(
-    backendFacades: JsBackendFacades,
+private fun <FO : ResultingArtifact.FrontendOutput<FO>> TestConfigurationBuilder
+    .commonConfigurationForJsBackendSecondStageTestWithoutTestDir(
+    backendFacades: JsBackendFacades
 ) {
     val pathToRootOutputDir =
-        System.getProperty("kotlin.js.test.root.out.dir") ?: error("'kotlin.js.test.root.out.dir' is not set")
+        System.getProperty("kotlin.js.test.root.out.dir")
+            ?: error("'kotlin.js.test.root.out.dir' is not set")
     defaultDirectives {
         JsEnvironmentConfigurationDirectives.PATH_TO_ROOT_OUTPUT_DIR with pathToRootOutputDir
         +JsEnvironmentConfigurationDirectives.GENERATE_NODE_JS_RUNNER
-        if (getBoolean("kotlin.js.ir.skipRegularMode")) +JsEnvironmentConfigurationDirectives.SKIP_REGULAR_MODE
+        if (getBoolean("kotlin.js.ir.skipRegularMode"))
+            +JsEnvironmentConfigurationDirectives.SKIP_REGULAR_MODE
         LANGUAGE with "+JsAllowValueClassesInExternals"
     }
 
@@ -171,18 +169,12 @@ private fun <FO : ResultingArtifact.FrontendOutput<FO>> TestConfigurationBuilder
     }
 
     jsArtifactsHandlersStep {
-        useHandlers(
-            ::JsSourceMapPathRewriter,
-        )
+        useHandlers(::JsSourceMapPathRewriter)
     }
 }
 
-/**
- * Configures handlers for JS box testing
- */
-private fun TestConfigurationBuilder.configureJsBoxHandlersWithoutTs(
-    verifyJsAst: Boolean = true,
-) {
+/** Configures handlers for JS box testing */
+private fun TestConfigurationBuilder.configureJsBoxHandlersWithoutTs(verifyJsAst: Boolean = true) {
     configureJsArtifactsHandlersStep {
         useHandlers(
             ::NodeJsGeneratorHandler,

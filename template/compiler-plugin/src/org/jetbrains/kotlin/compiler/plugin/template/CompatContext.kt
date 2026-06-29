@@ -1,6 +1,6 @@
 package org.jetbrains.kotlin.compiler.plugin.template
 
-import java.util.ServiceLoader
+import java.util.*
 
 interface CompatContext {
     val generateBar: Boolean
@@ -8,6 +8,7 @@ interface CompatContext {
     companion object Default : CompatContext {
         override val generateBar: Boolean
             get() = false
+
         val context by lazy {
             val contexts = ServiceLoader.load(CompatContext::class.java)
             contexts.firstOrNull() ?: Default

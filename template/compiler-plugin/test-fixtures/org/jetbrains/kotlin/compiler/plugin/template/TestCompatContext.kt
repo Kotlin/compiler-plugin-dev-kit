@@ -1,6 +1,6 @@
 package org.jetbrains.kotlin.compiler.plugin.template
 
-import java.util.ServiceLoader
+import java.util.*
 
 interface TestCompatContext {
     companion object Default : TestCompatContext {

@@ -14,6 +14,7 @@ internal fun RegisteredDirectivesBuilder.jvmDefaults() {
 }
 
 internal fun RegisteredDirectivesBuilder.versionDumpClassifier() {
-    TestDumpDirectives.DUMP_CLASSIFIER with KotlinCompilerVersion.VERSION.replace(".", "").replace("-", "_").lowercase()
+    TestDumpDirectives.DUMP_CLASSIFIER with
+        KotlinCompilerVersion.VERSION.replace(".", "").replace("-", "_").lowercase()
     +CodegenTestDirectives.IGNORE_DEXING
 }

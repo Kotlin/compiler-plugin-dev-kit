@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathP
 
 open class DevKitDiagnosticTest(
     private val registrar: () -> CompilerPluginRegistrar,
-    parser: FirParser = FirParser.LightTree
+    parser: FirParser = FirParser.LightTree,
 ) : AbstractFirPhasedDiagnosticTest(parser) {
     private val config: MutableList<TestConfigurationBuilder.() -> Unit> = mutableListOf()
 
@@ -18,26 +18,27 @@ open class DevKitDiagnosticTest(
         config.add(configuration)
     }
 
-    override fun createKotlinStandardLibrariesPathProvider() = EnvironmentBasedStandardLibrariesPathProvider
+    override fun createKotlinStandardLibrariesPathProvider() =
+        EnvironmentBasedStandardLibrariesPathProvider
 
-    final override fun configure(builder: TestConfigurationBuilder) = with(builder) {
-        super.configure(builder)
+    final override fun configure(builder: TestConfigurationBuilder) =
+        with(builder) {
+            super.configure(builder)
 
-        defaultDirectives {
-            versionDumpClassifier()
-            +FirDiagnosticsDirectives.FIR_DUMP
-            +FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
+            defaultDirectives {
+                versionDumpClassifier()
+                +FirDiagnosticsDirectives.FIR_DUMP
+                +FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
+            }
+
+            configurePlugin(registrar())
+            config.forEach { it() }
         }
-
-        configurePlugin(registrar())
-        config.forEach { it() }
-    }
 }
-
 
 open class DevKitJvmDiagnosticTest(
     registrar: () -> CompilerPluginRegistrar,
-    parser: FirParser = FirParser.LightTree
+    parser: FirParser = FirParser.LightTree,
 ) : DevKitDiagnosticTest(registrar, parser) {
     init {
         configure {

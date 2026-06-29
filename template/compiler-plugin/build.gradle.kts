@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.pluginConfig
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -6,9 +5,8 @@ plugins {
 }
 
 pluginConfig {
-    extraKotlinVersionsToTestAgainst += listOf(
-        KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"),
-    )
+    extraKotlinVersionsToTestAgainst +=
+        listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }
 
 sourceSets {

@@ -24,7 +24,8 @@ import org.jetbrains.kotlin.name.*
  */
 class SimpleClassGenerator(session: FirSession) : FirDeclarationGenerationExtension(session) {
     companion object {
-        val MY_CLASS_ID = ClassId(FqName.fromSegments(listOf("foo", "bar")), Name.identifier("MyClass"))
+        val MY_CLASS_ID =
+            ClassId(FqName.fromSegments(listOf("foo", "bar")), Name.identifier("MyClass"))
 
         val FOO_ID = CallableId(MY_CLASS_ID, Name.identifier("foo"))
         val BAR_ID = CallableId(MY_CLASS_ID, Name.identifier("bar"))
@@ -37,28 +38,45 @@ class SimpleClassGenerator(session: FirSession) : FirDeclarationGenerationExtens
         return klass.symbol
     }
 
-    override fun generateConstructors(context: MemberGenerationContext): List<FirConstructorSymbol> {
+    override fun generateConstructors(
+        context: MemberGenerationContext
+    ): List<FirConstructorSymbol> {
         val classId = context.owner.classId
         require(classId == MY_CLASS_ID)
-        val constructor = createConstructor(context.owner, Key, /*generateDelegatedNoArgConstructorCall = true*/)
+        val constructor =
+            createConstructor(
+                context.owner,
+                Key, /*generateDelegatedNoArgConstructorCall = true*/
+            )
         return listOf(constructor.symbol)
     }
 
     override fun generateFunctions(
         callableId: CallableId,
-        context: MemberGenerationContext?
+        context: MemberGenerationContext?,
     ): List<FirNamedFunctionSymbol> {
         val owner = context?.owner ?: return emptyList()
-        val function = createMemberFunction(owner, Key, callableId.callableName, returnType = session.builtinTypes.stringType.coneType)
+        val function =
+            createMemberFunction(
+                owner,
+                Key,
+                callableId.callableName,
+                returnType = session.builtinTypes.stringType.coneType,
+            )
         return listOf(function.symbol)
     }
 
-    override fun getCallableNamesForClass(classSymbol: FirClassSymbol<*>, context: MemberGenerationContext): Set<Name> {
-        return if (classSymbol.classId == MY_CLASS_ID) buildSet {
-            add(FOO_ID.callableName)
-            if (CompatContext.context.generateBar) add(BAR_ID.callableName)
-            add(SpecialNames.INIT)
-        } else {
+    override fun getCallableNamesForClass(
+        classSymbol: FirClassSymbol<*>,
+        context: MemberGenerationContext,
+    ): Set<Name> {
+        return if (classSymbol.classId == MY_CLASS_ID)
+            buildSet {
+                add(FOO_ID.callableName)
+                if (CompatContext.context.generateBar) add(BAR_ID.callableName)
+                add(SpecialNames.INIT)
+            }
+        else {
             emptySet()
         }
     }

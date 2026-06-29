@@ -14,8 +14,8 @@ internal fun TestConfigurationBuilder.configurePlugin(registrar: CompilerPluginR
 
 private fun CompilerPluginRegistrar.ExtensionRegistrarConfigurator(testServices: TestServices) =
     object : EnvironmentConfigurator(testServices) {
-    override fun CompilerPluginRegistrar.ExtensionStorage.registerCompilerExtensions(
-        module: TestModule,
-        configuration: CompilerConfiguration
-    ) = registerExtensions(configuration)
-}
+        override fun CompilerPluginRegistrar.ExtensionStorage.registerCompilerExtensions(
+            module: TestModule,
+            configuration: CompilerConfiguration,
+        ) = registerExtensions(configuration)
+    }
