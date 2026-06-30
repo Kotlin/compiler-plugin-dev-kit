@@ -5,7 +5,7 @@ plugins {
 }
 
 pluginConfig {
-    extraKotlinVersionsToTestAgainst +=
+    kotlinVersionsToTestAgainst +=
         listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }
 

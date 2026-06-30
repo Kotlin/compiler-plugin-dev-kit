@@ -50,7 +50,7 @@ interface PluginConfigExtension {
     val jsRepl: Property<String>
     val generateTestsClass: Property<String>
     val testGenDirectory: DirectoryProperty
-    val extraKotlinVersionsToTestAgainst: DomainObjectSet<KotlinToolingVersion>
+    val kotlinVersionsToTestAgainst: DomainObjectSet<KotlinToolingVersion>
 }
 
 val configExtension = project.extensions.create<PluginConfigExtension>("pluginConfig")
@@ -60,7 +60,9 @@ val jsRepl =
 val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
 val testGenDirectory =
     configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
-val extraKotlinVersionsToTestAgainst = configExtension.extraKotlinVersionsToTestAgainst
+val kotlinVersionsToTestAgainst = configExtension.kotlinVersionsToTestAgainst
+
+kotlinVersionsToTestAgainst.add(kotlinToolingVersion)
 
 rootProject.childProjects.values.forEach {
     var noMultiplatformProjects = true
@@ -155,7 +157,7 @@ private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = config
 // Based on mrjar and Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
 // https://github.com/melix/mrjar-gradle-plugin
-extraKotlinVersionsToTestAgainst.all {
+kotlinVersionsToTestAgainst.all {
     val main =
         sourceSets.register(versionName) {
             forceKotlinVersion(this@all)
@@ -231,19 +233,7 @@ extraKotlinVersionsToTestAgainst.all {
 
         tasks.check { dependsOn(this@register) }
     }
-    generateSignature()
-    tasks.jar {
-        metaInf {
-            into("kotlin/plugin/versions/$versionString") {
-                from(main.map { it.output })
-            }
-        }
-    }
 
-    dependencies.registerMultiReleasePluginTransform(project.provider { this@all })
-}
-
-fun KotlinToolingVersion.generateSignature() {
     val signature = configurations.create("${versionName}Signature")
     dependencies {
         // TODO add all Kotlin lib signatures, not just compiler
@@ -255,9 +245,17 @@ fun KotlinToolingVersion.generateSignature() {
             signatures(configurations.signature)
             files(signature)
         }
-    animalsniffer {
-        signatures += files(signatureGenTask.map { it.outputFiles })
+    animalsniffer.signatures += files(signatureGenTask.map { it.outputFiles })
+
+    tasks.jar {
+        metaInf {
+            into("kotlin/plugin/versions/$versionString") {
+                from(main.map { it.output })
+            }
+        }
     }
+
+    dependencies.registerMultiReleasePluginTransform(project.provider { this@all })
 }
 
 sourceSets {
@@ -285,8 +283,6 @@ dependencies {
 
     annotationsRuntimeClasspath(pluginAnnotations)
 }
-
-kotlinToolingVersion.generateSignature()
 
 animalsniffer {
     excludeJars("kotlin-compiler*")
