@@ -121,9 +121,6 @@ val generateTests =
 
 tasks.compileTestKotlin { dependsOn(generateTests) }
 
-val KotlinToolingVersion.versionString
-    get() = toString()
-
 // Uses same convention as Metro
 // https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
 val KotlinToolingVersion.baseVersionName
@@ -243,14 +240,7 @@ extraKotlinVersionsToTestAgainst.all {
         }
     }
 
-    dependencies.registerTransform(MultiReleasePluginTransform::class) {
-        parameters { kotlinVersion = versionString }
-        from
-            .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-            .attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
-        to.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-            .attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion(this@all))
-    }
+    dependencies.registerMultiReleasePluginTransform(project.provider { this@all })
 }
 
 fun KotlinToolingVersion.generateSignature() {
@@ -419,10 +409,4 @@ tasks.withType<Jar> {
     }
 }
 
-dependencies {
-    artifactTypes {
-        named("jar") {
-            attributes.attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
-        }
-    }
-}
+dependencies.setupCompilerVersionAttribute()

@@ -5,6 +5,7 @@ import java.util.jar.Manifest
 import kotlin.io.path.*
 import org.gradle.api.artifacts.transform.*
 import org.gradle.api.file.FileSystemLocation
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
@@ -17,7 +18,7 @@ abstract class MultiReleasePluginTransform :
 
     interface Parameters : TransformParameters {
         @get:Input
-        var kotlinVersion: String
+        val kotlinVersion: Property<String>
     }
 
     @get:[Classpath InputArtifact]
@@ -37,7 +38,7 @@ abstract class MultiReleasePluginTransform :
             if (manifest.mainAttributes.getValue("Kotlin-Compiler-Plugin-Multi-Release") != "true")
                 return@use
 
-            val versionDir = inputFs.getPath(PLUGIN_VERSIONS_PATH, parameters.kotlinVersion)
+            val versionDir = inputFs.getPath(PLUGIN_VERSIONS_PATH, parameters.kotlinVersion.get())
             if (!versionDir.exists()) return@use
 
             val output =
