@@ -132,8 +132,6 @@ val KotlinToolingVersion.versionName
     get() = "k$baseVersionName"
 val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
-val KotlinToolingVersion.featureName
-    get() = versionName.replace("_", "")
 
 fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachDependency {
     if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
@@ -157,17 +155,20 @@ private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = config
     named(runtimeClasspathConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
 }
 
-// Based on Gradle test-fixtures sourceSet setup
+// Based on mrjar and Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
+// https://github.com/melix/mrjar-gradle-plugin
 extraKotlinVersionsToTestAgainst.all {
-    sourceSets.register(versionName) {
-        forceKotlinVersion(this@all)
-        project.java.registerFeature(featureName) { usingSourceSet(this@register) }
-        dependencies {
-            compileOnlyConfigurationName(kotlin("compiler"))
-            implementationConfigurationName(project())
+    val main =
+        sourceSets.register(versionName) {
+            forceKotlinVersion(this@all)
+            dependencies {
+                compileOnlyConfigurationName(kotlin("compiler"))
+                // allow it to see shared main sources
+                // TODO test this
+                compileOnlyConfigurationName(sourceSets.main.map { it.output.classesDirs })
+            }
         }
-    }
 
     val testArtifacts = testArtifacts.withKotlinVersion(this)
 
@@ -185,21 +186,44 @@ extraKotlinVersionsToTestAgainst.all {
 
     testing.suites.register<JvmTestSuite>("${versionName}Test") {
         dependencies {
-            implementation(project().capabilities { requireFeature(featureName) })
-            implementation(testFixtures(project()))
+            // allow it to see shared test sources
+            // TODO test this
+            compileOnly(files(sourceSets.test.map { it.output.classesDirs }))
         }
         sources {
             addTestGenDir()
             forceKotlinVersion(this@all)
             generateTests { addTestSourceSet(this@sources) }
             tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
+
+            configurations.named(implementationConfigurationName) {
+                extendsFrom(
+                    sourceSets.test.flatMap {
+                        configurations.named(it.implementationConfigurationName)
+                    }
+                )
+            }
+            configurations.named(compileOnlyConfigurationName) {
+                extendsFrom(
+                    sourceSets.test.flatMap {
+                        configurations.named(it.compileOnlyConfigurationName)
+                    }
+                )
+            }
+            configurations.named(runtimeClasspathConfigurationName) {
+                // force it to use version-specific jars when running tests
+                attributes.attribute(
+                    KotlinCompilerVersion.attribute,
+                    KotlinCompilerVersion(this@all),
+                )
+            }
         }
 
         targets.all {
             testTask {
-                // Include common and version-specific tests
-                testClassesDirs = sourceSets.test.get().output + testClassesDirs
-                classpath = sourceSets.test.get().output + classpath
+                // Include common tests
+                testClassesDirs += files(sourceSets.test.map { it.output.classesDirs })
+                classpath += files(sourceSets.test.map { it.output })
                 configure(
                     testArtifacts.get(),
                     annotationsJvmRuntimeClasspath.get(),
@@ -211,6 +235,22 @@ extraKotlinVersionsToTestAgainst.all {
         tasks.check { dependsOn(this@register) }
     }
     generateSignature()
+    tasks.jar {
+        metaInf {
+            into("kotlin/plugin/versions/$versionString") {
+                from(main.map { it.output })
+            }
+        }
+    }
+
+    dependencies.registerTransform(MultiReleasePluginTransform::class) {
+        parameters { kotlinVersion = versionString }
+        from
+            .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
+            .attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
+        to.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
+            .attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion(this@all))
+    }
 }
 
 fun KotlinToolingVersion.generateSignature() {
@@ -371,4 +411,18 @@ fun Test.setLibraryProperty(testArtifacts: Configuration, propName: String, jarN
         testArtifacts.files.find { """$jarName-\d.*""".toRegex().matches(it.name) }?.absolutePath
             ?: return
     systemProperty(propName, path)
+}
+
+tasks.withType<Jar> {
+    manifest {
+        attributes("Kotlin-Compiler-Plugin-Multi-Release" to true)
+    }
+}
+
+dependencies {
+    artifactTypes {
+        named("jar") {
+            attributes.attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
+        }
+    }
 }
