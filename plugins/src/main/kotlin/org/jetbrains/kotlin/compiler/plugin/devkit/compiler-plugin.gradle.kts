@@ -1,9 +1,10 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.plugins.ide.internal.generator.generator.Generator
+import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
@@ -62,7 +63,8 @@ val testGenDirectory =
     configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
 val kotlinVersionsToTestAgainst = configExtension.kotlinVersionsToTestAgainst
 
-kotlinVersionsToTestAgainst.add(kotlinToolingVersion)
+@OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalBuildToolsApi::class)
+kotlinVersionsToTestAgainst.addLater(kotlin.compilerVersion.map(::KotlinToolingVersion))
 
 rootProject.childProjects.values.forEach {
     var noMultiplatformProjects = true
