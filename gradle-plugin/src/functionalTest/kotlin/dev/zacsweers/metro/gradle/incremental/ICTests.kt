@@ -1,0 +1,3278 @@
+// Copyright (C) 2025 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+@file:Suppress("UPPER_BOUND_VIOLATED_BASED_ON_JAVA_ANNOTATIONS")
+
+package dev.zacsweers.metro.gradle.incremental
+
+import com.autonomousapps.kit.GradleBuilder.build
+import com.autonomousapps.kit.GradleProject
+import com.autonomousapps.kit.GradleProject.DslKind
+import com.autonomousapps.kit.gradle.Dependency
+import com.autonomousapps.kit.gradle.Dependency.Companion.implementation
+import com.google.common.truth.Truth.assertThat
+import dev.zacsweers.metro.gradle.GradlePlugins
+import dev.zacsweers.metro.gradle.KmpTarget
+import dev.zacsweers.metro.gradle.KotlinToolingVersion
+import dev.zacsweers.metro.gradle.MetroProject
+import dev.zacsweers.metro.gradle.buildAndAssertThat
+import dev.zacsweers.metro.gradle.classLoader
+import dev.zacsweers.metro.gradle.cleanOutputLine
+import dev.zacsweers.metro.gradle.getTestCompilerToolingVersion
+import dev.zacsweers.metro.gradle.invokeMain
+import dev.zacsweers.metro.gradle.source
+import java.io.File
+import java.net.URLClassLoader
+import org.gradle.testkit.runner.TaskOutcome
+import org.junit.Assume.assumeTrue
+import org.junit.Ignore
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
+
+@RunWith(Parameterized::class)
+class ICTests(target: KmpTarget) : BaseIncrementalCompilationTest(target) {
+
+  companion object {
+    @JvmStatic
+    @Parameterized.Parameters(name = "{0}")
+    fun targets(): List<KmpTarget> = KmpTarget.selectedTargets()
+  }
+
+  private val generateClassesInIrEnabled =
+    getTestCompilerToolingVersion() >= KotlinToolingVersion("2.4.20-dev-6138")
+
+  private fun someRepositoryProviderRequestPath(): String {
+    return if (generateClassesInIrEnabled) {
+      "test.SomeRepositoryProvider.someRepository"
+    } else {
+      "test.SomeRepositoryProvider.MetroContributionToLoggedInScope.someRepository"
+    }
+  }
+
+  /**
+   * This test covers an issue where incremental compilation fails to detect when an `@Includes`
+   * parameter changes an accessor.
+   *
+   * Regression test for https://github.com/ZacSweers/metro/issues/314, based on the repro project:
+   * https://github.com/kevinguitar/metro-playground/tree/ic-issue-sample
+   */
+  @Test
+  fun removingDependencyPropertyShouldFailOnIc() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(appGraph, featureGraph, featureScreen)
+
+        private val appGraph =
+          source(
+            """
+          @DependencyGraph(Unit::class)
+          interface AppGraph
+
+          @Inject
+          @ContributesBinding(Unit::class)
+          class DependencyImpl : Dependency
+          """
+          )
+
+        private val featureGraph =
+          source(
+            """
+          @DependencyGraph
+          interface FeatureGraph {
+              fun inject(screen: FeatureScreen)
+
+              @DependencyGraph.Factory
+              interface Factory {
+                  fun create(
+                      @Includes serviceProvider: FeatureScreen.ServiceProvider
+                  ): FeatureGraph
+              }
+          }
+          """
+          )
+
+        val featureScreen =
+          source(
+            """
+            class FeatureScreen {
+                @Inject
+                lateinit var dependency: Dependency
+
+                @ContributesTo(Unit::class)
+                interface ServiceProvider {
+                    val dependency: Dependency // comment this line to break incremental
+                }
+            }
+
+            interface Dependency
+          """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Modify the FeatureScreen class to comment out the dependency property
+    project.modify(
+      fixture.featureScreen,
+      """
+      class FeatureScreen {
+          @Inject
+          lateinit var dependency: Dependency
+
+          @ContributesTo(Unit::class)
+          interface ServiceProvider {
+              // val dependency: Dependency
+          }
+      }
+
+      interface Dependency
+      """
+        .trimIndent(),
+    )
+
+    // Second build should fail correctly on a missing binding
+    val secondBuildResult = project.compileKotlinAndFail()
+
+    // Verify that the build failed with the expected error message
+    assertThat(secondBuildResult.output.cleanOutputLine())
+      .contains(
+        """
+        FeatureScreen.kt:7:18
+        [Metro/MissingBinding] No binding found for Dependency
+
+          FeatureScreen -> Dependency
+
+          trace (in test.FeatureGraph):
+              Dependency is injected at test.FeatureScreen.dependency
+              FeatureScreen is injected at test.FeatureGraph.inject()
+
+          help: ensure Dependency has an @Inject constructor or is provided by an @Provides or @Binds
+                declaration visible to FeatureGraph
+          docs: https://zacsweers.github.io/metro/latest/diagnostics/#missingbinding
+        """
+          .trimIndent()
+      )
+  }
+
+  @Test
+  fun includesDependencyWithRemovedAccessorsShouldBeDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(baseGraph, serviceProvider, target)
+
+        private val baseGraph =
+          source(
+            """
+            @DependencyGraph
+            interface BaseGraph {
+                val target: Target
+
+                @DependencyGraph.Factory
+                interface Factory {
+                    fun create(@Includes provider: ServiceProvider): BaseGraph
+                }
+            }
+            """
+              .trimIndent()
+          )
+
+        val serviceProvider =
+          source(
+            """
+            interface ServiceProvider {
+              val dependency: String
+            }
+            """
+              .trimIndent()
+          )
+
+        private val target = source("@Inject class Target(val string: String)")
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.serviceProvider,
+      """
+      interface ServiceProvider {
+          // val dependency: String // Removed accessor
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output)
+      .contains(
+        """
+        [Metro/MissingBinding] No binding found for String
+
+          test.BaseGraph.target -> Target -> String
+
+          trace (in test.BaseGraph):
+              String is injected at test.Target(…, string)
+              Target is requested at test.BaseGraph.target
+        """
+          .trimIndent()
+      )
+  }
+
+  @Test
+  fun extendingGraphChangesDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(childGraph, appGraph, target)
+
+        private val childGraph =
+          source(
+            """
+            @GraphExtension
+            interface ChildGraph {
+              val target: Target
+
+              @GraphExtension.Factory
+              interface Factory {
+                fun create(): ChildGraph
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        val appGraph =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph : ChildGraph.Factory {
+              @Provides
+              fun provideString(): String = ""
+            }
+            """
+              .trimIndent()
+          )
+
+        private val target = source("@Inject class Target(val string: String)")
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.appGraph,
+      """
+      @DependencyGraph
+      interface AppGraph : ChildGraph.Factory {
+        // Removed provider
+        // @Provides
+        // fun provideString(): String = ""
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output)
+      .contains(
+        """
+        [Metro/MissingBinding] No binding found for String
+
+          test.ChildGraph.target -> Target -> String
+
+          trace (in test.AppGraph.Impl.ChildGraphImpl):
+              String is injected at test.Target(…, string)
+              Target is requested at test.ChildGraph.target
+        """
+          .trimIndent()
+      )
+  }
+
+  @Test
+  fun supertypeProviderChangesDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(stringProvider, appGraph, target)
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph : StringProvider {
+              val target: Target
+            }
+            """
+              .trimIndent()
+          )
+
+        val stringProvider =
+          source(
+            """
+            interface StringProvider {
+              @Provides
+              fun provideString(): String = ""
+            }
+            """
+              .trimIndent()
+          )
+
+        private val target = source("@Inject class Target(val string: String)")
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.stringProvider,
+      """
+      interface StringProvider {
+        // Removed provider
+        // @Provides
+        // fun provideString(): String = ""
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output)
+      .contains(
+        """
+        [Metro/MissingBinding] No binding found for String
+
+          test.AppGraph.target -> Target -> String
+
+          trace (in test.AppGraph):
+              String is injected at test.Target(…, string)
+              Target is requested at test.AppGraph.target
+        """
+          .trimIndent()
+      )
+  }
+
+  /**
+   * Tests that external contribution changes are detected even when multiple graphs depend on the
+   * same scope. This verifies the fix where we track lookups before checking the cache, ensuring
+   * all callers register their dependency on scope hints (not just the first one that populates the
+   * cache).
+   *
+   * https://github.com/ZacSweers/metro/issues/1512
+   */
+  @Test
+  fun contributedProviderExternalChangeInGraphExtensionDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(appGraph, appGraph2)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(dependency, dependencyProvider) }
+        }
+
+        // First graph with a StringGraph extension
+        val appGraph =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val stringGraph: StringGraph
+            }
+
+            @GraphExtension(String::class)
+            interface StringGraph
+            """
+              .trimIndent()
+          )
+
+        // Second graph also using String::class scope - tests that cache hits still record lookups
+        val appGraph2 =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph2 {
+              val stringGraph2: StringGraph2
+            }
+
+            @GraphExtension(String::class)
+            interface StringGraph2
+            """
+              .trimIndent()
+          )
+
+        private val dependency =
+          source(
+            """
+            interface Dependency
+            """
+              .trimIndent()
+          )
+
+        val dependencyProviderSource =
+          """
+          @ContributesTo(String::class)
+          interface DependencyProvider {
+            val dependency: Dependency
+          }
+          """
+            .trimIndent()
+        val dependencyProvider = source(dependencyProviderSource)
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+    val failureMessage =
+      """
+      [Metro/MissingBinding] No binding found for Dependency
+      """
+        .trimIndent()
+
+    // First build should fail for both graphs due to missing binding
+    // Both graphs use String::class scope, so both should see the contributed DependencyProvider
+    val firstBuildResult = project.compileKotlinAndFail()
+    assertThat(firstBuildResult.output).contains(failureMessage)
+
+    // Both graphs should report the error (StringGraph and StringGraph2)
+    assertThat(firstBuildResult.output).contains("StringGraph")
+    assertThat(firstBuildResult.output).contains("StringGraph2")
+
+    // Remove dependencyProvider to fix the build
+    libProject.modify(project.rootDir, fixture.dependencyProvider, "")
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Restore dependencyProvider to break the build - both graphs should detect this change
+    // This is the key assertion: even though the second graph's lookup hits the internal cache
+    // within a single compilation, it should still register its IC dependency and be recompiled
+    libProject.modify(project.rootDir, fixture.dependencyProvider, fixture.dependencyProviderSource)
+
+    val thirdBuildResult = project.compileKotlinAndFail()
+    assertThat(thirdBuildResult.output).contains(failureMessage)
+
+    // Both graphs should still report the error after incremental recompilation
+    assertThat(thirdBuildResult.output).contains("StringGraph")
+    assertThat(thirdBuildResult.output).contains("StringGraph2")
+  }
+
+  @Test
+  fun supertypeProviderCompanionChangesDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(stringProvider, appGraph, target)
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph : StringProvider {
+              val target: Target
+            }
+            """
+              .trimIndent()
+          )
+
+        val stringProvider =
+          source(
+            """
+            interface StringProvider {
+              companion object {
+                @Provides
+                fun provideString(): String = ""
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        private val target = source("@Inject class Target(val string: String)")
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.stringProvider,
+      """
+      interface StringProvider {
+        companion object {
+          // Removed provider
+          // @Provides
+          // fun provideString(): String = ""
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output)
+      .contains(
+        """
+        [Metro/MissingBinding] No binding found for String
+
+          test.AppGraph.target -> Target -> String
+
+          trace (in test.AppGraph):
+              String is injected at test.Target(…, string)
+              Target is requested at test.AppGraph.target
+        """
+          .trimIndent()
+      )
+  }
+
+  @Test
+  fun newContributesIntoSetDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, contributedInterfaces)
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface ExampleGraph {
+              val set: Set<ContributedInterface>
+            }
+            interface ContributedInterface
+            """
+              .trimIndent()
+          )
+
+        val contributedInterfaces =
+          source(
+            """
+            @Inject
+            @ContributesIntoSet(Unit::class)
+            class Impl1 : ContributedInterface
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.contributedInterfaces,
+      """
+      @Inject
+      @ContributesIntoSet(Unit::class)
+      class Impl1 : ContributedInterface
+
+      @Inject
+      @ContributesIntoSet(Unit::class)
+      class NewContribution : ContributedInterface
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+  }
+
+  @Test
+  fun removedContributesIntoSetDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, contributedInterfaces)
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface ExampleGraph {
+              val set: Set<ContributedInterface>
+            }
+            interface ContributedInterface
+            """
+              .trimIndent()
+          )
+
+        val contributedInterfaces =
+          source(
+            """
+            @Inject
+            @ContributesIntoSet(Unit::class)
+            class Impl1 : ContributedInterface
+
+            @Inject
+            @ContributesIntoSet(Unit::class)
+            class Impl2 : ContributedInterface
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    project.modify(
+      fixture.contributedInterfaces,
+      """
+      @Inject
+      @ContributesIntoSet(Unit::class)
+      class Impl1 : ContributedInterface
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+  }
+
+  @Test
+  fun internalBindings() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(exampleGraph)
+            dependencies(
+              implementation(":lib:impl"),
+              implementation(":scopes"),
+              implementation(":graphs"),
+            )
+          }
+          subproject("scopes") { sources(scopes) }
+          subproject("graphs") {
+            sources(graphs)
+            dependencies(implementation(":scopes"))
+          }
+          subproject("lib") {
+            sources(repo)
+            dependencies(implementation(":scopes"))
+          }
+          subproject("lib:impl") {
+            sources(repoImpl)
+            dependencies(implementation(":scopes"), Dependency.api(":lib"))
+          }
+        }
+
+        private val scopes =
+          source(
+            """
+          abstract class LoggedInScope private constructor()
+        """
+          )
+
+        private val graphs =
+          source(
+            """
+          @GraphExtension(LoggedInScope::class)
+          interface LoggedInGraph {
+            @ContributesTo(AppScope::class)
+            @GraphExtension.Factory
+            interface Factory {
+              fun create(): LoggedInGraph
+            }
+          }
+        """
+          )
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph(AppScope::class)
+            interface ExampleGraph {
+              val loggedInGraphFactory: LoggedInGraph.Factory
+            }
+          """
+          )
+
+        val repo =
+          source(
+            """
+            interface SomeRepository
+
+            @ContributesTo(LoggedInScope::class)
+            interface SomeRepositoryProvider {
+              val someRepository: SomeRepository
+            }
+          """
+          )
+
+        val repoImpl =
+          source(
+            """
+            @ContributesBinding(LoggedInScope::class)
+            @Inject
+            internal class SomeRepositoryImpl : SomeRepository
+          """
+          )
+      }
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlinAndFail()
+
+    // Asserted in pieces: the trace line wraps (or not) at 100 columns depending on the
+    // version-dependent request path length.
+    val output = firstBuildResult.output.cleanOutputLine()
+    assertThat(output).contains("e: ExampleGraph.kt:6:11")
+    assertThat(output).contains("[Metro/MissingBinding] No binding found for SomeRepository")
+    assertThat(output).contains("trace (in test.ExampleGraph.Impl.LoggedInGraphImpl):")
+    assertThat(output).contains("SomeRepository is requested at")
+    assertThat(output).contains(someRepositoryProviderRequestPath())
+    assertThat(output).contains("similar bindings:")
+    assertThat(output)
+      .contains(
+        "- SomeRepository (Contributed by 'test.SomeRepositoryImpl' but that class is internal to its"
+      )
+  }
+
+  @Test
+  fun contributesToAddedInApiDependencyIsDetectedButNotAddedAsSupertype() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          subproject("app") {
+            sources(appGraph)
+            dependencies(implementation(":lib:impl"))
+          }
+          subproject("lib") { sources(dummy) }
+          subproject("lib:impl") {
+            sources(source("class LibImpl"))
+            dependencies(Dependency.api(":lib"))
+          }
+        }
+
+        private val appGraph =
+          source(
+            """
+          @DependencyGraph(AppScope::class)
+          interface AppGraph
+          """
+          )
+
+        val dummy =
+          source(
+            """
+          @Inject
+          class Dummy
+          """
+          )
+
+        val dummyWithContributionSource =
+          """
+          @Inject
+          class Dummy
+
+          @ContributesTo(AppScope::class)
+          internal interface DummyBindings {
+            val dummy: Dummy
+          }
+        """
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name.removePrefix(":") == "lib" }
+
+    fun appClassLoader(): ClassLoader {
+      val urls =
+        project.subprojects.mapNotNull { subproject ->
+          val projectPath = subproject.name.removePrefix(":").replace(":", "/")
+          val classesDir = project.rootDir.resolve("$projectPath/build/classes/kotlin/jvm/main")
+          if (classesDir.exists()) classesDir.toURI().toURL() else null
+        }
+      return URLClassLoader(urls.toTypedArray(), this::class.java.classLoader)
+    }
+
+    val firstBuildResult = project.compileKotlin(compileTaskFor("app"))
+    assertThat(firstBuildResult.task(compileTaskFor("app"))?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    libProject.modify(project.rootDir, fixture.dummy, fixture.dummyWithContributionSource)
+
+    val secondBuildResult = project.compileKotlin(compileTaskFor("app"))
+    assertThat(secondBuildResult.task(compileTaskFor("app"))?.outcome)
+      .isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget {
+      val secondClassLoader = appClassLoader()
+      val secondAppGraph = secondClassLoader.loadClass("test.AppGraph")
+      assertThat(secondAppGraph.interfaces.map { it.name })
+        .doesNotContain("test.DummyBindings\$MetroContributionToAppScope")
+    }
+  }
+
+  @Test
+  fun removedContributesToDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, contributedInterfaces)
+
+        private val exampleGraph =
+          source(
+            """
+            interface ContributedInterface
+
+            @DependencyGraph(Unit::class)
+            interface ExampleGraph
+            """
+              .trimIndent()
+          )
+
+        val contributedInterfaces =
+          source(
+            """
+            @ContributesTo(Unit::class)
+            interface ContributedInterface1
+
+            @ContributesTo(Unit::class)
+            interface ContributedInterface2
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget {
+      with(project.classLoader()) {
+        val exampleGraph = loadClass("test.ExampleGraph")
+        val contributedInterface2 = loadClass("test.ContributedInterface2")
+        assertThat(contributedInterface2.isAssignableFrom(exampleGraph)).isTrue()
+      }
+    }
+
+    project.modify(
+      fixture.contributedInterfaces,
+      """
+      @ContributesTo(Unit::class)
+      interface ContributedInterface1
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Check that ContributedInterface2 was removed as a supertype
+    ifJvmTarget {
+      val classLoader = project.classLoader()
+      val exampleGraph = classLoader.loadClass("test.ExampleGraph")
+      val interfaceNames = exampleGraph.interfaces.map { it.name }
+      assertThat(interfaceNames).doesNotContain("test.ContributedInterface2")
+      assertThat(interfaceNames)
+        .doesNotContain("test.ContributedInterface2\$MetroContributionToUnit")
+    }
+  }
+
+  @Test
+  fun scopingChangeOnProviderIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, main)
+
+        val exampleGraph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            abstract class ExampleGraph {
+              abstract val int: Int
+
+              private var count: Int = 0
+
+              @Provides fun provideInt(): Int = count++
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Int {
+              val graph = createGraph<ExampleGraph>()
+              return graph.int + graph.int
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(1) }
+    project.modify(
+      fixture.exampleGraph,
+      """
+      @DependencyGraph(Unit::class)
+      abstract class ExampleGraph {
+        abstract val int: Int
+
+        private var count: Int = 0
+
+        @Provides @SingleIn(Unit::class) fun provideInt(): Int = count++
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Check that count is scoped now and never increments
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(0) }
+    project.modify(
+      fixture.exampleGraph,
+      """
+      @DependencyGraph(Unit::class)
+      abstract class ExampleGraph {
+        abstract val int: Int
+
+        private var count: Int = 0
+
+        @Provides fun provideInt(): Int = count++
+      }
+      """
+        .trimIndent(),
+    )
+
+    val thirdBuildResult = project.compileKotlin()
+    assertThat(thirdBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Check that count is unscoped again and increments
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(1) }
+  }
+
+  @Test
+  fun scopingChangeOnContributedClassIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleClass, exampleGraph, main)
+
+        val exampleClass =
+          source(
+            """
+            @ContributesBinding(Unit::class)
+            @Inject
+            class ExampleClass : Counter {
+              override var count: Int = 0
+            }
+            """
+              .trimIndent()
+          )
+
+        private val exampleGraph =
+          source(
+            """
+                interface Counter {
+                  var count: Int
+                }
+            @SingleIn(AppScope::class)
+            @DependencyGraph(Unit::class)
+            interface ExampleGraph {
+              val counter: Counter
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Int {
+              val graph = createGraph<ExampleGraph>()
+              return graph.counter.count++ + graph.counter.count++
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(0) }
+    project.modify(
+      fixture.exampleClass,
+      """
+      @SingleIn(AppScope::class)
+      @ContributesBinding(Unit::class)
+      @Inject
+      class ExampleClass : Counter {
+        override var count: Int = 0
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Check that count is scoped now and never increments
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(1) }
+    project.modify(
+      fixture.exampleClass,
+      """
+      @ContributesBinding(Unit::class)
+      @Inject
+      class ExampleClass : Counter {
+        override var count: Int = 0
+      }
+      """
+        .trimIndent(),
+    )
+
+    val thirdBuildResult = project.compileKotlin()
+    assertThat(thirdBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Check that count is unscoped again and increments
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(0) }
+  }
+
+  @Test
+  fun scopingChangeOnNonContributedClassIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() =
+          listOf(unusedScope, exampleClass, exampleGraph, loggedInGraph, main)
+
+        val unusedScope =
+          source(
+            """
+            interface UnusedScope
+            """
+              .trimIndent()
+          )
+
+        val exampleClass =
+          source(
+            """
+            @Inject
+            @SingleIn(UnusedScope::class)
+            class ExampleClass
+            """
+              .trimIndent()
+          )
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph(scope = AppScope::class)
+            interface ExampleGraph
+            """
+              .trimIndent()
+          )
+
+        private val loggedInGraph =
+          source(
+            """
+            sealed interface LoggedInScope
+
+            @GraphExtension(LoggedInScope::class)
+            interface LoggedInGraph {
+              val exampleClass: ExampleClass
+
+                @ContributesTo(AppScope::class)
+                @GraphExtension.Factory
+                interface Factory {
+                    fun createLoggedInGraph(): LoggedInGraph
+                }
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Any {
+              val graph = createGraph<ExampleGraph>().createLoggedInGraph()
+              return graph.exampleClass
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    // First build should fail because [ExampleClass] is scoped incompatibly with both graph nodes
+    val firstBuildResult = project.compileKotlinAndFail()
+
+    assertThat(firstBuildResult.output.cleanOutputLine())
+      .contains(
+        """
+        e: LoggedInScope.kt:8:11
+        [Metro/IncompatiblyScopedBindings] test.ExampleGraph.Impl.LoggedInGraphImpl (scopes
+            '@SingleIn(LoggedInScope::class)') may not reference bindings from different scopes
+
+          trace (in test.ExampleGraph.Impl.LoggedInGraphImpl):
+              ExampleClass (scoped to '@SingleIn(UnusedScope::class)')
+              ExampleClass is requested at test.LoggedInGraph.exampleClass
+
+          note: LoggedInGraphImpl is contributed by 'test.LoggedInGraph' to 'test.ExampleGraph'
+          docs: https://zacsweers.github.io/metro/latest/diagnostics/#incompatiblyscopedbindings
+        """
+          .trimIndent()
+      )
+
+    project.modify(
+      fixture.exampleClass,
+      """
+      @Inject
+      @SingleIn(AppScope::class)
+      class ExampleClass
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget {
+      with(project.classLoader()) {
+        val mainClass = loadClass("test.MainKt")
+        val scopedDep = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as Any
+        assertThat(scopedDep).isNotNull()
+      }
+    }
+
+    // TODO We need to add or remove an annotation at this point to trigger the graph regen,
+    //  IC doesn't seem to pick up an annotation argument change when the previous compilation
+    //  was successful
+    project.modify(
+      fixture.exampleClass,
+      """
+      @Inject
+      class ExampleClass
+      """
+        .trimIndent(),
+    )
+
+    val thirdBuildResult = project.compileKotlin()
+    assertThat(thirdBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.exampleClass,
+      """
+      @Inject
+      @SingleIn(UnusedScope::class)
+      class ExampleClass
+      """
+        .trimIndent(),
+    )
+
+    // We expect that changing the source back to what we started with should again give us the
+    // original error
+    val fourthBuildResult = project.compileKotlinAndFail()
+    assertThat(fourthBuildResult.output.cleanOutputLine())
+      .contains(
+        """
+        [Metro/IncompatiblyScopedBindings] test.ExampleGraph.Impl.LoggedInGraphImpl (scopes
+            '@SingleIn(LoggedInScope::class)') may not reference bindings from different scopes
+
+          trace (in test.ExampleGraph.Impl.LoggedInGraphImpl):
+              ExampleClass (scoped to '@SingleIn(UnusedScope::class)')
+              ExampleClass is requested at test.LoggedInGraph.exampleClass
+
+          note: LoggedInGraphImpl is contributed by 'test.LoggedInGraph' to 'test.ExampleGraph'
+        """
+          .trimIndent()
+      )
+  }
+
+  @Ignore("Not working yet, pending https://youtrack.jetbrains.com/issue/KT-77938")
+  @Test
+  fun classVisibilityChangeDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, contributedClass)
+
+        private val exampleGraph =
+          source(
+            """
+            interface ContributedInterface
+
+            @DependencyGraph(Unit::class)
+            interface ExampleGraph
+            """
+              .trimIndent()
+          )
+
+        val contributedClass =
+          source(
+            """
+            @Inject
+            @ContributesBinding(Unit::class)
+            class ContributedInterfaceImpl : ContributedInterface
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.contributedClass,
+      """
+      @Inject
+      @ContributesBinding(Unit::class)
+      internal class ContributedInterfaceImpl : ContributedInterface
+      """
+        .trimIndent(),
+    )
+
+    // Second build should fail correctly on class visibility
+    val secondBuildResult = project.compileKotlinAndFail()
+
+    // Verify that the build failed with the expected error message
+    assertThat(secondBuildResult.output)
+      .contains(
+        "ContributedInterface.kt:8:11 DependencyGraph declarations may not extend declarations with narrower visibility. Contributed supertype 'test.ContributedInterfaceImpl' is internal but graph declaration 'test.ExampleGraph' is public."
+      )
+  }
+
+  @Test
+  fun fieldWrappedWithLazyIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(exampleGraph, exampleClass, main)
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph
+            interface ExampleGraph {
+              fun inject(exampleClass: ExampleClass)
+
+              @Provides fun provideString(): String = "Hello, world!"
+            }
+            """
+              .trimIndent()
+          )
+
+        val exampleClass =
+          source(
+            """
+            class ExampleClass {
+              @Inject lateinit var string: String
+            }
+            """
+              .trimIndent()
+          )
+
+        val main =
+          source(
+            """
+            fun main(): String {
+              val graph = createGraph<ExampleGraph>()
+              val exampleClass = ExampleClass()
+              graph.inject(exampleClass)
+              return exampleClass.string
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    fun buildAndAssertOutput() {
+      val buildResult = project.compileKotlin()
+      assertThat(buildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+      ifJvmTarget {
+        val mainClass = project.classLoader().loadClass("test.MainKt")
+        val string = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as String
+        assertThat(string).isEqualTo("Hello, world!")
+      }
+    }
+
+    buildAndAssertOutput()
+
+    project.modify(
+      fixture.exampleClass,
+      """
+      class ExampleClass {
+        @Inject lateinit var string: Lazy<String>
+      }
+      """
+        .trimIndent(),
+    )
+
+    project.modify(
+      fixture.main,
+      """
+      fun main(): String {
+        val graph = createGraph<ExampleGraph>()
+        val exampleClass = ExampleClass()
+        graph.inject(exampleClass)
+        return exampleClass.string.value
+      }
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertOutput()
+  }
+
+  @Test
+  fun icWorksWhenChangingAContributionScope() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() =
+          listOf(unusedScope, exampleClass, exampleGraph, loggedInGraph, main)
+
+        val unusedScope =
+          source(
+            """
+            interface UnusedScope
+            interface Foo
+            """
+              .trimIndent()
+          )
+
+        val exampleClass =
+          source(
+            """
+            @Inject
+            @ContributesBinding(UnusedScope::class)
+            class ExampleClass : Foo
+            """
+              .trimIndent()
+          )
+
+        private val exampleGraph =
+          source(
+            """
+            @DependencyGraph(scope = AppScope::class)
+            interface ExampleGraph
+            """
+              .trimIndent()
+          )
+
+        private val loggedInGraph =
+          source(
+            """
+            sealed interface LoggedInScope
+
+            @GraphExtension(LoggedInScope::class)
+            interface LoggedInGraph {
+              val childDependency: Foo
+
+                @ContributesTo(AppScope::class)
+                @GraphExtension.Factory
+                interface Factory {
+                    fun createLoggedInGraph(): LoggedInGraph
+                }
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Any {
+              val graph = createGraph<ExampleGraph>().createLoggedInGraph()
+              return graph.childDependency
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+
+    // First build should fail because `ExampleClass` is not contributed to the scopes of either
+    // graph
+    val firstBuildResult = project.compileKotlinAndFail()
+
+    assertThat(firstBuildResult.output.cleanOutputLine())
+      .contains(
+        """
+        e: LoggedInScope.kt:9:7
+        [Metro/MissingBinding] No binding found for Foo
+
+          trace (in test.ExampleGraph.Impl.LoggedInGraphImpl):
+              Foo is requested at test.LoggedInGraph.childDependency
+
+          help: ensure Foo has an @Inject constructor or is provided by an @Provides or @Binds declaration
+                visible to LoggedInGraphImpl
+          docs: https://zacsweers.github.io/metro/latest/diagnostics/#missingbinding
+        """
+          .trimIndent()
+      )
+
+    // Change to contribute to the scope of the root graph node -- will pass
+    project.modify(
+      fixture.exampleClass,
+      """
+      @Inject
+      @ContributesBinding(AppScope::class)
+      class ExampleClass : Foo
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    ifJvmTarget {
+      with(project.classLoader()) {
+        val mainClass = loadClass("test.MainKt")
+        val scopedDep = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as Any
+        assertThat(scopedDep).isNotNull()
+      }
+    }
+
+    // Change back to the original state -- should fail again for a missing binding
+    project.modify(
+      fixture.exampleClass,
+      """
+      @Inject
+      @ContributesBinding(UnusedScope::class)
+      class ExampleClass : Foo
+      """
+        .trimIndent(),
+    )
+
+    val thirdBuildResult = project.compileKotlinAndFail()
+    assertThat(thirdBuildResult.output.cleanOutputLine())
+      // Omit 'e: ExampleGraph.kt:6:11 ' prefix until 2.3.0+ as we report a more accurate location
+      // there
+      .contains(
+        """
+        [Metro/MissingBinding] No binding found for Foo
+
+          trace (in test.ExampleGraph.Impl.LoggedInGraphImpl):
+              Foo is requested at test.LoggedInGraph.childDependency
+        """
+          .trimIndent()
+      )
+  }
+
+  @Test
+  fun icWorksWhenAddingAParamToExistingInjectedTypeWithScopeWithZeroToOneParams() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(appGraph, main)
+            dependencies(implementation(":common"), implementation(":lib"))
+          }
+          subproject("common") { sources(bar) }
+          subproject("lib") {
+            sources(foo)
+            dependencies(implementation(":common"))
+          }
+        }
+
+        private val bar =
+          source(
+            """
+            interface Bar
+
+            @Inject
+            @ContributesBinding(AppScope::class)
+            class BarImpl : Bar
+            """
+              .trimIndent()
+          )
+
+        val foo =
+          source(
+            """
+            interface Foo
+
+            @SingleIn(AppScope::class)
+            @Inject
+            @ContributesBinding(AppScope::class)
+            class FooImpl : Foo
+            """
+              .trimIndent()
+          )
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph(AppScope::class)
+            interface AppGraph
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Any {
+              return createGraph<AppGraph>()
+            }
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    fun buildAndAssertOutput() {
+      val buildResult = project.compileKotlin()
+      assertThat(buildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+      ifJvmTarget {
+        val mainClass = project.classLoader().loadClass("test.MainKt")
+        val graph = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as Any
+        assertThat(graph).isNotNull()
+      }
+    }
+
+    buildAndAssertOutput()
+
+    // Adding a bar param to FooImpl, FooImpl.MetroFactory should be regenerated with member field
+    libProject.modify(
+      project.rootDir,
+      fixture.foo,
+      """
+      interface Foo
+
+      @SingleIn(AppScope::class)
+      @Inject
+      @ContributesBinding(AppScope::class)
+      class FooImpl(bar: Bar) : Foo
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertOutput()
+  }
+
+  @Test
+  fun icWorksWhenAddingAParamToExistingInjectedTypeWithScopeWithMultipleParams() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(appGraph, main)
+            dependencies(implementation(":common"), implementation(":lib"))
+          }
+          subproject("common") { sources(bar) }
+          subproject("lib") {
+            sources(foo)
+            dependencies(implementation(":common"))
+          }
+        }
+
+        private val bar =
+          source(
+            """
+            interface Bar
+
+            @Inject
+            @ContributesBinding(AppScope::class)
+            class BarImpl : Bar
+            """
+              .trimIndent()
+          )
+
+        val foo =
+          source(
+            """
+            interface Foo
+
+            @SingleIn(AppScope::class)
+            @Inject
+            @ContributesBinding(AppScope::class)
+            class FooImpl(int: Int) : Foo
+            """
+              .trimIndent()
+          )
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph(AppScope::class)
+            interface AppGraph {
+              @Provides fun provideInt(): Int = 0
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): Any {
+              return createGraph<AppGraph>()
+            }
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    fun buildAndAssertOutput() {
+      val buildResult = project.compileKotlin()
+      assertThat(buildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+      ifJvmTarget {
+        val mainClass = project.classLoader().loadClass("test.MainKt")
+        val graph = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as Any
+        assertThat(graph).isNotNull()
+      }
+    }
+
+    buildAndAssertOutput()
+
+    // Adding a bar param to FooImpl, FooImpl.MetroFactory should be regenerated with member field
+    libProject.modify(
+      project.rootDir,
+      fixture.foo,
+      """
+      interface Foo
+
+      @SingleIn(AppScope::class)
+      @Inject
+      @ContributesBinding(AppScope::class)
+      class FooImpl(int: Int, bar: Bar) : Foo
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertOutput()
+  }
+
+  @Test
+  fun multiModuleNonAbiChangeDoesNotTriggerRootRecompilation() {
+    // Metro's downstream-skip-on-non-ABI-change IC story is JVM-specific today; non-JVM targets
+    // currently recompile downstream. Run only on JVM until that's covered separately.
+    assumeTrue(target == KmpTarget.JVM)
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(appGraph, target)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(provider, unrelatedClass) }
+        }
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface AppGraph {
+              val target: Target
+            }
+            """
+              .trimIndent()
+          )
+
+        val provider =
+          source(
+            """
+            @ContributesTo(Unit::class)
+            interface StringProvider {
+              @Provides
+              fun provideString(): String = "Hello"
+
+              // Internal implementation detail
+              private fun internalHelper(): String = "internal"
+            }
+            """
+              .trimIndent()
+          )
+
+        val unrelatedClass =
+          source(
+            """
+            // Unrelated class not part of the dependency graph
+            class UnrelatedUtility {
+              fun doSomething(): String = "original"
+            }
+            """
+              .trimIndent()
+          )
+
+        private val target =
+          source(
+            """
+            @Inject
+            class Target(val string: String)
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build
+    buildAndAssertThat(project.rootDir, compileTaskFor()) {
+      task(compileTaskFor()).succeeded()
+      task(compileTaskFor("lib")).succeeded()
+    }
+
+    // Make a private change in the lib module in the same file still triggers IC because IC is
+    // unfortunately per-file
+    libProject.modify(
+      project.rootDir,
+      fixture.provider,
+      """
+      @ContributesTo(Unit::class)
+      interface StringProvider {
+        @Provides
+        fun provideString(): String = "Hello"
+
+        // Internal implementation detail
+        private fun internalHelper(): String = "internal"
+      }
+
+      private fun privateUtilInFile(): Int = 3
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertThat(project.rootDir, compileTaskFor()) {
+      // Lib module should be recompiled due to the change
+      task(compileTaskFor("lib")).succeeded()
+      // Root module isn't UP-TO-DATE because IC operates on the file
+      task(compileTaskFor()).succeeded()
+    }
+
+    // Make a non-ABI change to a function body.
+    libProject.modify(
+      project.rootDir,
+      fixture.provider,
+      """
+      @ContributesTo(Unit::class)
+      interface StringProvider {
+        @Provides
+        fun provideString(): String = "Hello"
+
+        // Modified internal implementation detail - non-ABI change
+        private fun internalHelper(): String = "modified internal"
+      }
+
+      private fun privateUtilInFile(): Int = 3
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertThat(project.rootDir, compileTaskFor()) {
+      // Lib module should be recompiled due to the change
+      task(compileTaskFor("lib")).succeeded()
+      // Root module isn't UP-TO-DATE because IC operates on the file
+      task(compileTaskFor()).upToDate()
+    }
+
+    // Modify an unrelated file in the lib module, should not trigger IC
+    libProject.modify(
+      project.rootDir,
+      fixture.unrelatedClass,
+      """
+      // Unrelated class not part of the dependency graph
+      class UnrelatedUtility {
+        fun doSomething(): String = "modified"
+      }
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertThat(project.rootDir, compileTaskFor()) {
+      // Lib module should be recompiled due to the change
+      task(compileTaskFor("lib")).succeeded()
+      // Root module should be UP-TO-DATE since the changed file is not part of the dependency graph
+      task(compileTaskFor()).upToDate()
+    }
+
+    // Verify the application still works correctly
+    ifJvmTarget {
+      val classLoader = project.classLoader()
+      val appGraphClass = classLoader.loadClass("test.AppGraph")
+      assertThat(appGraphClass).isNotNull()
+    }
+  }
+
+  @Test
+  fun multipleBindingReplacementsAreRespectedWhenAddingNewContribution() {
+    val fixture =
+      object : MetroProject(debug = true) {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(appGraph, fakeImpl, main)
+            dependencies(implementation(":common"), implementation(":lib"))
+          }
+          subproject("common") { sources(fooBar) }
+          subproject("lib") {
+            sources(realImpl)
+            dependencies(implementation(":common"))
+          }
+        }
+
+        private val appGraph =
+          source(
+            """
+            @DependencyGraph(AppScope::class)
+            interface AppGraph {
+              val bar: Bar
+            }
+            """
+              .trimIndent()
+          )
+
+        private val fooBar =
+          source(
+            """
+            interface Foo
+            interface Bar : Foo {
+              val str: String
+            }
+            """
+              .trimIndent()
+          )
+
+        val realImpl =
+          source(
+            """
+            @Inject
+            @ContributesBinding(AppScope::class, binding = binding<Foo>())
+            @ContributesBinding(AppScope::class, binding = binding<Bar>())
+            class RealImpl : Bar {
+              override val str: String = "real"
+            }
+            """
+              .trimIndent()
+          )
+
+        private val fakeImpl =
+          source(
+            """
+            @Inject
+            @ContributesBinding(AppScope::class, binding = binding<Foo>(), replaces = [RealImpl::class])
+            @ContributesBinding(AppScope::class, binding = binding<Bar>(), replaces = [RealImpl::class])
+            class FakeImpl : Bar {
+              override val str: String = "fake"
+            }
+            """
+              .trimIndent()
+          )
+
+        val placeholder = source("")
+
+        val main =
+          source(
+            """
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.bar.str
+            }
+            """
+              .trimIndent()
+          )
+      }
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    fun buildAndAssertOutput() {
+      val buildResult = project.compileKotlin()
+      assertThat(buildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+      ifJvmTarget {
+        val mainClass = project.classLoader().loadClass("test.MainKt")
+        val string = mainClass.declaredMethods.first { it.name == "main" }.invoke(null) as String
+        assertThat(string).isEqualTo("fake")
+      }
+    }
+
+    buildAndAssertOutput()
+
+    // Adding a new binding contribution should be alright
+    libProject.modify(
+      project.rootDir,
+      fixture.placeholder,
+      """
+      interface Baz
+
+      @Inject
+      @ContributesBinding(AppScope::class)
+      class BazImpl : Baz
+      """
+        .trimIndent(),
+    )
+
+    buildAndAssertOutput()
+  }
+
+  @Test
+  fun graphExtensionFactoryContributionExternalChangeIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(main)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(appGraph, featureGraph) }
+        }
+
+        private val appGraph =
+          source(
+            """
+      @DependencyGraph(Unit::class)
+      interface AppGraph
+      """
+          )
+
+        val main =
+          source(
+            """
+                    fun main() {
+                        val appGraph = createGraph<AppGraph>()
+                        val featureGraph = appGraph.asContribution<FeatureGraph.ParentBindings>().featureGraphFactory.create()
+                    }
+                """
+          )
+
+        val featureGraph =
+          source(
+            """
+      @GraphExtension(String::class)
+      interface FeatureGraph {
+          @GraphExtension.Factory
+          interface Factory {
+              fun create(): FeatureGraph
+          }
+
+          @ContributesTo(Unit::class)
+          interface ParentBindings {
+              val featureGraphFactory: FeatureGraph.Factory
+          }
+      }
+      """
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Modify the FeatureGraph class to contribute the factory directly but leave ParentBindings
+    libProject.modify(
+      project.rootDir,
+      fixture.featureGraph,
+      """
+      @GraphExtension(String::class)
+      interface FeatureGraph {
+          @GraphExtension.Factory
+          @ContributesTo(Unit::class)
+          interface Factory {
+              fun create(): FeatureGraph
+          }
+
+          interface ParentBindings {
+              val featureGraphFactory: FeatureGraph.Factory
+          }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Update asContribution type argument
+    project.modify(
+      fixture.main,
+      """
+      fun main() {
+          val appGraph = createGraph<AppGraph>()
+          val featureGraph = appGraph.asContribution<FeatureGraph.Factory>().create()
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build is still marked as success so we have to check the output
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.output).doesNotContain("Incremental compilation failed")
+  }
+
+  @Test
+  fun graphExtensionFactoryContributionInternalChangeIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(main, appGraph, featureGraph)
+
+        private val appGraph =
+          source(
+            """
+      @DependencyGraph(Unit::class)
+      interface AppGraph
+      """
+          )
+
+        val main =
+          source(
+            """
+                    fun main() {
+                        val appGraph = createGraph<AppGraph>()
+                        val featureGraph = appGraph.asContribution<FeatureGraph.ParentBindings>().featureGraphFactory.create()
+                    }
+                """
+          )
+
+        val featureGraph =
+          source(
+            """
+      @GraphExtension(String::class)
+      interface FeatureGraph {
+          @GraphExtension.Factory
+          interface Factory {
+              fun create(): FeatureGraph
+          }
+
+          @ContributesTo(Unit::class)
+          interface ParentBindings {
+              val featureGraphFactory: FeatureGraph.Factory
+          }
+      }
+      """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Modify the FeatureGraph class to contribute the factory directly but leave ParentBindings
+    project.modify(
+      fixture.featureGraph,
+      """
+      @GraphExtension(String::class)
+      interface FeatureGraph {
+          @GraphExtension.Factory
+          @ContributesTo(Unit::class)
+          interface Factory {
+              fun create(): FeatureGraph
+          }
+
+          interface ParentBindings {
+              val featureGraphFactory: FeatureGraph.Factory
+          }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Update asContribution type argument
+    project.modify(
+      fixture.main,
+      """
+      fun main() {
+          val appGraph = createGraph<AppGraph>()
+          val featureGraph = appGraph.asContribution<FeatureGraph.Factory>().create()
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build is still marked as success so we have to check the output
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+  }
+
+  @Test
+  fun changingScopeForContributedInterfaceInGraphExtensionIsDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(main, appGraph, stringProvider)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(myActivity, myActivityInjector) }
+        }
+
+        private val appGraph =
+          source(
+            """
+                        @DependencyGraph(Unit::class)
+                        interface RootGraph {
+                          val appGraph: AppGraph
+                        }
+
+                        @GraphExtension(AppScope::class)
+                        interface AppGraph {
+                          val featureGraph: FeatureGraph
+                        }
+
+                        @GraphExtension(String::class)
+                        interface FeatureGraph
+                    """
+          )
+
+        private val stringProvider =
+          source(
+            """
+            @ContributesTo(AppScope::class)
+            interface StringProvider {
+              @Provides
+              fun provideString(
+                @Named("Feature") featureString: String? = null
+              ) : String = featureString ?: "App"
+            }
+
+            @ContributesTo(String::class)
+            interface FeatureStringProvider {
+              @Provides @Named("Feature")
+              fun provideFeatureString() : String = "Feature"
+
+              @Binds @Named("Feature")
+              fun bindAsNullable(@Named("Feature") featureString: String): String?
+            }
+            """
+              .trimIndent()
+          )
+
+        val main =
+          source(
+            """
+            fun main(): String {
+                val rootGraph = createGraph<RootGraph>()
+                val injector = listOf(rootGraph, rootGraph.appGraph, rootGraph.appGraph.featureGraph)
+                  .filterIsInstance<MyActivityInjector>().first()
+                val myActivity = MyActivity().apply {
+                    injector.inject(this)
+                }
+                return myActivity.string
+            }
+            """
+              .trimIndent()
+          )
+
+        val myActivity =
+          source(
+            """
+            class MyActivity {
+              @Inject
+              lateinit var string: String
+            }
+            """
+              .trimIndent()
+          )
+
+        val myActivityInjector =
+          source(
+            """
+            @ContributesTo(String::class)
+            interface MyActivityInjector {
+              fun inject(whatever: MyActivity)
+            }
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Feature") }
+    // Modify the MyActivityInjector to contribute itself to the AppScope
+    libProject.modify(
+      project.rootDir,
+      fixture.myActivityInjector,
+      """
+      @ContributesTo(AppScope::class)
+      interface MyActivityInjector {
+        fun inject(whatever: MyActivity)
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build is still marked as success so we have to check the output
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("App") }
+  }
+
+  @Test
+  fun multiplatformAndroidPluginWithReportsEnabledShouldNotFailWithFileExistsException() {
+    // AGP-KMP regression test; the fixture overrides buildGradleProject() with a custom
+    // jvm()+android() KMP setup, so it doesn't share the parameter matrix with the rest of the
+    // suite. Run it once (under JVM) instead of repeating the same Android assemble for every
+    // parameter.
+    assumeTrue(target == KmpTarget.JVM)
+    val fixture =
+      object : MetroProject(reportsEnabled = true) {
+        override fun sources() =
+          listOf(
+            source(
+              """
+              data class DummyClass(val abc: Int, val xyz: String)
+              """
+                .trimIndent(),
+              packageName = "com.example.test",
+            )
+          )
+
+        override fun buildGradleProject(): GradleProject {
+          val projectSources = sources()
+          return newGradleProjectBuilder(DslKind.KOTLIN)
+            .withRootProject {
+              sources = projectSources
+              withBuildScript {
+                plugins(
+                  GradlePlugins.Kotlin.multiplatform(),
+                  GradlePlugins.agpKmp,
+                  GradlePlugins.metro,
+                )
+                withKotlin(
+                  """
+                    kotlin {
+                      jvm()
+
+                      android {
+                        namespace = "com.example.test"
+                        minSdk = 36
+                        compileSdk = 36
+                      }
+                    }
+
+                    ${buildMetroBlock()}
+                  """
+                    .trimIndent()
+                )
+              }
+
+              withMetroSettings()
+
+              val androidHome = System.getProperty("metro.androidHome")
+              assumeTrue(androidHome != null) // skip if environment not set up for Android
+              // Use invariantSeparatorsPath for cross-platform .properties file compatibility
+              val sdkDir = File(androidHome).invariantSeparatorsPath
+              withFile("local.properties", "sdk.dir=$sdkDir")
+            }
+            .write()
+        }
+      }
+
+    val project = fixture.gradleProject
+    val numRuns = 3
+
+    repeat(numRuns) { i ->
+      println("Running build ${i + 1}/$numRuns...")
+      build(project.rootDir, "assemble", "--no-configuration-cache", "--rerun-tasks")
+    }
+  }
+
+  /**
+   * Tests that we can properly reload member injections info during IC from metro metadata
+   *
+   * Regression test for https://github.com/ZacSweers/metro/issues/1607
+   */
+  @Test
+  fun memberInjectionsCanReloadFromMetadataInIC() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(appGraph, demoClass, anotherInjectedClass, main)
+
+        private val appGraph =
+          source(
+            """
+            @Suppress("SUSPICIOUS_MEMBER_INJECT_FUNCTION")
+            @DependencyGraph(AppScope::class)
+            interface AppGraph {
+              @Provides
+              fun provideString(): String = "Demo"
+              fun createAnotherInjectedClass(): AnotherInjectedClass
+              fun injectDemoClassMembers(target: DemoClass)
+            }
+            """
+              .trimIndent()
+          )
+
+        private val demoClass =
+          source(
+            """
+            @Inject
+            class DemoClass {
+              @Inject
+              lateinit var injectedString: String
+            }
+            """
+              .trimIndent()
+          )
+
+        val anotherInjectedClass =
+          source(
+            """
+            @Inject
+            class AnotherInjectedClass {
+              init {
+                println("1")
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        private val main =
+          source(
+            """
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              val demoClass = DemoClass()
+              graph.injectDemoClassMembers(demoClass)
+              return demoClass.injectedString
+            }
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed and member injection should work
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Demo") }
+    // Modify AnotherInjectedClass (unrelated to DemoClass member injection)
+    project.modify(
+      fixture.anotherInjectedClass,
+      """
+      @Inject
+      class AnotherInjectedClass {
+        init {
+          println("2")
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build should succeed and member injection should still work
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // This is the key assertion - member injection should still work after IC
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Demo") }
+  }
+
+  /**
+   * Tests that having a graph and its injected dependencies in the same file doesn't cause IC
+   * issues. Previously, `linkDeclarationsInCompilation` would link a file to itself via the
+   * expect/actual tracker, which could cause incorrect IC behavior.
+   *
+   * https://github.com/ZacSweers/metro/pull/883
+   */
+  @Test
+  fun sameFileDeclarationsDoNotCauseSelfReferentialICTracking() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(graphAndDeps, unrelated)
+
+        private val graphAndDeps =
+          source(
+            """
+            @Inject class Target(val string: String)
+
+            @DependencyGraph
+            interface AppGraph {
+              val target: Target
+
+              @Provides fun provideString(): String = "Hello"
+            }
+            """
+              .trimIndent()
+          )
+
+        val unrelated =
+          source(
+            """
+            class Unrelated {
+              fun doSomething(): String = "original"
+            }
+            """
+              .trimIndent()
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    project.modify(
+      fixture.unrelated,
+      """
+      class Unrelated {
+        fun doSomething(): String = "modified"
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+  }
+
+  /**
+   * Tests that adding a new injected (non-assisted) parameter to an @AssistedInject class is
+   * correctly detected during incremental compilation. The factory consumer should see that the
+   * underlying target class has changed and regenerate the factory accordingly.
+   */
+  @Test
+  fun `adding non-assisted param to an assisted inject class is detected in IC with the factory`() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(assistedClass, graphAndMain)
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+            ) {
+              fun call(): String = message + id
+
+              @AssistedFactory
+              fun interface Factory {
+                fun create(id: String): AssistedClass
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        val graphAndMain =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val factory: AssistedClass.Factory
+
+              @Provides fun provideString(): String = "Hello, "
+              @Provides fun provideInt(): Int = 42
+            }
+
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.factory.create("world").call()
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed and run correctly
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world") }
+    // Add a new non-assisted parameter (count: Int) to the assisted class
+    project.modify(
+      fixture.assistedClass,
+      """
+      @AssistedInject
+      class AssistedClass(
+        @Assisted val id: String,
+        val message: String,
+        val count: Int,
+      ) {
+        fun call(): String = message + id + count
+
+        @AssistedFactory
+        fun interface Factory {
+          fun create(id: String): AssistedClass
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build should succeed and the factory should pick up the new parameter
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world42") }
+  }
+
+  @Test
+  fun `adding non-assisted param to an assisted inject class is detected in IC with the factory in a separate file`() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(assistedClass, assistedFactory, graphAndMain)
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+            ) {
+              fun call(): String = message + id
+            }
+            """
+              .trimIndent()
+          )
+
+        val assistedFactory =
+          source(
+            """
+            @AssistedFactory
+            fun interface AssistedClassFactory {
+              fun create(id: String): AssistedClass
+            }
+            """
+              .trimIndent()
+          )
+
+        val graphAndMain =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val factory: AssistedClassFactory
+
+              @Provides fun provideString(): String = "Hello, "
+              @Provides fun provideInt(): Int = 42
+            }
+
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.factory.create("world").call()
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed and run correctly
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world") }
+    // Add a new non-assisted parameter (count: Int) to the assisted class
+    project.modify(
+      fixture.assistedClass,
+      """
+      @AssistedInject
+      class AssistedClass(
+        @Assisted val id: String,
+        val message: String,
+        val count: Int,
+      ) {
+        fun call(): String = message + id + count
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build should succeed and the factory should pick up the new parameter
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world42") }
+  }
+
+  @Test
+  fun `adding non-assisted param to an assisted inject class in a separate module is detected in IC`() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(graphAndMain)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(assistedClass) }
+        }
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+            ) {
+              fun call(): String = message + id
+
+              @AssistedFactory
+              fun interface Factory {
+                fun create(id: String): AssistedClass
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        val graphAndMain =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val factory: AssistedClass.Factory
+
+              @Provides fun provideString(): String = "Hello, "
+              @Provides fun provideInt(): Int = 42
+            }
+
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.factory.create("world").call()
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build should succeed and run correctly
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world") }
+    // Add a new non-assisted parameter (count: Int) to the assisted class in the lib module
+    libProject.modify(
+      project.rootDir,
+      fixture.assistedClass,
+      """
+      @AssistedInject
+      class AssistedClass(
+        @Assisted val id: String,
+        val message: String,
+        val count: Int,
+      ) {
+        fun call(): String = message + id + count
+
+        @AssistedFactory
+        fun interface Factory {
+          fun create(id: String): AssistedClass
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build should succeed and the factory should pick up the new parameter
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world42") }
+  }
+
+  @Test
+  fun `adding non-assisted param to an assisted inject class is detected across three modules`() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(graphAndMain)
+            dependencies(implementation(":factory"), implementation(":lib"))
+          }
+          subproject("factory") {
+            sources(assistedFactory)
+            dependencies(implementation(":lib"))
+          }
+          subproject("lib") { sources(assistedClass) }
+        }
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+            ) {
+              fun call(): String = message + id
+            }
+            """
+              .trimIndent()
+          )
+
+        val assistedFactory =
+          source(
+            """
+            @AssistedFactory
+            fun interface AssistedClassFactory {
+              fun create(id: String): AssistedClass
+            }
+            """
+              .trimIndent()
+          )
+
+        val graphAndMain =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val factory: AssistedClassFactory
+
+              @Provides fun provideString(): String = "Hello, "
+              @Provides fun provideInt(): Int = 42
+            }
+
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.factory.create("world").call()
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build should succeed and run correctly
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world") }
+    // Add a new non-assisted parameter (count: Int) to the assisted class in the lib module
+    libProject.modify(
+      project.rootDir,
+      fixture.assistedClass,
+      """
+      @AssistedInject
+      class AssistedClass(
+        @Assisted val id: String,
+        val message: String,
+        val count: Int,
+      ) {
+        fun call(): String = message + id + count
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build should succeed and the factory should pick up the new parameter
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world42") }
+  }
+
+  /**
+   * Tests that removing a non-assisted parameter from an @AssistedInject class' constructor is
+   * correctly detected during incremental compilation when the factory is contributed into a set
+   * via a @BindingContainer.
+   *
+   * The three-module layout is critical:
+   * - `lib` owns AssistedClass (@AssistedInject with multiple non-assisted params).
+   * - `middle` owns BaseFactory and the @BindingContainer that @Provides @IntoSet the factory; its
+   *   ABI does not change when AssistedClass loses a constructor param because
+   *   AssistedClass.Factory (the interface) is unchanged.
+   * - `root` depends only on `middle` (directly), so Metro reads AssistedClass metadata during
+   *   root's recompilation from a stale cache and regenerates AppGraph$Impl with the old Provider
+   *   arity, producing a NoSuchMethodError at runtime.
+   */
+  @Test
+  fun `removing non-assisted param from an assisted inject class is detected in IC`() {
+    val fixture =
+      object : MetroProject() {
+        override fun buildGradleProject() = multiModuleProject {
+          root {
+            sources(graphAndMain)
+            dependencies(implementation(":middle"))
+          }
+          subproject("middle") {
+            sources(baseFactory, assistedModule)
+            // api so that AssistedClass is on root's compile classpath (Metro needs it to resolve
+            // the AssistedFactory binding). Root's Kotlin *source* never references AssistedClass
+            // directly, so Kotlin IC won't recompile root when AssistedClass's ABI changes —
+            // only Metro's own IC tracking can detect and propagate the change.
+            dependencies(Dependency.api(":lib"))
+          }
+          subproject("lib") { sources(assistedClass) }
+        }
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+              val count: Int,
+            ) {
+              @AssistedFactory
+              fun interface Factory {
+                fun create(id: String): AssistedClass
+              }
+            }
+            """
+              .trimIndent()
+          )
+
+        // BaseFactory lives in :middle so that root's sources never reference :lib at all.
+        val baseFactory =
+          source(
+            """
+            interface BaseFactory {
+              fun create(id: String): Any
+            }
+            """
+              .trimIndent()
+          )
+
+        val assistedModule =
+          source(
+            """
+            @BindingContainer
+            @ContributesTo(AppScope::class)
+            interface AssistedModule {
+              companion object {
+                @Provides
+                @IntoSet
+                fun bindFactory(impl: AssistedClass.Factory): BaseFactory {
+                  return object : BaseFactory {
+                    override fun create(id: String) = impl.create(id)
+                  }
+                }
+              }
+
+              @Multibinds(allowEmpty = true)
+              fun bindFactories(): Set<BaseFactory>
+            }
+            """
+              .trimIndent()
+          )
+
+        val graphAndMain =
+          source(
+            """
+            @DependencyGraph(AppScope::class)
+            interface AppGraph {
+              val factories: Set<BaseFactory>
+
+              @Provides fun provideString(): String = "Hello, "
+              @Provides fun provideInt(): Int = 42
+            }
+
+            fun main(): Int {
+              val graph = createGraph<AppGraph>()
+              return graph.factories.size
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+      }
+
+    val project = fixture.gradleProject
+    val libProject = project.subprojects.first { it.name == "lib" }
+
+    // First build should succeed: 1 factory contributed into the set
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(1) }
+    // Remove the non-assisted parameter (count: Int) from AssistedClass in lib.
+    // This changes AssistedClass.MetroFactory.Companion.create() from a 2-Provider overload
+    // to a 1-Provider overload. Kotlin IC does recompile root (via the api dep chain), but
+    // Metro re-generates AppGraph$Impl using stale cached metadata for AssistedClass and
+    // still emits a call to the old 2-Provider create() → NoSuchMethodError at runtime.
+    libProject.modify(
+      project.rootDir,
+      fixture.assistedClass,
+      """
+      @AssistedInject
+      class AssistedClass(
+        @Assisted val id: String,
+        val message: String,
+      ) {
+        @AssistedFactory
+        fun interface Factory {
+          fun create(id: String): AssistedClass
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build compiles successfully but Metro uses stale metadata for AssistedClass and
+    // generates the wrong create() arity. invokeMain throws NoSuchMethodError until the fix.
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<Int>()).isEqualTo(1) }
+  }
+
+  /**
+   * Tests that auto-generated assisted factories (via `generateAssistedFactories.set(true)`) work
+   * correctly under incremental compilation when only the graph file changes.
+   *
+   * The auto-generated Factory interface and its `create()` function are produced by
+   * `AssistedFactoryFirGenerator` during FIR. Under IC, if the file containing the
+   * `@AssistedInject` class is not dirty, the Factory is loaded from the IC cache. The IR phase
+   * must still be able to find the abstract `create()` function on the cached Factory class.
+   *
+   * Regression test for https://github.com/ZacSweers/metro/issues/1887
+   */
+  @Test
+  fun `auto-generated assisted factory works under IC when only graph file changes`() {
+    val fixture =
+      object : MetroProject() {
+        override fun StringBuilder.onBuildScript() {
+          appendLine(
+            """
+            metro {
+              generateAssistedFactories.set(true)
+            }
+            """
+              .trimIndent()
+          )
+        }
+
+        val assistedClass =
+          source(
+            """
+            @AssistedInject
+            class AssistedClass(
+              @Assisted val id: String,
+              val message: String,
+            ) {
+              fun call(): String = message + id
+            }
+            """
+              .trimIndent()
+          )
+
+        // main() is in a separate file so it is not dirty when only the graph changes.
+        // This avoids FIR re-resolution of .create() in the dirty file; the IC bug
+        // manifests at the IR level (singleAbstractFunction) when processing the graph.
+        val mainFile =
+          source(
+            """
+            fun main(): String {
+              val graph = createGraph<AppGraph>()
+              return graph.factory.create("world").call()
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "Main",
+          )
+
+        val graphFile =
+          source(
+            """
+            @DependencyGraph
+            interface AppGraph {
+              val factory: AssistedClass.Factory
+
+              @Provides fun provideString(): String = "Hello, "
+            }
+            """
+              .trimIndent(),
+            fileNameWithoutExtension = "AppGraph",
+          )
+
+        override fun sources() = listOf(assistedClass, graphFile, mainFile)
+      }
+
+    val project = fixture.gradleProject
+
+    // First build (clean) should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hello, world") }
+    // Modify only the graph file — the @AssistedInject class file is not dirty.
+    // Under IC, the auto-generated Factory is loaded from cache.
+    project.modify(
+      fixture.graphFile,
+      """
+      @DependencyGraph
+      interface AppGraph {
+        val factory: AssistedClass.Factory
+
+        @Provides fun provideString(): String = "Hi, "
+      }
+      """
+        .trimIndent(),
+    )
+
+    // Second build (incremental) should succeed — the IC-cached Factory must still
+    // have its abstract create() function visible to the IR phase.
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+    ifJvmTarget { assertThat(project.invokeMain<String>()).isEqualTo("Hi, world") }
+  }
+
+  /**
+   * Tests that changing the `@DefaultBinding` type argument on a supertype triggers recompilation
+   * and correctly detects the binding change.
+   */
+  @Test
+  fun changingDefaultBindingTypeDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(baseInterface, impl, graph)
+
+        val baseInterface =
+          source(
+            """
+            @DefaultBinding<BaseFactory<*>>
+            interface BaseFactory<T : BaseFactory<T>> : RawFactory
+            interface RawFactory
+            """
+          )
+
+        private val impl =
+          source(
+            """
+            @ContributesBinding(Unit::class)
+            @Inject
+            class Impl : BaseFactory<Impl>
+            """
+          )
+
+        private val graph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface AppGraph {
+              val base: BaseFactory<*>
+            }
+            """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Change @DefaultBinding<Base> to @DefaultBinding<Other> — now the implicit binding type
+    // is Other, but the graph still requests Base, which should cause a missing binding error
+    project.modify(
+      fixture.baseInterface,
+      """
+      @DefaultBinding<RawFactory>
+      interface BaseFactory<T : BaseFactory<T>> : RawFactory
+      interface RawFactory
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output).contains("[Metro/MissingBinding]")
+  }
+
+  /**
+   * Tests that removing `@DefaultBinding` from a supertype triggers recompilation and correctly
+   * detects the now-ambiguous binding.
+   */
+  @Test
+  fun removingDefaultBindingDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(baseInterface, otherInterface, impl, graph)
+
+        val baseInterface =
+          source(
+            """
+            @DefaultBinding<Base>
+            interface Base
+            """
+          )
+
+        private val otherInterface = source("interface Other")
+
+        private val impl =
+          source(
+            """
+            @ContributesBinding(Unit::class)
+            @Inject
+            class Impl : Base, Other
+            """
+          )
+
+        private val graph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface AppGraph {
+              val base: Base
+            }
+            """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed — @DefaultBinding resolves the ambiguity
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Remove @DefaultBinding — now multiple supertypes with no default, should fail
+    project.modify(
+      fixture.baseInterface,
+      """
+      interface Base
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output)
+      .contains(
+        "`@ContributesBinding`-annotated class @dev.zacsweers.metro.ContributesBinding doesn't declare an explicit `binding` type but has multiple supertypes. You must define an explicit bound type in this scenario."
+      )
+  }
+
+  /**
+   * Tests that adding `@DefaultBinding` to a supertype triggers recompilation and correctly
+   * resolves a previously ambiguous binding.
+   */
+  @Test
+  fun addingDefaultBindingDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(baseInterface, otherInterface, impl, graph)
+
+        val baseInterface = source("interface Base")
+
+        private val otherInterface = source("interface Other")
+
+        val impl =
+          source(
+            """
+            @ContributesBinding(Unit::class, binding = binding<Base>())
+            @Inject
+            class Impl : Base, Other
+            """
+          )
+
+        private val graph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface AppGraph {
+              val base: Base
+            }
+            """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed — explicit binding resolves the ambiguity
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Add @DefaultBinding to Base and remove explicit binding from Impl — should still succeed
+    project.modify(
+      fixture.baseInterface,
+      """
+      @DefaultBinding<Base>
+      interface Base
+      """
+        .trimIndent(),
+    )
+    project.modify(
+      fixture.impl,
+      """
+      @ContributesBinding(Unit::class)
+      @Inject
+      class Impl : Base, Other
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlin()
+    assertThat(secondBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+  }
+
+  /**
+   * Tests that changing `@DefaultBinding` on a single-supertype interface triggers recompilation.
+   *
+   * This covers the primary use case: a generic base interface where `@DefaultBinding` specifies a
+   * star-projected type so contributors don't need to repeat `binding = binding<Factory<*>>()`.
+   * When the default binding type changes, downstream graphs must recompile.
+   */
+  @Test
+  fun changingDefaultBindingOnSingleSupertypeDetected() {
+    val fixture =
+      object : MetroProject() {
+        override fun sources() = listOf(factory, impl, graph)
+
+        val factory =
+          source(
+            """
+            @DefaultBinding<Factory<*>>
+            interface Factory<T> {
+              fun create(): T
+            }
+            """
+          )
+
+        private val impl =
+          source(
+            """
+            @ContributesBinding(Unit::class)
+            @Inject
+            class StringFactory : Factory<String> {
+              override fun create(): String = "hello"
+            }
+            """
+          )
+
+        private val graph =
+          source(
+            """
+            @DependencyGraph(Unit::class)
+            interface AppGraph {
+              val factory: Factory<*>
+            }
+            """
+          )
+      }
+
+    val project = fixture.gradleProject
+
+    // First build should succeed — @DefaultBinding<Factory<*>> binds as Factory<*>
+    val firstBuildResult = project.compileKotlin()
+    assertThat(firstBuildResult.task(compileTaskFor())?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+    // Change @DefaultBinding<Factory<*>> to @DefaultBinding<Factory<String>> —
+    // graph requests Factory<*> but the binding now produces Factory<String>, which should fail
+    project.modify(
+      fixture.factory,
+      """
+      @DefaultBinding<Factory<String>>
+      interface Factory<T> {
+        fun create(): T
+      }
+      """
+        .trimIndent(),
+    )
+
+    val secondBuildResult = project.compileKotlinAndFail()
+    assertThat(secondBuildResult.output).contains("[Metro/MissingBinding]")
+  }
+}

@@ -1,0 +1,133 @@
+# FAQ
+
+This is a list of frequently asked questions about Metro. Consider also searching the issue tracker and discussions section of the Metro repo for anything not covered here!
+
+### **Compiler plugins are not a stable API, is Metro safe to use?**
+
+Yes!
+
+While it's true that compiler plugins often require strict version alignment, Metro is explicitly architected to avoid this with a robust built-in compatibility system.
+
+Metro maintains forward compatibility on a best-effort basis (typically at least `N+.2` minor versions, often more) rather than locking you to a specific patch version. This allows a single version of Metro to support a broad range of Kotlin releases and IDE plugin versions simultaneously.
+
+!!! tip "Example"
+
+    The current release of Metro (`0.10.1` at the time of writing) supports Kotlin `2.2.20` all the way through `2.3.20-Beta1` (and will support `2.3.20` final).
+    
+    That's five Kotlin versions (`2.2.20`, `2.2.21`, `2.3.0`, `2.3.10`, and `2.3.20`) plus various intermediate versions bundled in the Kotlin IDE plugin.
+
+You can upgrade your Kotlin version (including across minor updates) or use different IDE versions without needing to wait for a matching Metro release. See the [compatibility docs](compatibility.md) for the full support matrix.
+
+In short — it's a wide, moving window of support that periodically raises the minimum, which isn't terribly dissimilar from any other tool.
+
+### **Why doesn't Metro support kotlin-inject-style `@IntoMap` bindings?**
+
+!!! tip "Some technical context"
+
+    kotlin-inject allows you to provide key/value pairs from an `@IntoMap` function rather than use `@MapKey` annotations.
+
+This allows some dynamism with keys but has some downsides. A few different reasons Metro doesn't use this approach
+
+- Duplicate key checking becomes a runtime failure rather than compile-time.
+- It breaks the ability to expose `Map<Key, () -> Value>` (or `Map<Key, Provider<Value>>`) unless you start manually managing function/provider types yourself.
+- You allocate and throw away a `Pair` instance each time it's called.
+
+### **Why doesn't Metro support functions with parameters for assisted injection?**
+
+!!! tip "Some technical context"
+
+    Metro supports use of function types like `() -> T` for deferred initialization of injected dependencies. Another idea in the same vein is to support function syntax for _assisted_ injection, such that `(String) -> T` could be an implicit assisted factory type for assisted-inject type `T`.
+
+There's a few reasons! Mainly, this is harder to maintain in codebases.
+
+- It makes injection sites _also_ responsible for declaring all the input parameters to that type, vs. just callers to its SAM function. This means that if you change the parameters, you then either have two compiler errors (one missing binding from metro, another to callsites) or you have to spend time finding them all and doing the prop-drilling that generated DI strives to spare you from.
+- They are harder to find (no "find usages" support from your assisted type).
+- They are harder to read (they are nameless).
+
+### **Our codebase is large and modular, so we basically always want contributions to be public and exposed to downstream compilations. How can I enforce this?**
+
+Set `nonPublicContributionSeverity` to `ERROR`. Note this diagnostic only fires for internal `@ExposeImplBinding`-annotated types if you enable `generateContributionProviders`.
+
+### **I use virtual threads on the JVM (Project Loom). Can Metro pin my carrier threads?**
+
+Metro's `DoubleCheck` (used for scoped bindings) synchronizes on the instance's own monitor, like Dagger.
+
+On JDK 21–23, `synchronized` can pin a virtual thread to its carrier if the thread blocks while holding or acquiring the monitor ([JEP 444](https://openjdk.org/jeps/444)). For Metro this can only happen during a scoped binding's _one-time_ initialization, and only if the provider does blocking work — after initialization, reads never touch the monitor.
+
+JDK 24+ removes monitor pinning entirely ([JEP 491](https://openjdk.org/jeps/491)).
+
+If you're on JDK 21–23 with virtual-thread-heavy workloads, avoid blocking I/O in scoped providers (good advice in general) or initialize those bindings during startup.
+
+### **Would you consider putting Metro into a foundation? My team has concerns about solo maintainers**
+
+I would only do this if it makes sense for the project, not for optics. Most open source software is maintained by one person. This probably includes many libraries your team already uses.
+
+This usually comes up in comparison to Dagger. Dagger is also usually only maintained by one or two people at Google. That level of backing is a luxury, not the standard.
+
+Moving to a foundation would not change the maintenance story — it would still be me. If your management requires a different GitHub URL to feel secure, they likely misunderstand how their dependencies are built. I prefer to focus on the project and its surrounding community rather than managing a facade :)
+
+[The best way to support Metro's continued maintenance is to sponsor it](https://www.zacsweers.dev/sponsoring-metro/)!
+
+## Dagger/Hilt FAQ
+
+### **Will Metro add support for dagger-android features or dagger-android interop?**
+
+No. Much of this infra can be recreated as needed in codebases that use it but dagger-android is long-deprecated at this point.
+
+### **In Dagger I could make declarations `internal` and it worked, why doesn't that work in Metro?**
+
+In short, it "works" in Dagger in the same way that any other access of Kotlin internal types "works" in **Java** sources. These types are always `public` (albeit sometimes with mangled names). This led to patterns of `internal` providers, `internal` Dagger modules, etc. This almost certainly also led to some degree of incremental compilation issues since `internal` declarations are usually excluded from a given module's ABI unless you use `@PublishedApi`.
+
+This pattern doesn't fly in Metro because Metro is an all-Kotlin system, meaning it fully understands the Kotlin language's visibility system and must also abide by it. It's necessary for both correctness and incremental compilation.
+
+Test source sets are able to do this because of a separate compiler mechanism called "associated compilations" that allow them to declare external compilations as "friend paths", and that must be configured at the build system level (it's done automatically by KGP for `main`/`test` source sets). Metro _does_ respect associated compilations, and will use `internal` symbols from other modules IFF they are designated "friend" modules.
+
+### **Why doesn't Metro support `@Reusable`?**
+
+!!! tip "Some technical context"
+
+    `@Reusable` works almost identically in code gen as scoped types, it just uses `SingleCheck` instead of `DoubleCheck`. It's basically like using `lazy(NONE)` instead of `lazy(SYNCHRONIZED)`.
+
+A few different reasons Metro doesn't have it
+
+- I think it risks being like `@Stable` in compose where people chase it for perceived performance benefits that they have not profiled or would not actualize if they did. Basically it becomes a premature optimization vector
+    - Ron Shapiro (the author of it) even said you shouldn't use it or scoping in general [for performance reasons] unless you've measured it: https://medium.com/@shapiro.rd/reusable-has-many-of-the-same-costs-as-singleton-c20b5d1ef308
+- Most people don't really know when to use it. It doesn't really strike a balance so much as blurs the line for limited value (see: the first bullet).
+- It invites people to make unclear assumptions. It's pretty simple to assume something stateful is always a new instance or always the same scoped instance. It is harder to envision scenarios where you have stateful types where you don't care about knowing if it's shared or not. You could say this should only be for stateless types then, but then you're deciding...
+    - Do you want to limit instances? Just scope it
+    - Do you not care about limiting instances? Don't scope it
+- What's the expected behavior if you have a `@Reusable` type `Thing` and then request a `Lazy<Thing>` elsewhere? Currently, Metro `DoubleCheck.lazy(...)`'s whatever binding provides it at the injection site, which would then defeat this. To undo that, Metro would need to introduce some means of indicating "what kind" of `Lazy` is needed, which just complicates things for the developer.
+
+### **Will Metro add support for Hilt features or Hilt interop?**
+
+Metro is largely inspired by Dagger and Anvil, but not Hilt. Hilt works in different ways and has different goals. Hilt is largely focused around supporting android components and relies heavily on subcomponents to achieve this.
+
+Some features overlap but just work differently in Metro:
+
+- Instead of `@UninstallModules` and `@TestInstallIn`, Metro graphs can exclude aggregations and contributed bindings can replace other bindings.
+- Hilt has support for injecting `ViewModel`s, but this is entirely doable without Hilt as well by just creating a multibinding. See the [android-app](https://github.com/ZacSweers/metro/tree/main/samples/android-app) sample for an example.
+- Hilt has support for aggregation with `@InstallIn`, Metro uses `@Contributes*` annotations.
+
+Some features are focused around injecting Android framework components. There are two arguably better solutions to this and one not-better solution.
+
+1. (Not better) Expose injector functions on a graph to do member injection directly from the graph.
+2. (Better) Constructor-inject these types using `AppComponentFactory`. This does require minSdk 28. When Hilt was first released in 2020, this was a relatively new API. However, 2020 was a long time ago! minSdk 28+ is much more common today, making this much more feasible of a solution.
+3. (Best) Use an app architecture that better abstracts away the surrounding Android framework components, making them solely entry points.
+
+The rest of Hilt's features focus on gluing these pieces together and also supporting Java (which Metro doesn't support).
+
+### How can I replicate Hilt's `@HiltAndroidTest`?
+
+!!! tip "Some technical context"
+    Hilt's `@HiltAndroidTest` and associated rule allow tests to "replace" bindings in a target graph even if it's compiled in another project.
+
+Metro supports dynamic replacements via a similar feature called [dynamic graphs](https://zacsweers.github.io/metro/latest/dependency-graphs/#dynamic-graphs).
+
+### Can Metro do Hilt's automatic aggregation of transitive dependencies' aggregated bindings?
+
+!!! tip "Some technical context"
+    Hilt can automatically aggregate transitive dependencies' contributed bindings even if they are not explicitly visible to the consuming project.
+
+In short: no. The fact that Hilt does this is a bad thing in my opinion. It essentially defeats the purpose of incremental compilation because you have to write your own version in a dedicated classpath scanning Gradle task that then generates stub sources for all the stuff you were trying to hide upstream.
+
+In Metro, you must play by kotlinc's native incremental compilation rules. If you want to aggregate bindings from transitive dependencies, you must expose them in that project (i.e. Gradle `api` dependencies) or explicitly declare those dependencies in the consuming project.

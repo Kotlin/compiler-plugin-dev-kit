@@ -1,0 +1,74 @@
+# MetroX Android
+
+Core Android support for Metro. This artifact specifically focuses on integration with `AppComponentFactory`, which requires API 28+. As a result, this artifact requires min SDK 28 since it's useless on older versions.
+
+## Usage
+
+For simple cases, all you need to do is
+
+1. Depend on this artifact
+
+    [![Maven Central](https://img.shields.io/maven-central/v/dev.zacsweers.metro/metrox-android.svg)](https://central.sonatype.com/artifact/dev.zacsweers.metro/metrox-android)
+    ```kotlin
+    dependencies {
+      implementation("dev.zacsweers.metro:metrox-android:x.y.z")
+    }
+    ```
+2. Make your `AppGraph` (or equivalent) implement `MetroAppComponentProviders`.
+    ```kotlin
+    @DependencyGraph(AppScope::class)
+    interface AppGraph : MetroAppComponentProviders
+    ```
+3. Make your `Application` subclass implement `MetroApplication` and implement `appComponentProviders`.
+    ```kotlin
+    class MyApp : Application(), MetroApplication {
+      private lateinit var appGraph: AppGraph
+
+      override fun onCreate() {
+        super.onCreate()
+        appGraph = createGraph<AppGraph>()
+      }
+
+      override val appComponentProviders: MetroAppComponentProviders
+        get() = appGraph
+    }
+    ```
+
+## Injecting Android app components
+
+To constructor inject Android app components (`Activity`, `Service`, etc), annotate them with the corresponding map key and contribute them into the maps used by `MetroAppComponentFactory`.
+
+For example, use `@ActivityKey` for an injected `Activity`:
+
+```kotlin
+@ContributesIntoMap(AppScope::class, binding<Activity>())
+@ActivityKey
+class MainActivity(private val fragmentFactory: FragmentFactory): AppCompatActivity()
+```
+
+For other types of components, use `@BroadcastReceiverKey`, `@ContentProviderKey`, and `@ServiceKey` the same way.
+
+Android creates `ContentProvider`s before `Application.onCreate()`. If you constructor-inject your own `ContentProvider`s through `MetroAppComponentFactory`, make sure `appComponentProviders` can be read before `onCreate()`.
+
+Note that the built-in `MetroAppComponentFactory` uses the base `Activity`, `Service`, etc types. If you want to use your own bases (`ComponentActivity`, etc), you'll need to create your own `AppComponentFactory` + relevant multibindings typed to the key you need.
+
+## Advanced
+
+If you have your own custom `AppComponentFactory`, you will need to exclude the MetroX implementation in your `AndroidManifest.xml` via `tools:replace` attribute.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <application
+    ...
+    android:appComponentFactory="your.custom.AppComponentFactory"
+    tools:replace="android:appComponentFactory"
+  >
+  </application>
+</manifest>
+```
+
+Then you can replicate what `MetroAppComponentFactory` does or subclass it in your custom factory.

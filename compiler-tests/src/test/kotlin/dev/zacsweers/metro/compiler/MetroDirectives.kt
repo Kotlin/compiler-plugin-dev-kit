@@ -1,0 +1,233 @@
+// Copyright (C) 2025 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+package dev.zacsweers.metro.compiler
+
+import java.util.EnumSet
+import java.util.Locale
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
+import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
+
+object MetroDirectives : SimpleDirectivesContainer() {
+  val METRO_IGNORE by directive("Ignores this test unless a given property is set to true")
+  val DISABLE_METRO by directive("Disables metro entirely on this module compilation if present.")
+  val COMPILER_VERSION by stringDirective("Target kotlin compiler version, if any")
+  val MIN_COMPILER_VERSION by stringDirective("Minimum kotlin compiler version (inclusive), if any")
+  val MAX_COMPILER_VERSION by stringDirective("Maximum kotlin compiler version (inclusive), if any")
+  // TODO eventually support multiple outputs
+  val CUSTOM_TEST_DATA_PER_COMPILER_VERSION by
+    directive("Generate custom test data files per compiler version")
+  val GENERATE_ASSISTED_FACTORIES by directive("Enable assisted factories generation.")
+  val ENABLE_TOP_LEVEL_FUNCTION_INJECTION by directive("Enable top-level function injection.")
+  val GENERATE_CONTRIBUTION_HINTS by
+    valueDirective("Enable/disable generation of contribution hint generation.") { it.toBoolean() }
+  val GENERATE_CONTRIBUTION_HINTS_IN_FIR by
+    directive("Enable/disable generation of contribution hint generation in FIR.")
+  val GENERATE_CLASSES_IN_IR by
+    valueDirective("Enable/disable generation of metadata-visible hidden classes in IR.") {
+      it.toBoolean()
+    }
+  val PUBLIC_SCOPED_PROVIDER_SEVERITY by
+    enumDirective<MetroOptions.DiagnosticSeverity>(
+      "Control diagnostic severity reporting of public scoped providers."
+    )
+  val SHRINK_UNUSED_BINDINGS by
+    valueDirective("Enable/disable shrinking of unused bindings.") { it.toBoolean() }
+  val STATEMENTS_PER_INIT_FUN by
+    valueDirective("Maximum statements per init function when chunking is enabled.") { it.toInt() }
+  val ENABLE_GRAPH_SHARDING by
+    valueDirective("Enable/disable graph sharding of binding graphs.") { it.toBoolean() }
+  val KEYS_PER_GRAPH_SHARD by
+    valueDirective("Maximum number of binding keys per graph shard when sharding is enabled.") {
+      it.toInt()
+    }
+  val MEMBER_NAMING_STRATEGY by
+    enumDirective<MemberNamingStrategy>(
+      "Strategy for naming generated provider/instance/factory members."
+    )
+  val MERGED_SUPERTYPE_CHUNK_SIZE by
+    valueDirective(
+      "Maximum number of contribution supertypes per chunk when merging contributions in IR. 0 disables chunking."
+    ) {
+      it.toInt()
+    }
+  val ENABLE_SWITCHING_PROVIDERS by
+    valueDirective("Enable SwitchingProviders for deferred class loading.") { it.toBoolean() }
+  val ENABLE_FULL_BINDING_GRAPH_VALIDATION by
+    directive(
+      "Enable/disable full binding graph validation of binds and provides declarations even if they are unused."
+    )
+  val ENABLE_GRAPH_IMPL_CLASS_AS_RETURN_TYPE by
+    directive(
+      "If true changes the return type of generated Graph Factories from the declared interface type to the generated Metro graph type. This is helpful for Dagger/Anvil interop."
+    )
+  val MAX_IR_ERRORS_COUNT by
+    valueDirective(
+      "Maximum number of errors to report before exiting IR processing. Default is 20, must be > 0."
+    ) {
+      it.toInt()
+    }
+  val OPTIONAL_DEPENDENCY_BEHAVIOR by
+    enumDirective<OptionalBindingBehavior>(
+      "Controls the behavior of optional dependencies on a per-compilation basis."
+    )
+  val DIAGNOSTICS_RENDER_MODE by
+    enumDirective<DiagnosticsRenderMode>(
+      "Render mode for diagnostics. RICH output is asserted against .rich golden files with ANSI codes escaped."
+    )
+  val INTEROP_ANNOTATIONS_NAMED_ARG_SEVERITY by
+    enumDirective<MetroOptions.DiagnosticSeverity>(
+      "Control diagnostic severity reporting of interop annotations using positional arguments instead of named arguments."
+    )
+  val NON_PUBLIC_CONTRIBUTION_SEVERITY by
+    enumDirective<MetroOptions.DiagnosticSeverity>(
+      "Control diagnostic severity reporting of @Contributes*-annotated declarations that are non-public."
+    )
+  val UNUSED_GRAPH_INPUTS_SEVERITY by
+    enumDirective<MetroOptions.DiagnosticSeverity>(
+      "Control diagnostic severity reporting of unused graph inputs (factory parameters that are not used by the graph)."
+    )
+  val CONTRIBUTES_AS_INJECT by
+    directive(
+      "If enabled, treats `@Contributes*` annotations (except ContributesTo) as implicit `@Inject` annotations."
+    )
+  val PARALLEL_THREADS by
+    valueDirective("Number of threads to use for parallel Metro processing.") { it.toInt() }
+  val ENABLE_PROVIDER_INLINING by
+    valueDirective("Enable/disable provider body inlining.") { it.toBoolean() }
+  val DESUGARED_PROVIDER_SEVERITY by
+    enumDirective<MetroOptions.DiagnosticSeverity>(
+      "Control diagnostic severity reporting of uses of the desugared `Provider<T>` form. Prefer the function syntax form `() -> T` instead."
+    )
+  val ENABLE_KCLASS_TO_CLASS_INTEROP by
+    directive("Enable KClass/Class interop for multibinding map keys.")
+  val GENERATE_CONTRIBUTION_PROVIDERS by
+    valueDirective(
+      "Generate top-level contribution provider classes with @Provides functions instead of nested @Binds interfaces."
+    ) {
+      it.toBoolean()
+    }
+
+  // Dependency directives.
+  val WITH_ANVIL by directive("Add Anvil as dependency and configure custom annotations.")
+  val WITH_KI_ANVIL by
+    directive("Add kotlin-inject-nnvil as dependency and configure custom annotations.")
+  val WITH_DAGGER by directive("Add Dagger as dependency and configure custom annotations.")
+  val ENABLE_DAGGER_INTEROP by
+    directive("Enable Dagger interop. This implicitly applies WITH_DAGGER directive as well.")
+  val ENABLE_DAGGER_KSP by
+    directive(
+      "Enable Dagger KSP processing. This implicitly applies WITH_DAGGER and ENABLE_DAGGER_INTEROP directives as well."
+    )
+  val ENABLE_ANVIL_KSP by
+    directive(
+      "Enable Anvil KSP processing. This implicitly applies WITH_DAGGER, ENABLE_DAGGER_INTEROP, and WITH_ANVIL directives as well."
+    )
+  val GUICE_ANNOTATIONS by directive("Add Guice as dependency and configure custom annotations.")
+  val ENABLE_GUICE_INTEROP by
+    directive(
+      "Enable Guice runtime interop. This implicitly applies GUICE_ANNOTATIONS directive as well."
+    )
+
+  // Anvil KSP options
+  val ANVIL_GENERATE_DAGGER_FACTORIES by
+    valueDirective("Enable/disable generation of Dagger factories in Anvil KSP.") { it.toBoolean() }
+  val ANVIL_GENERATE_DAGGER_FACTORIES_ONLY by
+    valueDirective(
+      "Enable/disable generating only Dagger factories in Anvil KSP, skip component merging. Default is true."
+    ) {
+      it.toBoolean()
+    }
+  val ANVIL_DISABLE_COMPONENT_MERGING by
+    valueDirective("Enable/disable component merging in Anvil KSP.") { it.toBoolean() }
+  val ANVIL_EXTRA_CONTRIBUTING_ANNOTATIONS by
+    stringDirective(
+      "Colon-separated list of extra contributing annotations for Anvil KSP. Example: 'com.example.MyAnnotation:com.example.OtherAnnotation'."
+    )
+  val KSP_LOG_SEVERITY by
+    valueDirective("KSP logging directive.") { value ->
+      when (val upper = value.uppercase(Locale.US)) {
+        "VERBOSE" ->
+          EnumSet.range(CompilerMessageSeverity.EXCEPTION, CompilerMessageSeverity.LOGGING)
+        else -> EnumSet.of(CompilerMessageSeverity.valueOf(upper))
+      }
+    }
+  val REPORTS_DESTINATION by
+    stringDirective(
+      "Relative path to a directory to dump Metro reports information. Example: 'metro/reports'."
+    )
+  val CHECK_REPORTS by
+    stringDirective(
+      "Specifies report file names to verify against expected files. Can be specified multiple times. " +
+        "Example: 'CHECK_REPORTS: merging-unmatched-exclusions-fir/test/AppGraph'. " +
+        "Expected files should be named '<testFile>/<diagnosticKey>/<path>/<reportName>.txt'. " +
+        "For report names with explicit extensions, append '.txt' to the expected file."
+    )
+  val TRACE_DESTINATION by
+    stringDirective(
+      "Relative path to a directory to dump Metro trace files. Example: 'metro/traces'."
+    )
+  val ENABLE_RUNTIME_TRACING by
+    directive("Enables bytecode/IR tracing for binding injections using androidx.tracing.")
+  val CHECK_TRACES by
+    directive(
+      "Verifies that Metro trace files were generated and follow the expected naming pattern. " +
+        "Verification runs inside MetroReportsChecker."
+    )
+  val ENABLE_CIRCUIT by directive("Enables Circuit code gen.")
+  val WITH_HILT by directive("Add Hilt-core as dependency.")
+  val ENABLE_HILT_INTEROP by
+    directive("Enables Hilt @InstallIn/@AggregatedDeps interop. Implicitly applies WITH_HILT.")
+  val ENABLE_HILT_KSP by
+    directive(
+      "Enable Hilt's KSP processors. Implicitly applies WITH_HILT and ENABLE_DAGGER_KSP since " +
+        "Hilt's processors require Dagger's per-@Provides factory classes to be generated in the " +
+        "same KSP round."
+    )
+  val METRO_DUMP_KT_IR by
+    directive("Like DUMP_KT_IR but uses betterDumpKotlinLike() for nested class name rendering.")
+
+  fun enableDaggerRuntime(directives: RegisteredDirectives): Boolean {
+    return WITH_DAGGER in directives ||
+      ENABLE_DAGGER_INTEROP in directives ||
+      ENABLE_DAGGER_KSP in directives ||
+      ENABLE_ANVIL_KSP in directives ||
+      // Hilt implies Dagger; pull dagger-runtime + javax/jakarta onto the compile classpath so
+      // `Singleton::class` etc. resolve in main modules that only have `// ENABLE_HILT_INTEROP`.
+      enableHilt(directives)
+  }
+
+  fun enableHilt(directives: RegisteredDirectives): Boolean {
+    return WITH_HILT in directives ||
+      ENABLE_HILT_INTEROP in directives ||
+      ENABLE_HILT_KSP in directives
+  }
+
+  fun enableHiltKsp(directives: RegisteredDirectives): Boolean {
+    return ENABLE_HILT_KSP in directives
+  }
+
+  fun enableDaggerRuntimeInterop(directives: RegisteredDirectives): Boolean {
+    return ENABLE_DAGGER_INTEROP in directives ||
+      ENABLE_DAGGER_KSP in directives ||
+      ENABLE_ANVIL_KSP in directives
+  }
+
+  fun enableDaggerKsp(directives: RegisteredDirectives): Boolean {
+    // Hilt's processors need Dagger's KSP processor in the same round to generate the per-@Provides
+    // factory classes that Metro's interop reads via `loadExternalBindingContainer`.
+    return ENABLE_DAGGER_KSP in directives || ENABLE_HILT_KSP in directives
+  }
+
+  fun enableAnvilKsp(directives: RegisteredDirectives): Boolean {
+    return ENABLE_ANVIL_KSP in directives
+  }
+
+  fun enableGuiceAnnotations(directives: RegisteredDirectives): Boolean {
+    return GUICE_ANNOTATIONS in directives || ENABLE_GUICE_INTEROP in directives
+  }
+
+  fun enableGuiceInterop(directives: RegisteredDirectives): Boolean {
+    return ENABLE_GUICE_INTEROP in directives
+  }
+}

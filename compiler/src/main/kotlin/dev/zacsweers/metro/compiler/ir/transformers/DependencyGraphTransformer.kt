@@ -1,0 +1,1050 @@
+// Copyright (C) 2024 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+package dev.zacsweers.metro.compiler.ir.transformers
+
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.compiler.ExitProcessingException
+import dev.zacsweers.metro.compiler.MetroLogger
+import dev.zacsweers.metro.compiler.Origins
+import dev.zacsweers.metro.compiler.diagnostics.MetroDiagnostic
+import dev.zacsweers.metro.compiler.diagnostics.MetroDiagnosticId
+import dev.zacsweers.metro.compiler.diagnostics.MetroSeverity
+import dev.zacsweers.metro.compiler.diagnostics.Note
+import dev.zacsweers.metro.compiler.diagnostics.buildText
+import dev.zacsweers.metro.compiler.exitProcessing
+import dev.zacsweers.metro.compiler.expectAs
+import dev.zacsweers.metro.compiler.expectAsOrNull
+import dev.zacsweers.metro.compiler.fir.MetroDiagnostics
+import dev.zacsweers.metro.compiler.graph.toText
+import dev.zacsweers.metro.compiler.ir.IrBindingContainerResolver
+import dev.zacsweers.metro.compiler.ir.IrBoundTypeResolver
+import dev.zacsweers.metro.compiler.ir.IrContextualTypeKey
+import dev.zacsweers.metro.compiler.ir.IrContributionData
+import dev.zacsweers.metro.compiler.ir.IrContributionMerger
+import dev.zacsweers.metro.compiler.ir.IrContributions
+import dev.zacsweers.metro.compiler.ir.IrMetroContext
+import dev.zacsweers.metro.compiler.ir.IrScope
+import dev.zacsweers.metro.compiler.ir.IrTypeKey
+import dev.zacsweers.metro.compiler.ir.MetroDeclarations
+import dev.zacsweers.metro.compiler.ir.MetroSimpleFunction
+import dev.zacsweers.metro.compiler.ir.ParentContext
+import dev.zacsweers.metro.compiler.ir.ParentContextReader
+import dev.zacsweers.metro.compiler.ir.RuntimeTracingAvailability
+import dev.zacsweers.metro.compiler.ir.UsedKeyCollector
+import dev.zacsweers.metro.compiler.ir.addMetadataVisibleDefaultConstructor
+import dev.zacsweers.metro.compiler.ir.addMetroImplMarkerAnnotation
+import dev.zacsweers.metro.compiler.ir.annotationsIn
+import dev.zacsweers.metro.compiler.ir.chunkSupertypesIfNeeded
+import dev.zacsweers.metro.compiler.ir.computePromotedParents
+import dev.zacsweers.metro.compiler.ir.createIrBuilder
+import dev.zacsweers.metro.compiler.ir.finalizeFakeOverride
+import dev.zacsweers.metro.compiler.ir.getOrCreateMetadataVisibleHiddenNestedClass
+import dev.zacsweers.metro.compiler.ir.graph.BindingGraphGenerator
+import dev.zacsweers.metro.compiler.ir.graph.BindingLookupCache
+import dev.zacsweers.metro.compiler.ir.graph.BindingPropertyContext
+import dev.zacsweers.metro.compiler.ir.graph.ChildGraphScopeInfo
+import dev.zacsweers.metro.compiler.ir.graph.GraphNode
+import dev.zacsweers.metro.compiler.ir.graph.GraphNodes
+import dev.zacsweers.metro.compiler.ir.graph.IrBinding
+import dev.zacsweers.metro.compiler.ir.graph.IrBindingGraph
+import dev.zacsweers.metro.compiler.ir.graph.IrBindingStack
+import dev.zacsweers.metro.compiler.ir.graph.IrGraphExtensionGenerator
+import dev.zacsweers.metro.compiler.ir.graph.IrGraphGenerator
+import dev.zacsweers.metro.compiler.ir.graph.expressions.BindingExpressionDecorator
+import dev.zacsweers.metro.compiler.ir.graph.generatedGraphExtensionData
+import dev.zacsweers.metro.compiler.ir.implements
+import dev.zacsweers.metro.compiler.ir.irCallConstructorWithSameParameters
+import dev.zacsweers.metro.compiler.ir.irExprBodySafe
+import dev.zacsweers.metro.compiler.ir.isAnnotatedWithAny
+import dev.zacsweers.metro.compiler.ir.isExternalParent
+import dev.zacsweers.metro.compiler.ir.metroDumpKotlinLike
+import dev.zacsweers.metro.compiler.ir.metroGraphOrFail
+import dev.zacsweers.metro.compiler.ir.nestedClassOrNull
+import dev.zacsweers.metro.compiler.ir.padForConsole
+import dev.zacsweers.metro.compiler.ir.rawTypeOrNull
+import dev.zacsweers.metro.compiler.ir.regularParameters
+import dev.zacsweers.metro.compiler.ir.render
+import dev.zacsweers.metro.compiler.ir.reportCompat
+import dev.zacsweers.metro.compiler.ir.requireNestedClass
+import dev.zacsweers.metro.compiler.ir.requireSimpleFunction
+import dev.zacsweers.metro.compiler.ir.resolveOverriddenTypeIfAny
+import dev.zacsweers.metro.compiler.ir.stubExpressionBody
+import dev.zacsweers.metro.compiler.ir.supportsTracing
+import dev.zacsweers.metro.compiler.ir.thisReceiverOrFail
+import dev.zacsweers.metro.compiler.ir.trackClassLookup
+import dev.zacsweers.metro.compiler.ir.writeDiagnostic
+import dev.zacsweers.metro.compiler.isGraphImpl
+import dev.zacsweers.metro.compiler.mapToSet
+import dev.zacsweers.metro.compiler.parallelMap
+import dev.zacsweers.metro.compiler.symbols.Symbols
+import dev.zacsweers.metro.compiler.tracing.TraceScope
+import dev.zacsweers.metro.compiler.tracing.diagnosticTag
+import dev.zacsweers.metro.compiler.tracing.trace
+import java.util.concurrent.ForkJoinPool
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.ir.builders.irBlockBody
+import org.jetbrains.kotlin.ir.builders.irCallConstructor
+import org.jetbrains.kotlin.ir.builders.irGetObject
+import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrOverridableDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.overrides.FakeOverrideBuilderStrategy
+import org.jetbrains.kotlin.ir.overrides.IrFakeOverrideBuilder
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
+import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.util.addFakeOverrides
+import org.jetbrains.kotlin.ir.util.classIdOrFail
+import org.jetbrains.kotlin.ir.util.companionObject
+import org.jetbrains.kotlin.ir.util.copyTo
+import org.jetbrains.kotlin.ir.util.file
+import org.jetbrains.kotlin.ir.util.functions
+import org.jetbrains.kotlin.ir.util.getAllSuperclasses
+import org.jetbrains.kotlin.ir.util.hasAnnotation
+import org.jetbrains.kotlin.ir.util.isInterface
+import org.jetbrains.kotlin.ir.util.isObject
+import org.jetbrains.kotlin.ir.util.kotlinFqName
+import org.jetbrains.kotlin.ir.util.primaryConstructor
+import org.jetbrains.kotlin.ir.util.properties
+import org.jetbrains.kotlin.ir.util.propertyIfAccessor
+import org.jetbrains.kotlin.name.ClassId
+
+/**
+ * Result of validating a dependency graph. Contains all information needed to generate the graph
+ * implementation in a subsequent phase.
+ */
+internal data class ValidationResult(
+  val graphClassId: ClassId,
+  val node: GraphNode.Local,
+  val bindingGraph: IrBindingGraph,
+  val sealResult: IrBindingGraph.BindingGraphResult,
+  val graphExtensionGenerator: IrGraphExtensionGenerator,
+  /** Child graph validation results to generate after this graph. */
+  val childValidationResults: List<ValidationResult>,
+  /** Context keys this graph uses from parent (reported back for extraKeeps). */
+  val usedParentContextKeys: Set<IrContextualTypeKey>,
+  val hasErrors: Boolean,
+)
+
+/** Result of validating a single graph extension (used during parallel validation). */
+private data class ExtensionValidationTask(
+  val contributedGraphKey: IrTypeKey,
+  val contributedGraph: IrClass,
+  val accessor: MetroSimpleFunction,
+  val isDirectExtension: Boolean,
+  val validation: ValidationResult,
+  val usedContextKeys: Set<IrContextualTypeKey>,
+)
+
+@Inject
+@SingleIn(IrScope::class)
+internal class DependencyGraphTransformer(
+  context: IrMetroContext,
+  private val contributionData: IrContributionData,
+  private val forkJoinPool: ForkJoinPool?,
+  private val metroDeclarations: MetroDeclarations,
+  private val bindingContainerResolver: IrBindingContainerResolver,
+  private val boundTypeResolver: IrBoundTypeResolver,
+  private val bindingExpressionDecorator: BindingExpressionDecorator,
+  private val runtimeTracingAvailability: RuntimeTracingAvailability,
+  traceScope: TraceScope,
+) : IrMetroContext by context, TraceScope by traceScope {
+
+  private val bindingLookupCache = BindingLookupCache()
+
+  private val contributionMerger: IrContributionMerger =
+    IrContributionMerger(this, contributionData, boundTypeResolver)
+
+  private val graphNodes =
+    GraphNodes(this, metroDeclarations, bindingContainerResolver, contributionMerger)
+
+  private var reportedRuntimeTracingUnavailable = false
+
+  internal fun processGraph(
+    dependencyGraphDeclaration: IrClass,
+    dependencyGraphAnno: IrConstructorCall,
+    graphImpl: IrClass,
+  ) {
+    try {
+      applyIrContributionMergeIfNeeded(dependencyGraphDeclaration, dependencyGraphAnno, graphImpl)
+      @Suppress("RETURN_VALUE_NOT_USED")
+      processGraphInner(
+        dependencyGraphDeclaration,
+        dependencyGraphAnno,
+        graphImpl,
+        parentContext = null,
+      )
+    } catch (_: ExitProcessingException) {
+      // End processing, don't fail up because this would've been warned before
+    }
+  }
+
+  /**
+   * For graphs annotated with `@MergeContributionsInIr`, FIR skipped the contribution-supertype
+   * merge entirely. IR-only class generation also skips FIR-hidden contribution markers so metadata
+   * does not reference classes generated later. Run the merger here in IR and append the merged
+   * supertypes onto the generated `$$Impl` so the binding graph builder picks them up via
+   * `allSupertypesSequence`.
+   */
+  private fun applyIrContributionMergeIfNeeded(
+    graphDeclaration: IrClass,
+    graphAnnotation: IrConstructorCall,
+    metroGraph: IrClass,
+  ) {
+    if (
+      !options.generateClassesInIr &&
+        !graphDeclaration.hasAnnotation(Symbols.ClassIds.mergeContributionsInIr)
+    ) {
+      return
+    }
+
+    val contributions =
+      contributionMerger.computeContributions(graphAnnotation, graphDeclaration) ?: return
+    if (contributions.supertypes.isEmpty()) return
+
+    val promotedParents = computePromotedParents(contributions, metroGraph)
+    metroGraph.superTypes +=
+      chunkSupertypesIfNeeded(contributions.supertypes, metroGraph, promotedParents)
+    // FIR2IR populated metroGraph's fake overrides before this transformer ran, so the contribution
+    // accessors we just added through new supertypes (markers, promoted parents, or chunks) are
+    // missing. Rebuilding reconciles existing fake overrides with the new supertype hierarchy so
+    // Metro's downstream IR pipeline can discover the accessors and synthesize implementations,
+    // without producing duplicates for members like equals that already had FIR2IR overrides bound
+    // to a different supertype path.
+    IrFakeOverrideBuilder(irTypeSystemContext, MetroFakeOverrideBuilderStrategy, emptyList())
+      .buildFakeOverridesForClass(metroGraph, oldSignatures = false)
+    reconcileContributionOverrides(metroGraph, contributions)
+
+    contributions.supertypes.forEach { marker ->
+      marker.rawTypeOrNull()?.let { trackClassLookup(graphDeclaration, it) }
+    }
+    promotedParents.values.forEach { parent ->
+      parent.rawTypeOrNull()?.let { trackClassLookup(graphDeclaration, it) }
+    }
+  }
+
+  private fun reconcileContributionOverrides(metroGraph: IrClass, contributions: IrContributions) {
+    val contributionClasses = contributions.supertypes.mapNotNull { it.rawTypeOrNull() }
+    if (contributionClasses.isEmpty()) return
+
+    val graphProperties = metroGraph.properties.groupBy { it.name }
+    for (contributionProperty in contributionClasses.flatMap { it.properties }) {
+      val matchingProperties = graphProperties[contributionProperty.name] ?: continue
+      for (graphProperty in matchingProperties) {
+        graphProperty.addOverriddenSymbol(contributionProperty.symbol)
+        graphProperty.getter?.let { graphGetter ->
+          contributionProperty.getter?.let { graphGetter.addOverriddenSymbol(it.symbol) }
+        }
+        graphProperty.setter?.let { graphSetter ->
+          contributionProperty.setter?.let { graphSetter.addOverriddenSymbol(it.symbol) }
+        }
+      }
+    }
+
+    val graphFunctions = metroGraph.functions.groupBy { it.name }
+    for (contributionFunction in contributionClasses.flatMap { it.functions }) {
+      val matchingFunctions = graphFunctions[contributionFunction.name] ?: continue
+      matchingFunctions
+        .filter { it.hasSameValueParameterShape(contributionFunction) }
+        .forEach { it.addOverriddenSymbol(contributionFunction.symbol) }
+    }
+  }
+
+  private fun IrSimpleFunction.hasSameValueParameterShape(other: IrSimpleFunction): Boolean {
+    val parameters = regularParameters
+    val otherParameters = other.regularParameters
+    if (parameters.size != otherParameters.size) return false
+    return parameters.zip(otherParameters).all { (parameter, otherParameter) ->
+      parameter.type == otherParameter.type
+    }
+  }
+
+  private fun <S : IrSymbol> IrOverridableDeclaration<S>.addOverriddenSymbol(symbol: S) {
+    if (symbol !in overriddenSymbols) {
+      overriddenSymbols += symbol
+    }
+  }
+
+  /**
+   * Processes a dependency graph through validation and generation phases.
+   *
+   * For root graphs (parentContext == null): validates all graphs in the tree, then generates
+   * parent-first so children can resolve property tokens against finalized parent properties.
+   *
+   * For child graphs (parentContext != null): only validates, returning the result. Generation is
+   * handled by the parent after it generates its own properties.
+   */
+  private fun processGraphInner(
+    dependencyGraphDeclaration: IrClass,
+    dependencyGraphAnno: IrConstructorCall,
+    metroGraph: IrClass,
+    parentContext: ParentContext?,
+  ): IrBindingGraph.BindingGraphResult? {
+    val graphClassId = dependencyGraphDeclaration.classIdOrFail
+
+    if (dependencyGraphDeclaration.isExternalParent) {
+      // Externally compiled, just use its generated class
+      return null
+    }
+
+    val tag = dependencyGraphDeclaration.kotlinFqName.shortName().asString()
+    val diagnosticTag = dependencyGraphDeclaration.diagnosticTag
+
+    // Phase 1: Validate the entire graph tree (recursively validates children)
+    return trace("[$tag] Transform dependency graph") {
+      val validationResult =
+        trace("Prepare and validate") {
+          validateDependencyGraph(
+            graphClassId,
+            dependencyGraphDeclaration,
+            dependencyGraphAnno,
+            metroGraph,
+            parentContext,
+            diagnosticTag,
+          )
+        }
+
+      if (validationResult.hasErrors) {
+        validationResult.sealResult
+      } else {
+        // Phase 2: Generate (only for root graphs - children are generated by parent)
+        if (parentContext == null) {
+          generateDependencyGraph(validationResult, parentBindingContext = null)
+        }
+        validationResult.sealResult
+      }
+    }
+  }
+
+  /**
+   * Validates a dependency graph and all its children, returning a [ValidationResult] that can be
+   * used to generate the graph implementation.
+   *
+   * This phase:
+   * 1. Builds the binding graph
+   * 2. Recursively validates child graphs (collecting their ValidationResults)
+   * 3. Seals/validates the binding graph
+   * 4. Marks bindings used from parent context
+   *
+   * Actual code generation (property creation, accessor implementation) is deferred to
+   * [generateDependencyGraph] so that parent properties are finalized before children generate.
+   */
+  context(traceScope: TraceScope)
+  private fun validateDependencyGraph(
+    graphClassId: ClassId,
+    dependencyGraphDeclaration: IrClass,
+    dependencyGraphAnno: IrConstructorCall,
+    metroGraph: IrClass,
+    parentContextReader: ParentContextReader?,
+    diagnosticTag: String,
+  ): ValidationResult {
+    val node =
+      graphNodes.getOrComputeNode(
+        dependencyGraphDeclaration,
+        IrBindingStack(
+          dependencyGraphDeclaration,
+          metroContext.loggerFor(MetroLogger.Type.GraphNodeConstruction),
+        ),
+        diagnosticTag,
+        metroGraph,
+        dependencyGraphAnno,
+      ) as GraphNode.Local
+
+    // Generate creator functions
+    trace("Implement creator functions") {
+      implementCreatorFunctions(node.sourceGraph, node.creator, metroGraph)
+    }
+
+    val bindingGraph =
+      trace("Build binding graph") {
+        BindingGraphGenerator(
+            metroContext,
+            this,
+            node,
+            metroDeclarations,
+            contributionData,
+            parentContextReader,
+            bindingLookupCache,
+            boundTypeResolver,
+          )
+          .generate()
+      }
+
+    val graphExtensionGenerator =
+      IrGraphExtensionGenerator(
+        metroContext,
+        contributionMerger,
+        bindingContainerResolver,
+        node.sourceGraph.metroGraphOrFail,
+      )
+
+    // Collect child validation results for deferred generation (populated if there are extensions)
+    val childValidationResults = mutableListOf<ValidationResult>()
+    var usedParentContextKeys: Set<IrContextualTypeKey> = emptySet()
+    var hasErrors = false
+
+    // Before validating/sealing the parent graph, analyze contributed child graphs to
+    // determine any parent-scoped static bindings that are required by children and
+    // add synthetic roots for them so they are materialized in the parent.
+    if (node.graphExtensions.isNotEmpty()) {
+      // Collect parent-available scoped binding keys to match against
+      // @Binds not checked because they cannot be scoped!
+      // If parent is a real ParentContext, reuse it (sequential mode - shares context stack).
+      // If parent is a snapshot-backed reader (parallel mode), create fresh with the snapshot
+      // reader as ancestorReader so scope checks and mark() calls can delegate to ancestor
+      // levels not represented in the local level stack.
+      val localParentContext =
+        (parentContextReader as? ParentContext)
+          ?: ParentContext(metroContext, parent = parentContextReader)
+
+      // This instance
+      localParentContext.add(node.typeKey)
+
+      // @Provides
+      node.providerFactories.values.flatten().forEach { providerFactory ->
+        if (providerFactory.annotations.isScoped) {
+          // skip @GraphPrivate bindings
+          if (providerFactory.typeKey !in node.graphPrivateKeys) {
+            localParentContext.add(providerFactory.typeKey)
+          }
+        }
+      }
+
+      // Instance bindings
+      node.creator?.parameters?.regularParameters?.forEach { parameter ->
+        // skip @GraphPrivate bindings
+        if (parameter.typeKey !in node.graphPrivateKeys) {
+          // Make both provides and includes available
+          localParentContext.add(parameter.typeKey)
+        }
+      }
+
+      // Published @Binds keys: non-private @Binds whose source is @GraphPrivate are exposed to
+      // child graphs as parent-resolved dependencies (the child can't inherit the @Binds alias
+      // since it can't resolve the private source type).
+      localParentContext.addAll(node.publishedBindsKeys)
+
+      // Included graph dependencies. Only include the current level, transitively included ones
+      // will already be in the parent context
+      for (included in node.includedGraphNodes.values) {
+        localParentContext.addAll(included.publicAccessors)
+      }
+
+      // Two passes on graph extensions
+      // Shallow first pass to create any keys for non-factory-returning types
+      val directExtensions = mutableSetOf<IrTypeKey>()
+      for ((typeKey, accessors) in node.graphExtensions) {
+        if (typeKey in bindingGraph) continue // Skip if already in graph
+
+        for (extensionAccessor in accessors) {
+          if (extensionAccessor.isFactory) {
+            // It's a factory returner instead
+            localParentContext.add(extensionAccessor.key.typeKey)
+            continue
+          }
+
+          if (!extensionAccessor.isFactorySAM) {
+            localParentContext.add(typeKey)
+            directExtensions.add(typeKey)
+          }
+        }
+      }
+
+      // Transform the contributed graphs
+      // Push the parent graph for all contributed graph processing
+      localParentContext.pushParentGraph(node)
+
+      // Pre-build all extension graph impl classes sequentially before parallel validation.
+      // This adds nested classes to the parent graph's declarations list, which must not
+      // happen concurrently with iteration over that list during graph node construction.
+      val prebuiltExtensionGraphs =
+        node.graphExtensions.entries.associate { (contributedGraphKey, accessors) ->
+          contributedGraphKey to
+            graphExtensionGenerator.getOrBuildGraphExtensionImpl(
+              contributedGraphKey,
+              node.sourceGraph,
+              accessors.first().accessor,
+            )
+        }
+
+      // Second pass on graph extensions to actually process them and create GraphExtension bindings
+      // Can run in parallel if executor is available
+      fun validateExtension(
+        contributedGraphKey: IrTypeKey,
+        contributedGraph: IrClass,
+        accessor: MetroSimpleFunction,
+        reader: ParentContextReader,
+        usedKeysProvider: () -> Set<IrContextualTypeKey>,
+      ): ExtensionValidationTask {
+
+        // Validate the child graph
+        val childTag = contributedGraph.kotlinFqName.shortName().asString()
+        val childValidation =
+          trace("[$childTag] Validate child graph") {
+            validateDependencyGraph(
+              contributedGraph.classIdOrFail,
+              contributedGraph,
+              contributedGraph.annotationsIn(metroSymbols.dependencyGraphAnnotations).single(),
+              contributedGraph,
+              reader,
+              diagnosticTag,
+            )
+          }
+
+        return ExtensionValidationTask(
+          contributedGraphKey = contributedGraphKey,
+          contributedGraph = contributedGraph,
+          accessor = accessor,
+          isDirectExtension = contributedGraphKey in directExtensions,
+          validation = childValidation,
+          usedContextKeys = usedKeysProvider(),
+        )
+      }
+
+      val extensionTasks: List<ExtensionValidationTask> =
+        if (forkJoinPool != null && node.graphExtensions.size > 1) {
+          // Parallel mode: create snapshot and validate children concurrently
+          val snapshot = localParentContext.snapshot()
+          node.graphExtensions.entries.toList().parallelMap(forkJoinPool) {
+            (contributedGraphKey, accessors) ->
+            val collector = UsedKeyCollector()
+            validateExtension(
+              contributedGraphKey,
+              prebuiltExtensionGraphs.getValue(contributedGraphKey),
+              accessors.first().accessor,
+              snapshot.asReader(collector),
+              collector::keys,
+            )
+          }
+        } else {
+          // Sequential mode: use shared parent context directly
+          node.graphExtensions.map { (contributedGraphKey, accessors) ->
+            validateExtension(
+              contributedGraphKey,
+              prebuiltExtensionGraphs.getValue(contributedGraphKey),
+              accessors.first().accessor,
+              localParentContext,
+              localParentContext::usedContextKeys,
+            )
+          }
+        }
+
+      // Merge results sequentially
+      for (task in extensionTasks) {
+        childValidationResults.add(task.validation)
+
+        if (task.validation.hasErrors) {
+          hasErrors = true
+          continue
+        }
+
+        if (task.isDirectExtension) {
+          val binding =
+            IrBinding.GraphExtension(
+              typeKey = task.contributedGraphKey,
+              parent = node.sourceGraph,
+              accessor = task.accessor.ir,
+              parentGraphKey = node.typeKey,
+            )
+
+          bindingGraph.addBinding(task.contributedGraphKey, binding, IrBindingStack.empty())
+
+          bindingGraph.keep(
+            binding.contextualTypeKey,
+            IrBindingStack.Entry.generatedExtensionAt(
+              binding.contextualTypeKey,
+              node.sourceGraph.kotlinFqName.asString(),
+              task.accessor.ir,
+            ),
+          )
+        }
+
+        writeDiagnostic(
+          "parent-keys-used",
+          { "${node.sourceGraph.name}-by-${task.contributedGraph.name}.txt" },
+        ) {
+          task.usedContextKeys.sortedBy { it.typeKey }.joinToString(separator = "\n")
+        }
+
+        for (contextKey in task.usedContextKeys) {
+          bindingGraph.keep(contextKey, IrBindingStack.Entry.simpleTypeRef(contextKey))
+          bindingGraph.reserveContextKey(contextKey)
+        }
+      }
+
+      // Pop the parent graph after all contributed graphs are processed
+      usedParentContextKeys = localParentContext.popParentGraph()
+
+      // Write diagnostic for parent keys used in child graphs
+      if (usedParentContextKeys.isNotEmpty()) {
+        writeDiagnostic("parent-keys-used-all", { "${node.sourceGraph.name}.txt" }) {
+          usedParentContextKeys.sortedBy { it.typeKey }.joinToString(separator = "\n")
+        }
+      }
+    }
+
+    // Validate that no accessor exposes a @GraphPrivate binding
+    if (node.graphPrivateKeys.isNotEmpty()) {
+      // Batch by declaration to avoid kotlinc diagnostic deduplication
+      val privateBindingErrors = mutableMapOf<IrDeclaration, MutableList<String>>()
+      for (accessor in node.accessors) {
+        val annotations = accessor.metroFunction.annotations
+        val accessorDeclaresGraphPrivateMultibinds =
+          annotations.isGraphPrivate && annotations.isMultibinds
+        if (accessorDeclaresGraphPrivateMultibinds) {
+          continue
+        }
+        if (accessor.contextKey.typeKey in node.graphPrivateKeys) {
+          // Resolve to the source declaration (the user-authored property/function in the
+          // interface, not the fake override in the generated impl class)
+          val accessorIr = accessor.metroFunction.ir
+          val sourceDeclaration: IrDeclaration =
+            accessorIr.correspondingPropertySymbol?.owner?.resolveOverriddenTypeIfAny()
+              ?: accessorIr.resolveOverriddenTypeIfAny()
+          privateBindingErrors.getOrPut(sourceDeclaration) { mutableListOf() } +=
+            "Cannot expose @GraphPrivate binding '${accessor.contextKey.typeKey.renderForDiagnostic(short = false)}' as a graph accessor. @GraphPrivate bindings are confined to the graph they are provided in."
+        }
+      }
+      if (privateBindingErrors.isNotEmpty()) {
+        for ((sourceDeclaration, messages) in privateBindingErrors) {
+          val combinedMessage = messages.joinToString(separator = "\n\n")
+          reportCompat(
+            irDeclarations = sequenceOf(sourceDeclaration, dependencyGraphDeclaration),
+            factory = MetroDiagnostics.PRIVATE_BINDING_ERROR,
+            a = combinedMessage,
+          )
+        }
+        hasErrors = true
+      }
+    }
+
+    val childGraphScopes =
+      childValidationResults
+        .filter { !it.hasErrors }
+        .map { child ->
+          ChildGraphScopeInfo(
+            reachableKeys = child.sealResult.reachableKeys,
+            scopeNames = child.node.aggregationScopes,
+          )
+        }
+
+    if (runtimeTracingAvailability.isAvailable() && parentContextReader == null) {
+      val tracerType = metroSymbols.tracer!!.defaultType
+      val tracerContextKey = IrContextualTypeKey(IrTypeKey(tracerType))
+      bindingGraph.keep(tracerContextKey, IrBindingStack.Entry.simpleTypeRef(tracerContextKey))
+    }
+
+    val sealResult =
+      bindingGraph.seal(childGraphScopes) { errors ->
+        errors
+          .groupBy { it.factory to it.declaration }
+          .forEach { (key, grouped) ->
+            val (factory, declaration) = key
+            val combinedMessage = grouped.joinToString(separator = "\n\n") { it.message }
+            reportCompat(
+              irDeclarations = sequenceOf(declaration, dependencyGraphDeclaration),
+              factory = factory,
+              a = combinedMessage.padForConsole(),
+            )
+          }
+      }
+
+    sealResult.reportUnusedInputs(dependencyGraphDeclaration)
+
+    if (sealResult.hasErrors) {
+      hasErrors = true
+    }
+
+    // Build validation result (may have errors - caller will check)
+    val validationResult =
+      ValidationResult(
+        graphClassId = graphClassId,
+        node = node,
+        bindingGraph = bindingGraph,
+        sealResult = sealResult,
+        graphExtensionGenerator = graphExtensionGenerator,
+        childValidationResults = childValidationResults,
+        usedParentContextKeys = usedParentContextKeys,
+        hasErrors = hasErrors,
+      )
+
+    if (hasErrors) {
+      // Return early with errors - caller will handle
+      return validationResult
+    }
+
+    // Mark bindings from enclosing parents to ensure they're generated there
+    // Only applicable in graph extensions
+    if (parentContextReader != null) {
+      for (key in sealResult.reachableKeys) {
+        val isSelfKey =
+          key == node.typeKey || key == node.metroGraph?.generatedGraphExtensionData?.typeKey
+        if (!isSelfKey && key in parentContextReader) {
+          @Suppress("RETURN_VALUE_NOT_USED") parentContextReader.mark(key)
+        }
+      }
+    }
+
+    writeDiagnostic(
+      "graph-dump",
+      { "${node.sourceGraph.kotlinFqName.asString().replace(".", "-")}.txt" },
+    ) {
+      bindingGraph.dumpGraph(node.sourceGraph.kotlinFqName.asString(), short = false)
+    }
+
+    return validationResult
+  }
+
+  private fun IrBindingGraph.BindingGraphResult.reportUnusedInputs(graphDeclaration: IrClass) {
+    // IR runs in CLI-only contexts, so IDE-only severities resolve to NONE here.
+    val severity = options.unusedGraphInputsSeverity.resolve(isIde = false)
+    if (!severity.isEnabled) return
+
+    if (unusedKeys.isEmpty()) return
+
+    val (diagnosticFactory, metroSeverity) =
+      when (severity) {
+        WARN -> MetroDiagnostics.UNUSED_GRAPH_INPUT_WARNING to MetroSeverity.WARNING
+        ERROR -> MetroDiagnostics.UNUSED_GRAPH_INPUT_ERROR to MetroSeverity.ERROR
+        // Already checked above, but for exhaustive when
+        else -> return
+      }
+
+    val unusedGraphInputs = unusedKeys.values.filterNotNull().sortedBy { it.typeKey }
+
+    // Group messages by target to avoid kotlinc diagnostic deduplication
+    data class UnusedInputReport(
+      val message: String,
+      val irElement: IrElement?,
+      val reportableDeclaration: IrDeclaration?,
+    )
+
+    val reports = unusedGraphInputs.map { unusedBinding ->
+      val notes = buildList {
+        // Show a hint of what direct node is including this, if any
+        unusedBinding.typeKey.type.rawTypeOrNull()?.let { containerClass ->
+          // Efficient to call here as it should be already cached
+          val transitivelyIncluded =
+            bindingContainerResolver.getCached(containerClass)?.mapToSet { it.typeKey }.orEmpty()
+          val transitivelyUsed =
+            sortedKeys.intersect(transitivelyIncluded).minus(unusedBinding.typeKey)
+          if (transitivelyUsed.isNotEmpty()) {
+            add(
+              Note.help(
+                buildText {
+                  append("the following binding containers are used and transitively included by ")
+                  append(unusedBinding.typeKey.toText())
+                  append(", consider including them directly instead: ")
+                  transitivelyUsed.sorted().forEachIndexed { index, key ->
+                    if (index > 0) append(", ")
+                    append(key.toText())
+                  }
+                }
+              )
+            )
+          }
+        }
+      }
+      val diagnostic =
+        MetroDiagnostic(
+          id = MetroDiagnosticId.UNUSED_GRAPH_INPUTS,
+          severity = metroSeverity,
+          title =
+            buildText {
+              append("Graph input ")
+              append(unusedBinding.typeKey.toText())
+              append(" is unused and can be removed")
+            },
+          notes = notes,
+        )
+      UnusedInputReport(
+        render(diagnostic).padForConsole(),
+        unusedBinding.irElement,
+        unusedBinding.reportableDeclaration,
+      )
+    }
+
+    // Partition: reports with irElement can be reported directly (unique per element)
+    // Reports without irElement need batching by declaration
+    val (withElement, withoutElement) = reports.partition { it.irElement != null }
+    for (report in withElement) {
+      diagnosticReporter.reportAt(
+        report.irElement!!,
+        graphDeclaration.file,
+        diagnosticFactory,
+        report.message,
+      )
+    }
+
+    if (withoutElement.isNotEmpty()) {
+      val graphDeclarationSource =
+        if (graphDeclaration.origin.isGraphImpl) {
+          graphDeclaration.getAllSuperclasses().find {
+            it.isAnnotatedWithAny(metroSymbols.classIds.graphExtensionAnnotations)
+          }
+        } else {
+          graphDeclaration
+        }
+
+      // Group by reportable declaration to batch messages targeting same element
+      withoutElement
+        .groupBy { it.reportableDeclaration }
+        .forEach { (reportableDecl, grouped) ->
+          val combinedMessage = grouped.joinToString(separator = "\n\n") { it.message }
+          reportCompat(
+            irDeclarations = sequenceOf(reportableDecl, graphDeclarationSource),
+            factory = diagnosticFactory,
+            a = combinedMessage,
+          )
+        }
+    }
+  }
+
+  /**
+   * Generates a dependency graph implementation from a validated [ValidationResult].
+   *
+   * This phase runs after all graphs have been validated. It generates parent graphs first, then
+   * children, so that children can resolve property access tokens against the parent's finalized
+   * [BindingPropertyContext].
+   *
+   * @param validationResult The validation result to generate
+   * @param parentBindingContext Parent graph's binding property context for hierarchical lookup.
+   *   Null for root graphs.
+   */
+  context(traceScope: TraceScope)
+  private fun generateDependencyGraph(
+    validationResult: ValidationResult,
+    parentBindingContext: BindingPropertyContext?,
+  ) {
+    val node = validationResult.node
+    val metroGraph = node.metroGraphOrFail
+
+    trace("[${metroGraph.kotlinFqName.shortName().asString()}] Generate graph") {
+      try {
+        reportRuntimeTracingUnavailableOnce(metroGraph)
+        // Generate this graph's implementation. The generator's constructor does non-trivial
+        // work (name-allocator preallocation over graph properties/nested classes), so trace it
+        // separately from generate() to keep that cost visible instead of an opaque leading gap.
+        val generator =
+          trace("Construct IrGraphGenerator") {
+            IrGraphGenerator(
+              metroContext = metroContext,
+              traceScope = this,
+              diagnosticTag = metroGraph.diagnosticTag,
+              graphNodesByClass = graphNodes::get,
+              node = node,
+              graphClass = metroGraph,
+              bindingGraph = validationResult.bindingGraph,
+              sealResult = validationResult.sealResult,
+              metroDeclarations = metroDeclarations,
+              graphExtensionGenerator = validationResult.graphExtensionGenerator,
+              bindingExpressionDecorator = bindingExpressionDecorator,
+              runtimeTracingAvailability = runtimeTracingAvailability,
+              parentBindingContext = parentBindingContext,
+            )
+          }
+        val bindingPropertyContext = generator.generate()
+
+        // Generate child graphs with this graph's binding context as their parent
+        for (childResult in validationResult.childValidationResults) {
+          generateDependencyGraph(childResult, parentBindingContext = bindingPropertyContext)
+        }
+      } catch (e: Exception) {
+        if (e is ExitProcessingException) {
+          // Implement unimplemented overrides to reduce noise in failure output
+          // Otherwise compiler may complain that these are invalid bytecode
+          implementCreatorFunctions(
+            node.sourceGraph,
+            node.creator,
+            node.sourceGraph.metroGraphOrFail,
+          )
+
+          node.accessors
+            .asSequence()
+            .map { it.metroFunction.ir }
+            .plus(node.injectors.map { it.metroFunction.ir })
+            .plus(node.bindsCallables.values.flatten().map { it.callableMetadata.function })
+            .plus(node.graphExtensions.flatMap { it.value }.map { it.accessor.ir })
+            .filterNot { it.isExternalParent }
+            .forEach { function ->
+              with(function) {
+                val declarationToFinalize =
+                  propertyIfAccessor.expectAs<IrOverridableDeclaration<*>>()
+                if (declarationToFinalize.isFakeOverride) {
+                  declarationToFinalize.finalizeFakeOverride(
+                    metroGraph.thisReceiverOrFail.copyTo(this)
+                  )
+                  body =
+                    if (returnType != pluginContext.irBuiltIns.unitType) {
+                      stubExpressionBody(
+                        "Graph transform failed. If you're seeing this at runtime, it means that the Metro compiler plugin reported a compiler error but kotlinc for some reason didn't fail the build!"
+                      )
+                    } else {
+                      pluginContext.createIrBuilder(symbol).run {
+                        irBlockBody { +irReturn(irGetObject(pluginContext.irBuiltIns.unitClass)) }
+                      }
+                    }
+                }
+              }
+            }
+          throw e
+        }
+        throw AssertionError(
+            "Code gen exception while processing ${node.sourceGraph.classIdOrFail}. ${e.message}",
+            e,
+          )
+          .apply {
+            // Don't fill in the stacktrace here as it's not relevant to the issue
+            setStackTrace(emptyArray())
+          }
+      }
+    }
+
+    metroGraph.dumpToMetroLog()
+
+    writeDiagnostic(
+      "graph-dumpKotlin",
+      { "${node.sourceGraph.kotlinFqName.asString().replace(".", "-")}.kt" },
+    ) {
+      metroGraph.metroDumpKotlinLike()
+    }
+  }
+
+  private fun reportRuntimeTracingUnavailableOnce(metroGraph: IrClass) {
+    val reason = runtimeTracingAvailability.unavailableReason ?: return
+    if (!options.enableRuntimeTracing || !platform.supportsTracing()) return
+    if (!reportedRuntimeTracingUnavailable) {
+      reportCompat(metroGraph, MetroDiagnostics.METRO_TRACE_ERROR, reason)
+      reportedRuntimeTracingUnavailable = true
+    }
+    exitProcessing()
+  }
+
+  private fun implementCreatorFunctions(
+    sourceGraph: IrClass,
+    creator: GraphNode.Creator?,
+    metroGraph: IrClass,
+  ) {
+    // NOTE: may not have a companion object if this graph is a contributed graph, which has no
+    // static creators
+    val companionObject = sourceGraph.companionObject() ?: return
+    val factoryCreator = creator?.expectAsOrNull<GraphNode.Creator.Factory>()
+    if (factoryCreator != null) {
+      // TODO would be nice if we could just class delegate to the `Impl` object
+      val implementFactoryFunction: IrClass.() -> Unit = {
+        val ownerClass = this
+        val samName = factoryCreator.function.name.asString()
+        requireSimpleFunction(samName).owner.apply {
+          if (isFakeOverride) {
+            finalizeFakeOverride(ownerClass.thisReceiverOrFail)
+          }
+          val createFunction = this
+          body =
+            pluginContext.createIrBuilder(symbol).run {
+              irExprBodySafe(
+                irCallConstructorWithSameParameters(
+                  source = createFunction,
+                  constructor = metroGraph.primaryConstructor!!.symbol,
+                )
+              )
+            }
+        }
+      }
+
+      // Implement the factory's `Impl` class if present
+      val factoryImpl = factoryCreator.type.graphFactoryImplClass().apply(implementFactoryFunction)
+
+      if (
+        factoryCreator.type.isInterface &&
+          companionObject.implements(factoryCreator.type.classIdOrFail)
+      ) {
+        // Implement the interface creator function directly in this companion object
+        companionObject.implementFactoryFunction()
+      } else {
+        companionObject.apply {
+          // Implement a factory() function that returns the factory impl instance
+          requireSimpleFunction(Symbols.StringNames.FACTORY).owner.apply {
+            if (origin == Origins.MetroGraphFactoryCompanionGetter) {
+              if (isFakeOverride) {
+                finalizeFakeOverride(companionObject.thisReceiverOrFail)
+              }
+              body =
+                pluginContext.createIrBuilder(symbol).run {
+                  irExprBodySafe(
+                    if (factoryImpl.isObject) {
+                      irGetObject(factoryImpl.symbol)
+                    } else {
+                      irCallConstructor(factoryImpl.primaryConstructor!!.symbol, emptyList())
+                    }
+                  )
+                }
+            }
+          }
+        }
+      }
+    } else {
+      // Generate a no-arg invoke() function
+      companionObject.apply {
+        requireSimpleFunction(Symbols.StringNames.INVOKE).owner.apply {
+          if (isFakeOverride) {
+            finalizeFakeOverride(companionObject.thisReceiverOrFail)
+          }
+          body =
+            pluginContext.createIrBuilder(symbol).run {
+              irExprBodySafe(irCallConstructor(metroGraph.primaryConstructor!!.symbol, emptyList()))
+            }
+        }
+      }
+    }
+
+    companionObject.dumpToMetroLog()
+  }
+
+  private fun IrClass.graphFactoryImplClass(): IrClass {
+    nestedClassOrNull(Symbols.Names.Impl)?.let {
+      return it
+    }
+
+    return if (options.generateClassesInIr) {
+      getOrCreateGraphFactoryImplShell()
+    } else {
+      requireNestedClass(Symbols.Names.Impl)
+    }
+  }
+
+  context(context: IrMetroContext)
+  private fun IrClass.getOrCreateGraphFactoryImplShell(): IrClass {
+    return getOrCreateMetadataVisibleHiddenNestedClass(
+        name = Symbols.Names.Impl,
+        origin = Origins.GraphFactoryImplClassDeclaration,
+        kind = ClassKind.OBJECT,
+        superTypesProvider = {
+          listOf(this@getOrCreateGraphFactoryImplShell.symbol.defaultType)
+        },
+        copyTypeParameters = false,
+      )
+      .apply {
+        addMetroImplMarkerAnnotation()
+        addMetadataVisibleDefaultConstructor()
+        addFakeOverrides(context.irTypeSystemContext)
+      }
+  }
+}
+
+private object MetroFakeOverrideBuilderStrategy :
+  FakeOverrideBuilderStrategy.BindToPrivateSymbols() {
+  override fun postProcessGeneratedFakeOverride(
+    fakeOverride: IrOverridableDeclaration<*>,
+    clazz: IrClass,
+  ) {}
+
+  override fun shouldSeeInternals(
+    thisModule: ModuleDescriptor,
+    memberModule: ModuleDescriptor,
+  ): Boolean = thisModule.shouldSeeInternalsOf(memberModule)
+}

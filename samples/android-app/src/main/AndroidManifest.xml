@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <application
+    android:name=".MetroApp"
+    android:allowBackup="true"
+    android:icon="@mipmap/ic_launcher"
+    android:label="Metro Android Sample"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.Material3.DayNight"
+  >
+    <activity
+      android:name=".MainActivity"
+      android:exported="true"
+      tools:ignore="Instantiatable">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+
+    <provider
+        android:name="androidx.startup.InitializationProvider"
+        android:authorities="${applicationId}.androidx-startup"
+        android:exported="false"
+        tools:node="merge">
+      <!-- Remove to use Application workManagerConfiguration -->
+      <meta-data
+          android:name="androidx.work.WorkManagerInitializer"
+          android:value="androidx.startup"
+          tools:node="remove" />
+      <!-- Use MetroApp's trace driver so sample traces and profiler broadcasts share one sink. -->
+      <meta-data
+          android:name="androidx.tracing.profiler.ConnectedProfilerTracingInitializer"
+          android:value="androidx.startup"
+          tools:node="remove" />
+    </provider>
+  </application>
+</manifest>

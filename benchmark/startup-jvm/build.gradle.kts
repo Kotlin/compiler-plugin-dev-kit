@@ -1,0 +1,20 @@
+// Copyright (C) 2025 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+plugins {
+  alias(libs.plugins.kotlin.jvm)
+  alias(libs.plugins.jmh)
+}
+
+dependencies { jmh(project(":app:component")) }
+
+jmh {
+  warmupIterations = 4
+  iterations = 10
+  fork = 2
+  resultFormat = "JSON"
+  jvmArgs =
+    listOf(
+      "-Dmetro.benchmark.runtimeTraceDir=${rootProject.layout.projectDirectory.dir("app/component/build/metro-runtime-traces").asFile.absolutePath}"
+    )
+  profilers = listOf("gc")
+}
