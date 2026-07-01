@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package dev.zacsweers.metro.compiler.proto;
+
+option java_package = "dev.zacsweers.metro.compiler.proto";
+option java_multiple_files = true;
+
+message DependencyGraphProto {
+  // Required boolean "isGraph"
+  bool is_graph = 1;
+
+  // Provider factory entries with extended metadata
+  // If is_graph is true, this includes _all_ inherited classes' factories too
+  repeated ProviderFactoryProto provider_factories = 2;
+
+  // Set of accessor callable names (strings)
+  repeated string accessor_callable_names = 3;
+
+  // Bit field to represent which accessor indices are multibindings
+  // Stored as multiple 32-bit integers to support >32 accessors
+  repeated int32 multibinding_accessor_indices = 4;
+
+  // Set of all transitively included binding container class IDs (strings)
+  repeated string included_binding_containers = 5;
+}
+
+// Extended provider factory entry with visibility metadata.
+// Used for IR-only factories that are not visible in Kotlin metadata.
+message ProviderFactoryProto {
+  // ClassId of the factory class
+  string class_id = 1;
+  // If true, the factory is IR-generated only and not visible in Kotlin metadata.
+  // Consuming modules must synthesize a stub to link against.
+  bool invisible = 2;
+  // Whether the factory is an object (true) or a class (false)
+  bool is_object = 3;
+  // The callable name of the source @Provides function
+  string callable_name = 4;
+  // Property name (empty string for non-property providers)
+  string property_name = 5;
+  // The newInstance function name
+  string new_instance_name = 6;
+  // If present, callers should materialize this value instead of invoking the factory.
+  InlinedProviderProto inlined = 7;
+}
+
+message InlinedProviderProto {
+  // Current provider inlining materializes a value directly at the call site. If a future
+  // inlineable shape needs different semantics (for example, dependency passthrough), add a new
+  // field here rather than overloading InlinedValueProto.
+  oneof kind {
+    InlinedValueProto value = 1;
+  }
+}
+
+message InlinedValueProto {
+  oneof kind {
+    // Byte and Short constants are widened and materialized using the target type.
+    int32 int_value = 1;
+    int64 long_value = 2;
+    float float_value = 3;
+    double double_value = 4;
+    bool bool_value = 5;
+    string string_value = 6;
+    int32 char_value = 7;
+    bool is_null = 8;
+    string object_class_id = 9;
+    EnumEntryProto enum_value = 10;
+    string class_literal_class_id = 11;
+  }
+}
+
+message EnumEntryProto {
+  string enum_class_id = 1;
+  string entry_name = 2;
+}
+
+message AssistedFactoryImplProto {
+  // The name of the SAM function in the factory interface
+  string sam_function_name = 1;
+
+  // The simple name of the generated impl class
+  string impl_class_name = 2;
+}
+
+message InjectedClassProto {
+  // The simple name of the generated factory class. Can be optional if this only has member injections
+  optional string factory_class_name = 1;
+  // Optional member injections (if any)
+  optional MemberInjectionsProto member_injections = 2;
+}
+
+message MemberInjectionsProto {
+  // The simple name of the generated injector class
+  string injector_class_name = 1;
+
+  repeated string member_inject_functions = 2;
+}
+
+// IMPORTANT: When making breaking changes to this file, you must increment
+// METADATA_VERSION in compiler/build.gradle.kts
+message MetroMetadata {
+  // Metadata version for compatibility checking. Must match METADATA_VERSION in buildconfig.
+  int32 version = 1;
+
+  DependencyGraphProto dependency_graph = 2;
+
+  InjectedClassProto injected_class = 3;
+
+  AssistedFactoryImplProto assisted_factory_impl = 4;
+}

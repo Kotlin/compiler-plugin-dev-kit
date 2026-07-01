@@ -1,0 +1,87 @@
+// Copyright (C) 2025 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+pluginManagement {
+  includeBuild("../build-logic")
+  repositories {
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+    mavenLocal()
+    maven("https://redirector.kotlinlang.org/maven/bootstrap")
+    maven("https://redirector.kotlinlang.org/maven/dev/")
+    // Publications used by IJ
+    // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
+    maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
+  }
+  plugins {
+    id("com.gradle.develocity") version "4.4.3"
+    id("com.android.settings") version "9.2.1"
+  }
+}
+
+dependencyResolutionManagement {
+  versionCatalogs { maybeCreate("libs").apply { from(files("../gradle/libs.versions.toml")) } }
+  repositories {
+    mavenCentral()
+    google()
+    mavenLocal()
+    maven("https://redirector.kotlinlang.org/maven/bootstrap")
+    maven("https://redirector.kotlinlang.org/maven/dev/")
+    // Publications used by IJ
+    // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
+    maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
+  }
+}
+
+plugins {
+  id("com.gradle.develocity")
+  id("com.android.settings")
+}
+
+android {
+  compileSdk = 36
+  targetSdk = 36
+  minSdk = 28
+}
+
+rootProject.name = "metro-samples"
+
+include(
+  ":android-app",
+  ":circuit-app",
+  ":compose-viewmodels:androidApp",
+  ":compose-viewmodels:app",
+  ":compose-viewmodels:desktopApp",
+  ":compose-viewmodels:screen-details",
+  ":compose-viewmodels:screen-home",
+  ":compose-viewmodels:screen-settings",
+  ":graph-analysis",
+  ":integration-tests",
+  ":interop:customAnnotations-dagger",
+  ":interop:customAnnotations-guice",
+  ":interop:customAnnotations-hilt",
+  ":interop:customAnnotations-hilt:lib",
+  ":interop:customAnnotations-kotlinInject",
+  ":interop:dependencies-dagger",
+  ":interop:dependencies-kotlinInject",
+  ":weather-app",
+)
+
+includeBuild("..")
+
+develocity {
+  buildScan {
+    termsOfUseUrl = "https://gradle.com/terms-of-service"
+    termsOfUseAgree = "yes"
+
+    tag(if (System.getenv("CI").isNullOrBlank()) "Local" else "CI")
+
+    obfuscation {
+      username { "Redacted" }
+      hostname { "Redacted" }
+      ipAddresses { addresses -> addresses.map { "0.0.0.0" } }
+    }
+  }
+}
+
+enableFeaturePreview("NO_IMPLICIT_LOOKUP_IN_PARENT_PROJECTS")

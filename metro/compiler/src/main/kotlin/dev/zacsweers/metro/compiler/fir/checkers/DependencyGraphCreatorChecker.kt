@@ -1,0 +1,342 @@
+// Copyright (C) 2024 Zac Sweers
+// SPDX-License-Identifier: Apache-2.0
+package dev.zacsweers.metro.compiler.fir.checkers
+
+import dev.zacsweers.metro.compiler.compat.CompatContext
+import dev.zacsweers.metro.compiler.fir.FirTypeKey
+import dev.zacsweers.metro.compiler.fir.MetroDiagnostics
+import dev.zacsweers.metro.compiler.fir.allScopeClassIds
+import dev.zacsweers.metro.compiler.fir.annotationsIn
+import dev.zacsweers.metro.compiler.fir.bindingContainerErrorMessage
+import dev.zacsweers.metro.compiler.fir.classIds
+import dev.zacsweers.metro.compiler.fir.compatContext
+import dev.zacsweers.metro.compiler.fir.diagnosticString
+import dev.zacsweers.metro.compiler.fir.isBindingContainer
+import dev.zacsweers.metro.compiler.fir.isIntrinsicType
+import dev.zacsweers.metro.compiler.fir.isResolved
+import dev.zacsweers.metro.compiler.fir.metroFirBuiltIns
+import dev.zacsweers.metro.compiler.fir.render
+import dev.zacsweers.metro.compiler.fir.scopeAnnotations
+import dev.zacsweers.metro.compiler.fir.shouldCheckRuntimeTracingGraphInputs
+import dev.zacsweers.metro.compiler.fir.singleAbstractFunction
+import dev.zacsweers.metro.compiler.fir.toClassSymbolCompat
+import dev.zacsweers.metro.compiler.fir.validateApiDeclaration
+import dev.zacsweers.metro.compiler.flatMapToSet
+import dev.zacsweers.metro.compiler.isPlatformType
+import dev.zacsweers.metro.compiler.symbols.Symbols
+import dev.zacsweers.metro.compiler.tracing.trace
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
+import org.jetbrains.kotlin.diagnostics.reportOn
+import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
+import org.jetbrains.kotlin.fir.analysis.checkers.classKind
+import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirClassChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.fullyExpandedClassId
+import org.jetbrains.kotlin.fir.analysis.checkers.toClassLikeSymbol
+import org.jetbrains.kotlin.fir.declarations.FirClass
+import org.jetbrains.kotlin.fir.declarations.toAnnotationClassId
+import org.jetbrains.kotlin.fir.declarations.toAnnotationClassIdSafe
+import org.jetbrains.kotlin.fir.declarations.utils.classId
+import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
+import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.name.ClassId
+
+internal object DependencyGraphCreatorChecker : FirClassChecker(MppCheckerKind.Common) {
+  private val NON_INCLUDES_KINDS = setOf(ClassKind.ENUM_CLASS, ClassKind.ANNOTATION_CLASS)
+
+  context(context: CheckerContext, reporter: DiagnosticReporter)
+  override fun check(declaration: FirClass) {
+    declaration.source ?: return
+    val session = context.session
+    if (
+      declaration
+        .annotationsIn(session, session.classIds.graphFactoryLikeAnnotations)
+        .singleOrNull() == null
+    ) {
+      return
+    }
+    session.trace(name = { "DependencyGraphCreatorChecker(${declaration.classId})" }) {
+      context(session.compatContext) { checkImpl(declaration) }
+    }
+  }
+
+  context(context: CheckerContext, reporter: DiagnosticReporter, compatContext: CompatContext)
+  private fun checkImpl(declaration: FirClass) {
+    val session = context.session
+    val classIds = session.classIds
+
+    val graphFactoryAnnotation =
+      declaration.annotationsIn(session, classIds.graphFactoryLikeAnnotations).singleOrNull()
+        ?: return
+
+    val annotationClassId = graphFactoryAnnotation.toAnnotationClassId(session) ?: return
+    val contributesToAnno =
+      declaration.annotationsIn(session, classIds.contributesToAnnotations).toList()
+    val isContributedExtensionFactory =
+      annotationClassId in classIds.graphExtensionFactoryAnnotations &&
+        contributesToAnno.isNotEmpty()
+
+    if (isContributedExtensionFactory) {
+      // Must be interfaces
+      if (declaration.classKind != ClassKind.INTERFACE) {
+        reporter.reportOn(
+          declaration.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "Contributed @${annotationClassId.relativeClassName.asString()} declarations can only be interfaces.",
+        )
+        return
+      }
+    }
+
+    declaration.validateApiDeclaration(
+      "@${annotationClassId.relativeClassName.asString()} declarations",
+      checkConstructor = true,
+    ) {
+      return
+    }
+
+    val createFunction =
+      declaration.singleAbstractFunction(
+        session,
+        reporter,
+        "@${annotationClassId.relativeClassName.asString()} declarations",
+      ) {
+        return
+      }
+
+    val targetGraph = createFunction.resolvedReturnType.toClassSymbolCompat(session)
+    val targetGraphAnnotation =
+      targetGraph
+        ?.resolvedCompilerAnnotationsWithClassIds
+        ?.annotationsIn(session, classIds.graphLikeAnnotations)
+        ?.singleOrNull()
+    targetGraph?.let {
+      if (targetGraphAnnotation == null) {
+        reporter.reportOn(
+          createFunction.resolvedReturnTypeRef.source ?: declaration.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "@${annotationClassId.relativeClassName.asString()} abstract function '${createFunction.name}' must return a dependency graph but found ${it.classId.asSingleFqName()}.",
+        )
+        return
+      }
+
+      if (isContributedExtensionFactory) {
+        // Target graph must be an extension
+        if (
+          targetGraphAnnotation.toAnnotationClassId(session) !in classIds.graphExtensionAnnotations
+        ) {
+          reporter.reportOn(
+            targetGraphAnnotation.source ?: declaration.source,
+            MetroDiagnostics.GRAPH_CREATORS_ERROR,
+            "@${annotationClassId.relativeClassName.asString()} abstract function '${createFunction.name}' must return a graph extension but found ${it.classId.asSingleFqName()}.",
+          )
+          return
+        }
+        // Factory must be nested in that class
+        val containingClassId = declaration.getContainingClassSymbol()?.classId
+        if (it.classId != containingClassId) {
+          reporter.reportOn(
+            targetGraphAnnotation.source ?: declaration.source,
+            MetroDiagnostics.GRAPH_CREATORS_ERROR,
+            "@${annotationClassId.relativeClassName.asString()} declarations must be nested within the contributed graph they create but was ${containingClassId?.asSingleFqName() ?: "top-level"}.",
+          )
+          return
+        }
+      }
+    }
+
+    val targetGraphScopes = targetGraphAnnotation?.allScopeClassIds(session).orEmpty()
+    val isDependencyGraphFactory = annotationClassId in classIds.dependencyGraphFactoryAnnotations
+    val createsDependencyGraph =
+      targetGraphAnnotation?.toAnnotationClassId(session) in classIds.dependencyGraphAnnotations
+    val checksRuntimeTracingInputs = session.shouldCheckRuntimeTracingGraphInputs()
+    val missingRuntimeTracerInput = !createFunction.hasRuntimeTracerGraphInput(session)
+    if (
+      isDependencyGraphFactory &&
+        createsDependencyGraph &&
+        checksRuntimeTracingInputs &&
+        missingRuntimeTracerInput
+    ) {
+      reporter.reportOn(
+        createFunction.source ?: declaration.source,
+        MetroDiagnostics.METRO_TRACE_ERROR,
+        "Runtime tracing is enabled, so @DependencyGraph.Factory create functions must take a `@Provides tracer: androidx.tracing.Tracer` input.",
+      )
+    }
+
+    if (isContributedExtensionFactory) {
+      val contributedScopes = contributesToAnno.flatMapToSet { it.allScopeClassIds(session) }
+      val overlapping = contributedScopes.intersect(targetGraphScopes)
+      // GraphExtension.Factory must not contribute to the same scope as its containing
+      // graph, otherwise it'd be contributing to itself!
+      if (overlapping.isNotEmpty()) {
+        reporter.reportOn(
+          graphFactoryAnnotation.source ?: declaration.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "${annotationClassId.relativeClassName.asString()} declarations must contribute to a different scope than their contributed graph. However, this factory and its contributed graph both contribute to '${overlapping.map { it.diagnosticString }.single()}'.",
+        )
+        return
+      }
+    }
+
+    val paramTypes = mutableSetOf<FirTypeKey>()
+
+    for (param in createFunction.valueParameterSymbols) {
+      val typeKey = FirTypeKey.from(session, param)
+      if (!paramTypes.add(typeKey)) {
+        reporter.reportOn(
+          param.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "${annotationClassId.relativeClassName.asString()} abstract function parameters must be unique.",
+        )
+      }
+
+      if (param.isVararg) {
+        reporter.reportOn(
+          param.source,
+          MetroDiagnostics.GRAPH_CREATORS_VARARG_ERROR,
+          "${annotationClassId.relativeClassName.asString()} abstract function parameters may not be vararg.",
+        )
+      }
+
+      var isIncludes = false
+      var providesAnnotationClassId: ClassId? = null
+      var isProvides = false
+      var isGraphPrivate = false
+
+      for (annotation in param.resolvedCompilerAnnotationsWithClassIds) {
+        if (!annotation.isResolved) continue
+        val annotationClassId = annotation.toAnnotationClassIdSafe(session) ?: continue
+        when (annotationClassId) {
+          in classIds.includes -> {
+            isIncludes = true
+          }
+
+          in classIds.providesAnnotations -> {
+            providesAnnotationClassId = annotationClassId
+            isProvides = true
+          }
+
+          classIds.graphPrivateAnnotation -> {
+            isGraphPrivate = true
+          }
+        }
+      }
+
+      for (scopeAnnotation in
+        param.resolvedCompilerAnnotationsWithClassIds.scopeAnnotations(session)) {
+        reporter.reportOn(
+          scopeAnnotation.fir.source,
+          MetroDiagnostics.SCOPED_GRAPH_FACTORY_PARAMETER,
+        )
+      }
+
+      // @GraphPrivate on a factory parameter requires @Provides
+      if (isGraphPrivate) {
+        reportInvalidGraphPrivate(param.source, hasValidBindingAnnotation = isProvides)
+      }
+
+      val reportAnnotationCountError = {
+        reporter.reportOn(
+          param.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "${annotationClassId.relativeClassName.asString()} abstract function parameters must be annotated with exactly one @Includes or @Provides.",
+        )
+      }
+      if (isIncludes && isProvides) {
+        reportAnnotationCountError()
+        continue
+      }
+
+      val type = param.resolvedReturnTypeRef.toClassLikeSymbol(session) ?: continue
+
+      // Don't allow the target graph as a param
+      if (type.classId == targetGraph?.classId) {
+        reporter.reportOn(
+          param.resolvedReturnTypeRef.source ?: param.source ?: declaration.source,
+          MetroDiagnostics.GRAPH_CREATORS_ERROR,
+          "${annotationClassId.relativeClassName.asString()} declarations cannot have their target graph type as parameters.",
+        )
+      }
+
+      when {
+        isIncludes -> {
+          val isBindingContainer = type.isBindingContainer(session)
+          if (isBindingContainer) {
+            type.bindingContainerErrorMessage(session, alreadyCheckedAnnotation = true)?.let {
+              bindingContainerErrorMessage ->
+              reporter.reportOn(
+                param.source,
+                MetroDiagnostics.GRAPH_CREATORS_ERROR,
+                "Invalid binding container argument: $bindingContainerErrorMessage",
+              )
+            }
+          } else {
+            if (type.classKind in NON_INCLUDES_KINDS || type.classId.isPlatformType()) {
+              reporter.reportOn(
+                param.source,
+                MetroDiagnostics.GRAPH_CREATORS_ERROR,
+                "@Includes cannot be applied to enums, annotations, or platform types.",
+              )
+            }
+          }
+        }
+
+        isProvides -> {
+          // Reject intrinsic parameter types (Provider, Lazy, MembersInjector, and Function0
+          // when `enableFunctionProviders` is on). Metro generates the provider wrapper for the
+          // bound instance itself, so a pre-wrapped parameter would silently double-wrap.
+          // Mirrors Dagger's BindingElementValidator.checkFrameworkType for @BindsInstance params.
+          val paramType = param.resolvedReturnTypeRef.coneType
+          val paramClassId = paramType.fullyExpandedClassId(session)
+          if (paramClassId.isIntrinsicType(session)) {
+            val rendered = paramType.render(short = true)
+            val base =
+              "`@${providesAnnotationClassId?.shortClassName}` graph factory parameters may not be intrinsic types, but " +
+                "`${param.name.asString()}` is `$rendered`. " +
+                "Remove the wrapper and let Metro handle the underlying type directly."
+            val message =
+              if (
+                session.metroFirBuiltIns.options.enableFunctionProviders &&
+                  paramClassId == Symbols.ClassIds.function0
+              ) {
+                base +
+                  " Note: `enableFunctionProviders` is enabled, so parameter-less Kotlin function literal types " +
+                  "are treated as provider types by Metro and cannot be unique bindings on the graph."
+              } else {
+                base
+              }
+            reporter.reportOn(
+              param.resolvedReturnTypeRef.source ?: param.source,
+              MetroDiagnostics.INTRINSIC_BINDING_ERROR,
+              message,
+            )
+          }
+        }
+
+        else -> {
+          reportAnnotationCountError()
+        }
+      }
+    }
+  }
+
+  /**
+   * Returns true when the factory create method has the root graph input Metro uses to seed
+   * tracing.
+   */
+  private fun FirNamedFunctionSymbol.hasRuntimeTracerGraphInput(session: FirSession): Boolean {
+    return valueParameterSymbols.any { parameter ->
+      val parameterClassId = parameter.resolvedReturnTypeRef.coneType.fullyExpandedClassId(session)
+      val isTracer = parameterClassId == Symbols.ClassIds.tracer
+      val isGraphInput =
+        parameter.resolvedCompilerAnnotationsWithClassIds
+          .annotationsIn(session, session.classIds.providesAnnotations)
+          .any()
+      isTracer && isGraphInput
+    }
+  }
+}

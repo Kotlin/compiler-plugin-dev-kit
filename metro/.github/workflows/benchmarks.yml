@@ -1,0 +1,649 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref1:
+        description: 'Baseline ref: git ref (branch/commit) or Metro version (e.g., 1.0.0)'
+        required: false
+        type: string
+        default: 'main'
+      ref2:
+        description: 'Comparison ref: git ref or Metro version. Leave empty for single-ref benchmark.'
+        required: false
+        type: string
+        default: ''
+      metro:
+        description: 'Benchmark Metro'
+        required: false
+        type: boolean
+        default: true
+      anvil-ksp:
+        description: 'Benchmark Anvil (KSP)'
+        required: false
+        type: boolean
+        default: true
+      anvil-kapt:
+        description: 'Benchmark Anvil (KAPT)'
+        required: false
+        type: boolean
+        default: true
+      kotlin-inject-anvil:
+        description: 'Benchmark kotlin-inject-anvil'
+        required: false
+        type: boolean
+        default: true
+      module_count:
+        description: 'Number of modules to generate'
+        required: false
+        type: string
+        default: '500'
+      run-startup-benchmarks:
+        description: 'Run startup benchmarks (JMH)'
+        required: false
+        type: boolean
+        default: true
+      run-startup-r8-benchmarks:
+        description: 'Run R8-minified startup benchmarks'
+        required: false
+        type: boolean
+        default: true
+      run-build-benchmarks:
+        description: 'Run build benchmarks (Gradle Profiler)'
+        required: false
+        type: boolean
+        default: true
+      run-multiplatform-benchmarks:
+        description: 'Run multiplatform benchmarks using kotlinx-benchmark (Metro only)'
+        required: false
+        type: boolean
+        default: false
+      multiplatform-target:
+        description: 'Target for multiplatform benchmarks'
+        required: false
+        type: choice
+        options:
+          - jvm
+          - js
+          - wasmJs
+          - native
+          - all
+        default: 'jvm'
+      rerun-non-metro:
+        description: 'Re-run non-metro modes on ref2 (default: only metro, uses ref1 results for others)'
+        required: false
+        type: boolean
+        default: false
+      binary-metrics-only:
+        description: 'Build and compare binary metrics only (skip JMH/device benchmarks)'
+        required: false
+        type: boolean
+        default: false
+      force-refresh-gradle-profiler-cache:
+        description: 'Force rebuild gradle-profiler (ignore cache)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Shared job to validate inputs and build modes string
+  validate:
+    name: "Validate inputs"
+    runs-on: ubuntu-slim
+    outputs:
+      modes: ${{ steps.modes.outputs.modes }}
+      is_single_ref: ${{ steps.check_mode.outputs.is_single_ref }}
+      ref1_is_metro_version: ${{ steps.detect_ref_types.outputs.ref1_is_metro_version }}
+      ref2_is_metro_version: ${{ steps.detect_ref_types.outputs.ref2_is_metro_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check benchmark mode
+        id: check_mode
+        run: |
+          if [ -z "${{ inputs.ref2 }}" ]; then
+            echo "is_single_ref=true" >> $GITHUB_OUTPUT
+            echo "Running in single-ref mode (ref1 only)"
+          else
+            echo "is_single_ref=false" >> $GITHUB_OUTPUT
+            echo "Running in comparison mode (ref1 vs ref2)"
+          fi
+
+      - name: Detect ref types (git ref vs Metro version)
+        id: detect_ref_types
+        run: |
+          # Source common utilities
+          source benchmark/benchmark-utils.sh
+
+          # Check ref1
+          if is_metro_version "${{ inputs.ref1 }}"; then
+            echo "ref1_is_metro_version=true" >> $GITHUB_OUTPUT
+            echo "ref1 (${{ inputs.ref1 }}) is a Metro version"
+          else
+            echo "ref1_is_metro_version=false" >> $GITHUB_OUTPUT
+            echo "ref1 (${{ inputs.ref1 }}) is a git ref"
+          fi
+
+          # Check ref2 (if provided)
+          if [ -n "${{ inputs.ref2 }}" ]; then
+            if is_metro_version "${{ inputs.ref2 }}"; then
+              echo "ref2_is_metro_version=true" >> $GITHUB_OUTPUT
+              echo "ref2 (${{ inputs.ref2 }}) is a Metro version"
+            else
+              echo "ref2_is_metro_version=false" >> $GITHUB_OUTPUT
+              echo "ref2 (${{ inputs.ref2 }}) is a git ref"
+            fi
+          else
+            echo "ref2_is_metro_version=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build modes string
+        id: modes
+        run: |
+          modes=""
+          if [ "${{ inputs.metro }}" = "true" ]; then
+            modes="${modes}metro,"
+          fi
+          if [ "${{ inputs.anvil-ksp }}" = "true" ]; then
+            modes="${modes}anvil-ksp,"
+          fi
+          if [ "${{ inputs.anvil-kapt }}" = "true" ]; then
+            modes="${modes}anvil-kapt,"
+          fi
+          if [ "${{ inputs.kotlin-inject-anvil }}" = "true" ]; then
+            modes="${modes}kotlin-inject-anvil,"
+          fi
+          # Remove trailing comma
+          modes="${modes%,}"
+          if [ -z "$modes" ]; then
+            echo "Error: At least one mode must be selected"
+            exit 1
+          fi
+          echo "modes=$modes" >> $GITHUB_OUTPUT
+          echo "Selected modes: $modes"
+
+      - name: Validate git refs
+        run: |
+          # Source common utilities
+          source benchmark/benchmark-utils.sh
+
+          # Fetch all remote branches to ensure we can resolve branch names
+          git fetch --all
+
+          # Validate ref1 (skip if Metro version)
+          if is_metro_version "${{ inputs.ref1 }}"; then
+            echo "ref1 (${{ inputs.ref1 }}) is a Metro version, skipping git validation"
+          else
+            echo "Validating ref1: ${{ inputs.ref1 }}"
+            git rev-parse --verify "${{ inputs.ref1 }}" || git rev-parse --verify "origin/${{ inputs.ref1 }}" || {
+              echo "Error: Invalid git ref: ${{ inputs.ref1 }}"
+              exit 1
+            }
+          fi
+
+          # Validate ref2 (skip if Metro version or empty)
+          if [ -n "${{ inputs.ref2 }}" ]; then
+            if is_metro_version "${{ inputs.ref2 }}"; then
+              echo "ref2 (${{ inputs.ref2 }}) is a Metro version, skipping git validation"
+            else
+              echo "Validating ref2: ${{ inputs.ref2 }}"
+              git rev-parse --verify "${{ inputs.ref2 }}" || git rev-parse --verify "origin/${{ inputs.ref2 }}" || {
+                echo "Error: Invalid git ref: ${{ inputs.ref2 }}"
+                exit 1
+              }
+            fi
+            echo "All refs validated"
+          else
+            echo "Single ref mode - ref1 validated"
+          fi
+
+  # Startup benchmarks using JMH
+  startup-benchmarks:
+    name: "${{ !inputs.run-startup-benchmarks && 'Startup (JMH) (skipped)' || (inputs.ref2 && format('Startup (JMH): {0} vs {1}', inputs.ref1, inputs.ref2) || format('Startup (JMH): {0}', inputs.ref1)) }}"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.run-startup-benchmarks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Gradle
+        uses: ./.github/actions/setup-gradle
+        with:
+          encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+
+      - name: Fetch and checkout refs
+        run: |
+          # Source common utilities
+          source benchmark/benchmark-utils.sh
+
+          git fetch --all
+
+          # Checkout ref1 (skip if Metro version - script will handle METRO_VERSION)
+          if is_metro_version "${{ inputs.ref1 }}"; then
+            echo "ref1 is a Metro version (${{ inputs.ref1 }}), staying on current branch"
+          else
+            git checkout "${{ inputs.ref1 }}" || git checkout -b "${{ inputs.ref1 }}" "origin/${{ inputs.ref1 }}"
+          fi
+
+          # Checkout ref2 if in comparison mode and it's a git ref
+          if [ -n "${{ inputs.ref2 }}" ]; then
+            if is_metro_version "${{ inputs.ref2 }}"; then
+              echo "ref2 is a Metro version (${{ inputs.ref2 }}), will be handled by script"
+            else
+              git checkout "${{ inputs.ref2 }}" || git checkout -b "${{ inputs.ref2 }}" "origin/${{ inputs.ref2 }}"
+            fi
+          fi
+
+          # Return to ref1 as the starting point (if it's a git ref)
+          if ! is_metro_version "${{ inputs.ref1 }}"; then
+            git checkout "${{ inputs.ref1 }}"
+          fi
+
+      - name: Run startup benchmarks
+        run: |
+          cd benchmark
+          BINARY_METRICS_FLAG=""
+          if [ "${{ inputs.binary-metrics-only }}" = "true" ]; then
+            BINARY_METRICS_FLAG="--binary-metrics-only"
+          fi
+          if [ "${{ needs.validate.outputs.is_single_ref }}" = "true" ]; then
+            # Single-ref mode
+            ./run_startup_benchmarks.sh single \
+              --ref "${{ inputs.ref1 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              --count "${{ inputs.module_count }}" \
+              --benchmark jvm \
+              $BINARY_METRICS_FLAG
+          else
+            # Comparison mode
+            RERUN_FLAG=""
+            if [ "${{ inputs.rerun-non-metro }}" = "true" ]; then
+              RERUN_FLAG="--rerun-non-metro"
+            fi
+            ./run_startup_benchmarks.sh compare \
+              --ref1 "${{ inputs.ref1 }}" \
+              --ref2 "${{ inputs.ref2 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              --count "${{ inputs.module_count }}" \
+              --benchmark jvm \
+              $RERUN_FLAG \
+              $BINARY_METRICS_FLAG
+          fi
+
+      - name: Find results directory
+        id: results
+        run: |
+          results_dir=$(ls -td benchmark/startup-benchmark-results/*/ 2>/dev/null | head -1)
+          if [ -z "$results_dir" ]; then
+            echo "Error: No results directory found"
+            exit 1
+          fi
+          echo "results_dir=$results_dir" >> $GITHUB_OUTPUT
+          echo "Results directory: $results_dir"
+
+      - name: Upload startup benchmark results
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-benchmark-results
+          path: ${{ steps.results.outputs.results_dir }}
+          retention-days: 30
+
+      - name: Add startup summary to workflow
+        run: |
+          results_dir="${{ steps.results.outputs.results_dir }}"
+          # Try comparison-summary.md first, then single-summary.md
+          if [ -f "${results_dir}comparison-summary.md" ]; then
+            summary_file="${results_dir}comparison-summary.md"
+          elif [ -f "${results_dir}single-summary.md" ]; then
+            summary_file="${results_dir}single-summary.md"
+          else
+            summary_file=""
+          fi
+
+          if [ -n "$summary_file" ]; then
+            echo "## Startup Benchmark Results (JMH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat "$summary_file" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Startup Benchmark Results (JMH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No summary found. Check the uploaded artifacts for raw results." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Startup benchmarks with R8 minification
+  startup-r8-benchmarks:
+    name: "${{ !inputs.run-startup-r8-benchmarks && 'Startup R8 (JMH) (skipped)' || (inputs.ref2 && format('Startup R8 (JMH): {0} vs {1}', inputs.ref1, inputs.ref2) || format('Startup R8 (JMH): {0}', inputs.ref1)) }}"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.run-startup-r8-benchmarks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Gradle
+        uses: ./.github/actions/setup-gradle
+        with:
+          encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+
+      - name: Fetch and checkout refs
+        run: |
+          # Source common utilities
+          source benchmark/benchmark-utils.sh
+
+          git fetch --all
+
+          # Checkout ref1 (skip if Metro version - script will handle METRO_VERSION)
+          if is_metro_version "${{ inputs.ref1 }}"; then
+            echo "ref1 is a Metro version (${{ inputs.ref1 }}), staying on current branch"
+          else
+            git checkout "${{ inputs.ref1 }}" || git checkout -b "${{ inputs.ref1 }}" "origin/${{ inputs.ref1 }}"
+          fi
+
+          # Checkout ref2 if in comparison mode and it's a git ref
+          if [ -n "${{ inputs.ref2 }}" ]; then
+            if is_metro_version "${{ inputs.ref2 }}"; then
+              echo "ref2 is a Metro version (${{ inputs.ref2 }}), will be handled by script"
+            else
+              git checkout "${{ inputs.ref2 }}" || git checkout -b "${{ inputs.ref2 }}" "origin/${{ inputs.ref2 }}"
+            fi
+          fi
+
+          # Return to ref1 as the starting point (if it's a git ref)
+          if ! is_metro_version "${{ inputs.ref1 }}"; then
+            git checkout "${{ inputs.ref1 }}"
+          fi
+
+      - name: Install diffuse
+        run: ./benchmark/install-diffuse.sh
+
+      - name: Run R8 startup benchmarks
+        run: |
+          cd benchmark
+          BINARY_METRICS_FLAG=""
+          if [ "${{ inputs.binary-metrics-only }}" = "true" ]; then
+            BINARY_METRICS_FLAG="--binary-metrics-only"
+          fi
+          if [ "${{ needs.validate.outputs.is_single_ref }}" = "true" ]; then
+            # Single-ref mode
+            ./run_startup_benchmarks.sh single \
+              --ref "${{ inputs.ref1 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              --count "${{ inputs.module_count }}" \
+              --benchmark jvm-r8 \
+              $BINARY_METRICS_FLAG
+          else
+            # Comparison mode
+            RERUN_FLAG=""
+            if [ "${{ inputs.rerun-non-metro }}" = "true" ]; then
+              RERUN_FLAG="--rerun-non-metro"
+            fi
+            ./run_startup_benchmarks.sh compare \
+              --ref1 "${{ inputs.ref1 }}" \
+              --ref2 "${{ inputs.ref2 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              --count "${{ inputs.module_count }}" \
+              --benchmark jvm-r8 \
+              $RERUN_FLAG \
+              $BINARY_METRICS_FLAG
+          fi
+
+      - name: Find results directory
+        id: results
+        run: |
+          results_dir=$(ls -td benchmark/startup-benchmark-results/*/ 2>/dev/null | head -1)
+          if [ -z "$results_dir" ]; then
+            echo "Error: No results directory found"
+            exit 1
+          fi
+          echo "results_dir=$results_dir" >> $GITHUB_OUTPUT
+          echo "Results directory: $results_dir"
+
+      - name: Upload R8 startup benchmark results
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-r8-benchmark-results
+          path: ${{ steps.results.outputs.results_dir }}
+          retention-days: 30
+
+      - name: Upload diffuse output
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: diffuse-output
+          path: ${{ steps.results.outputs.results_dir }}diffuse/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Add R8 startup summary to workflow
+        run: |
+          results_dir="${{ steps.results.outputs.results_dir }}"
+          # Try comparison-summary.md first, then single-summary.md
+          if [ -f "${results_dir}comparison-summary.md" ]; then
+            summary_file="${results_dir}comparison-summary.md"
+          elif [ -f "${results_dir}single-summary.md" ]; then
+            summary_file="${results_dir}single-summary.md"
+          else
+            summary_file=""
+          fi
+
+          if [ -n "$summary_file" ]; then
+            echo "## Startup Benchmark Results - R8 Minified (JMH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat "$summary_file" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Startup Benchmark Results - R8 Minified (JMH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No summary found. Check the uploaded artifacts for raw results." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Build benchmarks using Gradle Profiler
+  build-benchmarks:
+    name: "${{ !inputs.run-build-benchmarks && 'Build (Gradle Profiler) (skipped)' || (inputs.ref2 && format('Build (Gradle Profiler): {0} vs {1}', inputs.ref1, inputs.ref2) || format('Build (Gradle Profiler): {0}', inputs.ref1)) }}"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.run-build-benchmarks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Gradle
+        uses: ./.github/actions/setup-gradle
+        with:
+          encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+
+      - name: Fetch and checkout refs
+        run: |
+          # Source common utilities
+          source benchmark/benchmark-utils.sh
+
+          git fetch --all
+
+          # Checkout ref1 (skip if Metro version - script will handle METRO_VERSION)
+          if is_metro_version "${{ inputs.ref1 }}"; then
+            echo "ref1 is a Metro version (${{ inputs.ref1 }}), staying on current branch"
+          else
+            git checkout "${{ inputs.ref1 }}" || git checkout -b "${{ inputs.ref1 }}" "origin/${{ inputs.ref1 }}"
+          fi
+
+          # Checkout ref2 if in comparison mode and it's a git ref
+          if [ -n "${{ inputs.ref2 }}" ]; then
+            if is_metro_version "${{ inputs.ref2 }}"; then
+              echo "ref2 is a Metro version (${{ inputs.ref2 }}), will be handled by script"
+            else
+              git checkout "${{ inputs.ref2 }}" || git checkout -b "${{ inputs.ref2 }}" "origin/${{ inputs.ref2 }}"
+            fi
+          fi
+
+          # Return to ref1 as the starting point (if it's a git ref)
+          if ! is_metro_version "${{ inputs.ref1 }}"; then
+            git checkout "${{ inputs.ref1 }}"
+          fi
+
+      - name: Get cache key for gradle-profiler
+        id: gradle-profiler-cache-key
+        run: |
+          # Use week number for ~weekly cache expiration
+          WEEK=$(date +%Y-W%V)
+          echo "week=$WEEK" >> $GITHUB_OUTPUT
+
+      - name: Cache gradle-profiler
+        id: gradle-profiler-cache
+        if: ${{ inputs.force-refresh-gradle-profiler-cache != true }}
+        uses: actions/cache@v6
+        with:
+          path: tmp/gradle-profiler-source/build/install/gradle-profiler
+          key: gradle-profiler-${{ runner.os }}-${{ steps.gradle-profiler-cache-key.outputs.week }}
+          restore-keys: |
+            gradle-profiler-${{ runner.os }}-
+
+      - name: Install gradle-profiler
+        run: ./benchmark/install-gradle-profiler.sh
+
+      - name: Run build benchmarks
+        run: |
+          cd benchmark
+          if [ "${{ needs.validate.outputs.is_single_ref }}" = "true" ]; then
+            # Single-ref mode
+            ./run_benchmarks.sh single \
+              --ref "${{ inputs.ref1 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              ${{ inputs.module_count }}
+          else
+            # Comparison mode
+            RERUN_FLAG=""
+            if [ "${{ inputs.rerun-non-metro }}" = "true" ]; then
+              RERUN_FLAG="--rerun-non-metro"
+            fi
+            ./run_benchmarks.sh compare \
+              --ref1 "${{ inputs.ref1 }}" \
+              --ref2 "${{ inputs.ref2 }}" \
+              --modes "${{ needs.validate.outputs.modes }}" \
+              $RERUN_FLAG \
+              ${{ inputs.module_count }}
+          fi
+
+      - name: Find results directory
+        id: results
+        run: |
+          results_dir=$(ls -td benchmark/benchmark-results/*/ 2>/dev/null | head -1)
+          if [ -z "$results_dir" ]; then
+            echo "Error: No results directory found"
+            exit 1
+          fi
+          echo "results_dir=$results_dir" >> $GITHUB_OUTPUT
+          echo "Results directory: $results_dir"
+
+      - name: Upload build benchmark results
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-benchmark-results
+          path: ${{ steps.results.outputs.results_dir }}
+          retention-days: 30
+
+      - name: Add build summary to workflow
+        run: |
+          results_dir="${{ steps.results.outputs.results_dir }}"
+          # Try comparison-summary.md first, then single-summary.md
+          if [ -f "${results_dir}comparison-summary.md" ]; then
+            summary_file="${results_dir}comparison-summary.md"
+          elif [ -f "${results_dir}single-summary.md" ]; then
+            summary_file="${results_dir}single-summary.md"
+          else
+            summary_file=""
+          fi
+
+          if [ -n "$summary_file" ]; then
+            echo "## Build Benchmark Results (Gradle Profiler)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat "$summary_file" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Build Benchmark Results (Gradle Profiler)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No summary found. Check the uploaded artifacts for raw results." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Multiplatform benchmarks using kotlinx-benchmark (Metro only)
+  # For automated regression tracking, see benchmark-regression.yml
+  multiplatform-benchmarks:
+    name: "${{ !inputs.run-multiplatform-benchmarks && 'Multiplatform (kotlinx-benchmark) (skipped)' || format('Multiplatform: {0}', inputs.multiplatform-target) }}"
+    runs-on: ${{ inputs.multiplatform-target == 'native' && 'macos-latest' || 'ubuntu-latest' }}
+    needs: validate
+    if: inputs.run-multiplatform-benchmarks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref1 }}
+
+      - name: Setup Gradle
+        uses: ./.github/actions/setup-gradle
+        with:
+          encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+
+      - name: Setup Node.js (for JS/WasmJS targets)
+        if: inputs.multiplatform-target == 'js' || inputs.multiplatform-target == 'wasmJs' || inputs.multiplatform-target == 'all'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Run multiplatform benchmark
+        run: |
+          cd benchmark
+          ./run_startup_benchmarks.sh multiplatform \
+            --target "${{ inputs.multiplatform-target }}" \
+            --count "${{ inputs.module_count }}"
+
+      - name: Find results directory
+        id: results
+        run: |
+          results_dir=$(ls -td benchmark/startup-benchmark-results/*/ 2>/dev/null | head -1)
+          if [ -z "$results_dir" ]; then
+            echo "Error: No results directory found"
+            exit 1
+          fi
+          echo "results_dir=$results_dir" >> $GITHUB_OUTPUT
+
+      - name: Generate summary
+        run: |
+          results_dir="${{ steps.results.outputs.results_dir }}"
+          echo "## Multiplatform Benchmark Results (kotlinx-benchmark)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ref:** ${{ inputs.ref1 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target:** ${{ inputs.multiplatform-target }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Module count:** ${{ inputs.module_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Display results for each platform
+          for json_file in "$results_dir"*/main/*/*.json; do
+            if [ -f "$json_file" ]; then
+              platform=$(basename "$json_file" .json)
+              score=$(python3 -c "import json; d=json.load(open('$json_file')); print(f\"{d[0]['primaryMetric']['score']:.4f}\")" 2>/dev/null || echo "N/A")
+              echo "| $platform | ${score} ms/op |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Upload results
+        uses: actions/upload-artifact@v7
+        with:
+          name: multiplatform-benchmark-results
+          path: ${{ steps.results.outputs.results_dir }}
+          retention-days: 7
