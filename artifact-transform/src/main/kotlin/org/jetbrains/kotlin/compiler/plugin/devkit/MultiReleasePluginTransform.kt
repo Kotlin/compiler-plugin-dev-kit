@@ -9,6 +9,7 @@ import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 private const val PLUGIN_VERSIONS_PATH = "META-INF/kotlin/plugin/versions"
 
@@ -38,17 +39,24 @@ abstract class MultiReleasePluginTransform :
             if (manifest.mainAttributes.getValue("Kotlin-Compiler-Plugin-Multi-Release") != "true")
                 return@use
 
-            val versionDir = inputFs.getPath(PLUGIN_VERSIONS_PATH, parameters.kotlinVersion.get())
-            if (!versionDir.exists()) return@use
+            val versionsDir = inputFs.getPath(PLUGIN_VERSIONS_PATH)
+            if (!versionsDir.isDirectory()) return@use
+            val version =
+                VersionResolution.resolveVersion(
+                    KotlinToolingVersion(parameters.kotlinVersion.get()),
+                    versionsDir.listDirectoryEntries().map { KotlinToolingVersion(it.name) },
+                ) ?: return@use
+            val versionDir = versionsDir / version.versionString
 
             val output =
                 outputs
-                    .file(input.name.removeSuffix(".jar") + "-${parameters.kotlinVersion}.jar")
+                    .file(input.name.removeSuffix(".jar") + "-${version.versionString}.jar")
                     .toPath()
 
             return newFileSystem(output, mapOf("create" to true)).use { outputFs ->
                 val outputRoot = outputFs.rootDirectories.single()
                 val outputVersionsDir = outputRoot.resolve(PLUGIN_VERSIONS_PATH)
+                val markerFile = outputRoot.resolve(".marker")
 
                 versionDir.copyToRecursively(outputRoot, followLinks = false)
 
@@ -56,8 +64,12 @@ abstract class MultiReleasePluginTransform :
                     outputRoot,
                     followLinks = false,
                 ) { src, dst ->
-                    if (src == outputVersionsDir) CopyActionResult.SKIP_SUBTREE
-                    else src.copyToIgnoringExistingDirectory(dst, followLinks = false)
+                    when {
+                        dst == markerFile -> CopyActionResult.SKIP_SUBTREE
+                        dst == outputVersionsDir -> CopyActionResult.SKIP_SUBTREE
+                        dst.exists() -> CopyActionResult.CONTINUE
+                        else -> src.copyToIgnoringExistingDirectory(dst, followLinks = false)
+                    }
                 }
             }
         }

@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.4.20-dev-7885"
-buildconfig = "5.6.5"
+buildconfig = "6.0.10"
 node-gradle = "7.0.2"
 animal-sniffer = "2.0.1"
 

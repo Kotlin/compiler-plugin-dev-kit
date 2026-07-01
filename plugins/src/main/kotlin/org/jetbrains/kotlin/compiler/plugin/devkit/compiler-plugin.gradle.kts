@@ -21,12 +21,6 @@ plugins {
     id("idea")
 }
 
-repositories {
-    mavenCentral()
-    maven("https://redirector.kotlinlang.org/maven/bootstrap")
-    maven("https://redirector.kotlinlang.org/maven/dev/")
-}
-
 @OptIn(ExperimentalWasmDsl::class) project.plugins.apply(D8Plugin::class.java)
 
 val annotationsRuntimeClasspath =
@@ -125,12 +119,6 @@ val generateTests =
 
 tasks.compileTestKotlin { dependsOn(generateTests) }
 
-// Uses same convention as Metro
-// https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
-val KotlinToolingVersion.baseVersionName
-    get() = versionString.replace(".", "").replace("-", "_").lowercase()
-val KotlinToolingVersion.versionName
-    get() = "k$baseVersionName"
 val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
@@ -156,12 +144,26 @@ private fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) = config
     named(runtimeClasspathConfigurationName) { resolutionStrategy.forceKotlinVersion(version) }
 }
 
+val versionMarker =
+    tasks.register("versionMarker") {
+        val markerFile = layout.buildDirectory.file("compiler-plugin-devkit/.marker")
+        outputs.file(markerFile).withPropertyName("versionMarker")
+        doLast {
+            markerFile.get().asFile.apply {
+                parentFile.mkdirs()
+                writeText("")
+            }
+        }
+    }
+
 // Based on mrjar and Gradle test-fixtures sourceSet setup
 // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
 // https://github.com/melix/mrjar-gradle-plugin
 kotlinVersionsToTestAgainst.all {
     val main =
         sourceSets.register(versionName) {
+            java.setSrcDirs(listOf("$versionName/src/main/java", "$versionName/src/main/kotlin"))
+            resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
             forceKotlinVersion(this@all)
             dependencies {
                 compileOnlyConfigurationName(kotlin("compiler"))
@@ -187,11 +189,14 @@ kotlinVersionsToTestAgainst.all {
 
     testing.suites.register<JvmTestSuite>("${versionName}Test") {
         dependencies {
+            implementation(testFixtures(project()))
             // allow it to see shared test sources
             // TODO test this
             compileOnly(files(sourceSets.test.map { it.output.classesDirs }))
         }
         sources {
+            java.setSrcDirs(listOf("$versionName/src/test/java", "$versionName/src/test/kotlin"))
+            resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
             addTestGenDir()
             forceKotlinVersion(this@all)
             generateTests { addTestSourceSet(this@sources) }
@@ -252,7 +257,12 @@ kotlinVersionsToTestAgainst.all {
     tasks.jar {
         metaInf {
             into("kotlin/plugin/versions/$versionString") {
-                from(main.map { it.output })
+                // Ensures the directory exists in the jar even if `main` has no output.
+                from(versionMarker)
+                from(main.map { it.output }) {
+                    exclude("META-INF/*kotlin_module")
+                    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                }
             }
         }
     }
@@ -287,9 +297,9 @@ dependencies {
 }
 
 animalsniffer {
+    sourceSets = listOf(project.sourceSets.main.get(), project.sourceSets.test.get())
     excludeJars("kotlin-compiler*")
     ignore("java.*", "javax.*", "org.omg.*", "org.w3c.dom.*")
-    checkTestSources = true
 }
 
 buildConfig {
