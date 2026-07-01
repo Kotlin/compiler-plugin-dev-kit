@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 @file:OptIn(ExperimentalWasmDsl::class)
 
-import org.gradle.api.attributes.Attribute
-import org.gradle.api.attributes.Category
-import org.gradle.api.attributes.Usage
-import org.gradle.kotlin.dsl.sourceSets
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.kotlinCompilerVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.registerMultiReleasePluginTransform
+import org.jetbrains.kotlin.compiler.plugin.devkit.setupCompilerVersionAttribute
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
@@ -15,6 +15,12 @@ import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
+
+buildscript {
+  dependencies {
+    classpath("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
+  }
+}
 
 plugins {
   alias(libs.plugins.kotlin.jvm)
@@ -184,6 +190,8 @@ reflectVersion =
   }
 
 dependencies {
+  setupCompilerVersionAttribute()
+  registerMultiReleasePluginTransform(project.provider { testKotlinVersion })
   // 2.3.0 changed the test gen APIs around into different packages
   "generator230CompileOnly"(
     "org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:$compilerTestFrameworkVersion"
@@ -213,7 +221,9 @@ dependencies {
   testImplementation("org.jetbrains.kotlin:kotlin-compose-compiler-plugin:$kotlinArtifactsVersion")
 
   testImplementation(project(":compiler"))
-  testImplementation(project(":compiler-compat"))
+  testImplementation(project(":compiler-compat")) {
+    kotlinCompilerVersion(KotlinToolingVersion(testCompilerVersion))
+  }
   testCompileOnly(project(":metro-common"))
 
   testImplementation(libs.kotlin.testJunit5)

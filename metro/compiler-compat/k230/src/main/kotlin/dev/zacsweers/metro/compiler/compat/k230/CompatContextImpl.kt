@@ -90,6 +90,8 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.util.PrivateForInline
 
 public class CompatContextImpl : CompatContext {
+  override val pluginGeneratedSourceElementKind: KtFakeSourceElementKind
+    get() = KtFakeSourceElementKind.PluginGenerated
 
   override fun KtSourcelessDiagnosticFactory.createCompat(
     message: String,

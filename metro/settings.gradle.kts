@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pluginManagement {
   includeBuild("build-logic")
+  includeBuild("../plugins")
   repositories {
     mavenCentral()
     google()
@@ -16,6 +17,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+  includeBuild("..")
   repositories {
     mavenCentral()
     google()

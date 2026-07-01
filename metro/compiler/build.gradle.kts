@@ -3,6 +3,10 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.drewhamilton.poko.gradle.PokoFirIdeMode
 import dev.zacsweers.metro.gradle.RequiresIdeSupport
+import org.jetbrains.kotlin.compiler.plugin.devkit.kotlinCompilerVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.registerMultiReleasePluginTransform
+import org.jetbrains.kotlin.compiler.plugin.devkit.setupCompilerVersionAttribute
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 // Bootstrap: add the Metro compiler plugin JAR to the buildscript classpath from Maven Central.
 // Buildscript resolution is NOT subject to project-level composite build dependency substitution,
@@ -15,6 +19,7 @@ buildscript {
       ?: error("METRO_BOOTSTRAP_VERSION not set in gradle.properties")
   dependencies {
     classpath("dev.zacsweers.metro:compiler:$bootstrapVersion") { isTransitive = false }
+    classpath("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
   }
 }
 
@@ -222,6 +227,14 @@ for (c in arrayOf("apiElements", "runtimeElements")) {
 }
 
 dependencies {
+  val testCompilerVersion =
+    providers.gradleProperty("metro.testCompilerVersion").orElse(libs.versions.kotlin).get()
+
+  setupCompilerVersionAttribute()
+  registerMultiReleasePluginTransform(
+    project.provider { KotlinToolingVersion(testCompilerVersion) }
+  )
+
   compileOnly(libs.kotlin.compiler)
   compileOnly(libs.kotlin.stdlib)
   compileOnly(libs.poko.annotations)
@@ -235,7 +248,9 @@ dependencies {
   add(embedded.name, libs.mordant)
   add(embedded.name, libs.wire.runtime)
   add(embedded.name, libs.kotlinx.serialization.json)
-  add(embedded.name, project(":compiler-compat"))
+  add(embedded.name, project(":compiler-compat")) {
+    kotlinCompilerVersion(KotlinToolingVersion(testCompilerVersion))
+  }
   rootProject.isolated.projectDirectory.dir("compiler-compat").asFile.listFiles()!!.forEach {
     if (it.isDirectory && it.name.startsWith("k") && File(it, "version.txt").exists()) {
       add(embedded.name, project(":compiler-compat:${it.name}"))
@@ -247,8 +262,7 @@ dependencies {
   testImplementation(project(":interop-dagger"))
   testImplementation(libs.kotlin.reflect)
   testImplementation(libs.kotlin.stdlib)
-  val testCompilerVersion =
-    providers.gradleProperty("metro.testCompilerVersion").orElse(libs.versions.kotlin).get()
+
   testRuntimeOnly("org.jetbrains.kotlin:kotlin-compiler:$testCompilerVersion")
   // Cover for https://github.com/tschuchortdev/kotlin-compile-testing/issues/274
   testImplementation(libs.kotlin.aptEmbeddable)

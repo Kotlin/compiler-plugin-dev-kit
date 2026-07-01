@@ -1,8 +1,11 @@
+import org.jetbrains.kotlin.compiler.plugin.devkit.versionName
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
 // Copyright (C) 2025 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
 plugins {
   alias(libs.plugins.kotlin.jvm)
-  alias(libs.plugins.buildConfig)
+  alias(libs.plugins.kotlin.compiler.plugin.devkit)
   id("metro.publish")
 }
 
@@ -42,10 +45,38 @@ buildConfig {
 }
 
 dependencies {
-  compileOnly(libs.kotlin.compiler)
-  compileOnly(libs.kotlin.stdlib)
-
-  testImplementation(libs.junit)
-  testImplementation(libs.kotlin.test)
   testImplementation(libs.truth)
+}
+
+// ignore tests provided by devkit
+tasks.generateTests { enabled = false }
+
+tasks.withType<Test> { failOnNoDiscoveredTests = false }
+
+pluginConfig {
+  // TODO extract into file
+  val versions =
+    listOf(
+      "2.3.0",
+      "2.3.20",
+      "2.4.0-dev-2124",
+      "2.4.0",
+      "2.4.20-dev-3583",
+      "2.4.20-dev-6138",
+      "2.4.20-Beta1",
+    ).map(::KotlinToolingVersion)
+  kotlinVersionsToTestAgainst.addAll(versions.filter { it !in kotlinVersionsToTestAgainst })
+  versions.forEachIndexed { i, version ->
+    sourceSets.named(version.versionName) {
+      for (lower in versions.subList(0, i)) dependOn(sourceSets.named(lower.versionName))
+    }
+  }
+}
+
+fun SourceSet.dependOn(other: Provider<SourceSet>) {
+  val otherClasses = other.map { it.output.classesDirs }
+  dependencies {
+    compileOnlyConfigurationName(files(otherClasses))
+  }
+  output.dir(otherClasses)
 }
