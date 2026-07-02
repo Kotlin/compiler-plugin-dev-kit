@@ -1,0 +1,6 @@
+[versions]
+# https://github.com/JetBrains/kotlin
+kotlin = "2.4.20-dev-7885"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

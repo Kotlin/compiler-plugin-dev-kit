@@ -11,7 +11,7 @@ assignment { annotation("org.gradle.api.SupportsKotlinAssignmentOverloading") }
 
 dependencies {
     implementation(gradleKotlinDsl())
-    implementation(libs.kotlin.jvm)
+    implementation(embeddedKotlin("gradle-plugin"))
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)

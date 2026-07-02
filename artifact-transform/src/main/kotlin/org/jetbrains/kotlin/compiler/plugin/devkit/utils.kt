@@ -2,7 +2,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
-import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -32,20 +31,14 @@ public fun DependencyHandler.registerMultiReleasePluginTransform(
 ) {
     registerTransform(MultiReleasePluginTransform::class.java) {
         parameters { kotlinVersion.set(version.map(KotlinToolingVersion::versionString)) }
-        from
-            .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-            .attribute(KotlinCompilerVersion.attribute, noVersion)
-        to.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-            .attributeProvider(
-                KotlinCompilerVersion.attribute,
-                version.map(::KotlinCompilerVersion),
-            )
+        from.attribute(KotlinCompilerVersion.attribute, noVersion)
+        to.attributeProvider(KotlinCompilerVersion.attribute, version.map(::KotlinCompilerVersion))
     }
 }
 
 public fun DependencyHandler.setupCompilerVersionAttribute() {
     artifactTypes {
-        named("jar") {
+        all {
             attributes.attribute(KotlinCompilerVersion.attribute, noVersion)
         }
     }
@@ -53,19 +46,11 @@ public fun DependencyHandler.setupCompilerVersionAttribute() {
 
 public fun ModuleDependency.kotlinCompilerVersion(version: KotlinToolingVersion): ModuleDependency =
     attributes {
-        attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-        attribute(
-            KotlinCompilerVersion.attribute,
-            KotlinCompilerVersion(version),
-        )
+        attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion(version))
     }
 
 public fun ModuleDependency.kotlinCompilerVersion(
     version: Provider<KotlinToolingVersion>
 ): ModuleDependency = attributes {
-    attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-    attributeProvider(
-        KotlinCompilerVersion.attribute,
-        version.map(::KotlinCompilerVersion),
-    )
+    attributeProvider(KotlinCompilerVersion.attribute, version.map(::KotlinCompilerVersion))
 }

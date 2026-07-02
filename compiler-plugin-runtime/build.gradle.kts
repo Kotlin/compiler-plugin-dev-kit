@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
+    alias(libs.plugins.kotlin.jvm)
     kotlin("compiler.plugin.devkit.compiler-plugin")
 }
 

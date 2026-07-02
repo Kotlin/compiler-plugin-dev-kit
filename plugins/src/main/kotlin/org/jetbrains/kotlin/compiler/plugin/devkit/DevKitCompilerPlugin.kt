@@ -256,11 +256,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         }
 
         tasks.named<Test>("test") {
-            configure(
-                testArtifacts,
-                annotationsJvmRuntimeClasspath.get(),
-                annotationsJsRuntimeClasspath.get(),
-            )
+            // The `test` task doesn't run any tests itself. The common tests are compiled into
+            // and executed by each version-specific test suite (see the `${versionName}Test`
+            // suites below), which this task aggregates via `dependsOn`.
+            enabled = false
         }
 
         fun JavaExec.addTestSourceSet(set: SourceSet) {
@@ -422,7 +421,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     }
                 }
 
-                tasks.named("check") { dependsOn(this@register) }
+                tasks.named("test") { dependsOn(this@register) }
             }
 
             val signature = configurations.create("${versionName}Signature")
@@ -438,7 +437,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             animalsniffer.signatures += files(signatureGenTask.map { it.outputFiles })
 
-            tasks.named<Jar>("jar") {
+            tasks.withType<Jar> {
                 metaInf {
                     into("kotlin/plugin/versions/$versionString") {
                         // Ensures the directory exists in the jar even if `main` has no output.

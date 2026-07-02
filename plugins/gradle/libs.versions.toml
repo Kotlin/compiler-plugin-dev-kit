@@ -1,11 +1,9 @@
 [versions]
-kotlin = "2.4.20-dev-7885"
 buildconfig = "6.0.10"
 node-gradle = "7.0.2"
 animal-sniffer = "2.0.1"
 
 [libraries]
-kotlin-jvm = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
 node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
