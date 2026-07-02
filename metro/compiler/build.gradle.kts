@@ -230,7 +230,7 @@ project.afterEvaluate {
   }
 }
 
-pluginConfig {
+pluginDevKit {
   kotlinVersionsToTestAgainst.addAll(
     listOf(
         "2.3.0",
@@ -328,7 +328,7 @@ dependencies {
   testImplementation(libs.kotlin.aptEmbeddable)
   testImplementation("dev.zacsweers.kctfork:core:0.13.0")
   testImplementation("dev.zacsweers.kctfork:ksp:0.13.0")
-  pluginConfig.kotlinVersionsToTestAgainst.all {
+  pluginDevKit.kotlinVersionsToTestAgainst.all {
     // TODO provide easier source set access by version
     sourceSets.named("${versionName}Test") {
       if (major == 2 && minor == 4) {

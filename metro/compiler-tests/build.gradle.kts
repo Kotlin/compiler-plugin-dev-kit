@@ -162,7 +162,7 @@ check(testKotlinVersion >= kotlin23) {
 
 generatorConfigToUse =
   // Any 2.4.20 dev test version compiles against the fallback 2420 artifacts (see
-  // kotlinArtifactsVersion above), so the generator helpers must match that framework.
+  // kotlinArtifactsVersion above), so the helpers must match that framework.
   if (useKotlin2420DevFallbackArtifacts || testKotlinVersion >= kotlin2420Dev6138) {
     "generator2420"
   } else if (testKotlinVersion >= kotlin24Beta1) {

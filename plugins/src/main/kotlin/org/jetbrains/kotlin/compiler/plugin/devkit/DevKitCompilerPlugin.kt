@@ -39,7 +39,7 @@ import java.io.File
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
-public interface CompilerPluginConfigExtension {
+public interface DevKitCompilerPluginConfigExtension {
     public val pluginAnnotations: Property<Project>
     public val generateTestsClass: Property<String>
     public val testGenDirectory: DirectoryProperty
@@ -111,13 +111,13 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             }
 
-        val configExtension =
-            project.extensions.create<CompilerPluginConfigExtension>("pluginConfig")
-        val pluginAnnotations = configExtension.pluginAnnotations
-        val generateTestsClass = configExtension.generateTestsClass.convention("GenerateTestsKt")
+        val pluginDevKit =
+            project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit")
+        val pluginAnnotations = pluginDevKit.pluginAnnotations
+        val generateTestsClass = pluginDevKit.generateTestsClass.convention("GenerateTestsKt")
         val testGenDirectory =
-            configExtension.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
-        val kotlinVersionsToTestAgainst = configExtension.kotlinVersionsToTestAgainst
+            pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
+        val kotlinVersionsToTestAgainst = pluginDevKit.kotlinVersionsToTestAgainst
 
         kotlinVersionsToTestAgainst.addLater(
             kotlinExtension.compilerVersion.map(::KotlinToolingVersion)

@@ -4,7 +4,7 @@ plugins {
     kotlin("compiler.plugin.devkit.compiler-plugin")
 }
 
-pluginConfig {
+pluginDevKit {
     kotlinVersionsToTestAgainst += listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }
 
@@ -17,7 +17,7 @@ sourceSets {
         java.setSrcDirs(listOf("test-fixtures"))
     }
     test {
-        java.setSrcDirs(listOf("test", pluginConfig.testGenDirectory.dir(name)))
+        java.setSrcDirs(listOf("test", pluginDevKit.testGenDirectory.dir(name)))
         resources.setSrcDirs(listOf("testData"))
     }
 
@@ -41,7 +41,7 @@ testing {
             sources {
                 if (this == sourceSets.test.get()) return@sources
                 val folder = name.removeSuffix("Test")
-                java.setSrcDirs(listOf("$folder/test", pluginConfig.testGenDirectory.dir(name)))
+                java.setSrcDirs(listOf("$folder/test", pluginDevKit.testGenDirectory.dir(name)))
                 resources.setSrcDirs(listOf("$folder/testData"))
             }
         }

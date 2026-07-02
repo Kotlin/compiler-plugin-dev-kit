@@ -14,6 +14,6 @@ kotlin {
     compilerOptions.jvmTarget = JvmTarget.JVM_17
 }
 
-pluginConfig {
+pluginDevKit {
     kotlinVersionsToTestAgainst += listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }

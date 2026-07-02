@@ -30,9 +30,9 @@ public class DevKitGradlePlugin : Plugin<Project> {
             "testImplementation"(kotlin("test-junit5"))
         }
 
-        val configExtension = project.extensions.create<GradlePluginConfigExtension>("pluginConfig")
-        val compilerPlugin = configExtension.compilerPlugin
-        val pluginAnnotations = configExtension.pluginAnnotations
+        val pluginDevKit = project.extensions.create<GradlePluginConfigExtension>("pluginDevKit")
+        val compilerPlugin = pluginDevKit.compilerPlugin
+        val pluginAnnotations = pluginDevKit.pluginAnnotations
 
         rootProject.childProjects.values.forEach {
             var noMultiplatformProjects = true

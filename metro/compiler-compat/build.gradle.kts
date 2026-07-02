@@ -53,7 +53,7 @@ tasks.generateTests { enabled = false }
 
 tasks.withType<Test> { failOnNoDiscoveredTests = false }
 
-pluginConfig {
+pluginDevKit {
   // TODO extract into file
   val versions =
     listOf(
