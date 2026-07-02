@@ -1,0 +1,70 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Common Commands
+
+```bash
+./gradlew :compiler:test                   # Legacy compiler tests
+./gradlew :compiler-tests:test             # New compiler tests (JetBrains infrastructure)
+./gradlew :gradle-plugin:functionalTest    # Gradle integration tests
+./gradlew -p samples check                 # Sample project tests
+./gradlew :compiler-tests:generateTests    # Regenerate test classes after adding test data files
+./gradlew dokkaGenerateHtml                # Generate API documentation
+./metrow check                             # All validation, tests, linting, API validation (expensive)
+cd benchmark && ./run_benchmarks.sh metro  # Performance benchmarks
+```
+
+Run with `--quiet` to reduce noise. Do not add `--info`, `--no-daemon`, or other extra flags. Always run `./gradlew` from the directory containing the wrapper; never `cd` into a module first.
+
+Never run tests without asking first — failures often require context to debug.
+
+## Architecture
+
+Metro is a compile-time dependency injection framework implemented as a Kotlin compiler plugin with full multiplatform support (JVM, Android, JS, Wasm, Native). It requires no KAPT/KSP.
+
+### Composite Build Layout
+
+`metro/` is a Gradle project that includes two external builds:
+- `build-logic/` — Metro-specific Gradle conventions
+- `../plugins` — The parent `compiler-plugin-dev-kit` project, which provides shared build infrastructure (`metro.base`, `metro.android`, `metro.publish` plugins) and the `compiler-plugin-runtime`/`gradle-plugin-runtime` artifacts used across all plugins in the dev kit
+
+### Core Modules
+
+**`compiler/`** — The Kotlin compiler plugin, distributed as a shadow JAR to avoid classpath conflicts.
+- Two-phase: FIR (analysis/validation via `fir/`) → IR (code generation via `ir/`)
+- `graph/` — Dependency graph construction, topological sorting, and cycle detection
+- Entry point: `MetroCompilerPluginRegistrar.kt`
+
+**`runtime/`** — Multiplatform annotation API (`@DependencyGraph`, `@Inject`, `@Provides`, `@Binds`, `@Scope`, `createGraph()`). `internal/` holds runtime support classes (factories, providers, double-check lazy).
+
+**`gradle-plugin/`** — Wires the compiler plugin and runtime onto consumer projects; exposes `metro { }` DSL. `MetroGradleSubplugin.kt` is the main entry point.
+
+**`compiler-compat/`** — Versioned compatibility layers for different Kotlin compiler releases. Each `k<version>/` subdirectory has a `version.txt` and is auto-included as `:compiler-compat:<kN>`.
+
+**`compiler-tests/`** — Modern test infrastructure (JetBrains compiler testing framework). Tests are generated; source lives in `src/test/data/`:
+- `box/` — Full compilation + execution
+- `diagnostic/` — Error message validation
+- `dump/` — FIR/IR tree inspection
+
+Add a file there, then run `generateTests` to produce the JUnit test class.
+
+**Interop modules** (`interop-dagger/`, `interop-javax/`, `interop-jakarta/`, `interop-guice/`) — Bridge types for migrating from existing DI frameworks.
+
+### Key Architectural Rules
+
+- FIR is for analysis and validation only; IR is for code generation. Do not mix concerns across phases.
+- Kotlin compiler plugin APIs are unstable — Metro tracks Kotlin releases closely via `compiler-compat/`.
+- Public modules have binary compatibility validation (`apiCheck`). Run it when changing public APIs.
+- Use KotlinPoet for code generation; do not hand-write IR strings.
+- Prefer fakes over mocks in tests.
+
+## Working Style
+
+- Edit only the exact file specified. Do not touch adjacent modules or "nearby" code unless asked. If unsure which file, ask first.
+- Explain the plan before making edits on non-trivial changes; wait for approval.
+- Do not make changes beyond what was asked. If something adjacent should also change, mention it but don't do it.
+- Never explore `.gradle` directories or external library internals. Check official docs via WebFetch instead.
+- Avoid dense expression chains with trailing Elvis (`?: run { ... }`) fallbacks. Prefer named local values, early returns, or small helpers.
+- Avoid large stacked boolean conditions. Split into named boolean values describing the state.
+- Reuse existing infrastructure. Grep before adding anything new.

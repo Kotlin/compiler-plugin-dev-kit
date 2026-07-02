@@ -109,6 +109,11 @@ val shadowJar =
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
 
+    // Exclude JAR signature files so embedded signed JARs don't break the shadow JAR's integrity check
+    exclude("META-INF/*.SF")
+    exclude("META-INF/*.DSA")
+    exclude("META-INF/*.RSA")
+
     relocate("com.google.common", "dev.zacsweers.metro.gradle.shaded.com.google.common")
     relocate("com.google.thirdparty", "dev.zacsweers.metro.gradle.shaded.com.google.thirdparty")
     relocate("com.google.errorprone", "dev.zacsweers.metro.gradle.shaded.com.google.errorprone")
@@ -134,6 +139,7 @@ dependencies {
 
   add(embedded.name, libs.graphSupport)
   add(embedded.name, libs.guava)
+  add(embedded.name, "org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
 
   lintChecks(libs.androidx.lint.gradle)
 

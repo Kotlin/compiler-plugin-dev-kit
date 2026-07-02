@@ -4,8 +4,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.drewhamilton.poko.gradle.PokoFirIdeMode
 import dev.zacsweers.metro.gradle.RequiresIdeSupport
 import org.jetbrains.kotlin.compiler.plugin.devkit.kotlinCompilerVersion
-import org.jetbrains.kotlin.compiler.plugin.devkit.registerMultiReleasePluginTransform
-import org.jetbrains.kotlin.compiler.plugin.devkit.setupCompilerVersionAttribute
+import org.jetbrains.kotlin.compiler.plugin.devkit.versionName
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 // Bootstrap: add the Metro compiler plugin JAR to the buildscript classpath from Maven Central.
@@ -19,7 +18,6 @@ buildscript {
       ?: error("METRO_BOOTSTRAP_VERSION not set in gradle.properties")
   dependencies {
     classpath("dev.zacsweers.metro:compiler:$bootstrapVersion") { isTransitive = false }
-    classpath("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
   }
 }
 
@@ -27,13 +25,17 @@ plugins {
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.kotlin.plugin.serialization)
   alias(libs.plugins.poko)
-  alias(libs.plugins.buildConfig)
+  id("org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin")
   alias(libs.plugins.wire)
   alias(libs.plugins.shadow) apply false
   id("metro.publish")
   // apply false to put metro on the classpath. Conditionally applied below.
   alias(libs.plugins.metro)
 }
+
+tasks.generateTests { enabled = false }
+
+animalsniffer { ignore("org.*") }
 
 metroArtifact {
   artifactId.set("compiler")
@@ -89,7 +91,7 @@ buildConfig {
   }
 }
 
-tasks.test {
+tasks.withType<Test> {
   maxParallelForks = Runtime.getRuntime().availableProcessors() * 2
   systemProperty("metro.buildDir", project.layout.buildDirectory.asFile.get().absolutePath)
   systemProperty("metro.diagnosticsRenderMode", "PLAIN")
@@ -218,7 +220,30 @@ project.afterEvaluate {
   }
   configurations.named("implementation") {
     dependencies.removeIf { it is ExternalDependency && it.group == "dev.drewhamilton.poko" }
+    // The devkit adds an unversioned implementation dependency on its compiler-plugin-runtime.
+    // That module has no `main` output (only test fixtures) and Metro's compiler doesn't use it, so
+    // it contributes nothing here. Left in place it leaks into the published POM without a version,
+    // which breaks resolution for external consumers of dev.zacsweers.metro:compiler.
+    dependencies.removeIf {
+      it is ExternalDependency && it.group == "org.jetbrains.kotlin.compiler.plugin.devkit"
+    }
   }
+}
+
+pluginConfig {
+  kotlinVersionsToTestAgainst.addAll(
+    listOf(
+        "2.3.0",
+        "2.3.20",
+        "2.4.0-dev-2124",
+        "2.4.0",
+        "2.4.20-dev-3583",
+        "2.4.20-dev-6138",
+        "2.4.20-Beta1",
+      )
+      .map(::KotlinToolingVersion)
+      .filter { it !in kotlinVersionsToTestAgainst }
+  )
 }
 
 for (c in arrayOf("apiElements", "runtimeElements")) {
@@ -226,14 +251,55 @@ for (c in arrayOf("apiElements", "runtimeElements")) {
   artifacts.add(c, shadowJar)
 }
 
+// The steps above make this project's consumable variants expose the *shaded* shadowJar. The
+// devkit's java-test-fixtures/jvm-test-suite wiring then resolves that shaded JAR for the project's
+// own main classes on the test classpaths. That is wrong for tests in two ways:
+//   1. Compilation sees relocated `androidx.*` types (e.g. the shaded ScatterMap) instead of the
+//      plain ones the test sources import.
+//   2. The shadowJar embeds unrelocated deps (e.g. an older kotlinx-coroutines) that shadow the
+//      real versions at runtime, causing NoSuchMethodError.
+// Swap the shaded JAR out for the raw, unshaded main output. All of the compiler's runtime deps are
+// already present unshaded on the test classpath via `embedded`, which extends testImplementation.
+//
+// The per-Kotlin-version test suites the devkit registers (e.g. `k240Test`) have no sources of their
+// own; they re-run the shared `test` output against a version-specific runtime classpath. That
+// classpath carries the KotlinCompilerVersion attribute, so the shadowJar reaches it via the
+// MultiReleasePluginTransform under a version-suffixed name (e.g. `compiler-1.4.0-SNAPSHOT-2.4.0.jar`);
+// match both the base and transformed names. Because those suites capture their Test task classpath
+// before a source-set reassignment would take effect, the shaded JAR is stripped from the Test tasks
+// directly for runtime, and from the source sets for compilation.
+//
+// `archiveFileName` (a plain string derived from base name/version/classifier) is read rather than
+// `archiveFile` (a task output), so it resolves at configuration time without the shadowJar task
+// having run. Resolve it to a plain String so the filter predicates below only capture serializable
+// state (a script-level helper would capture the build script and break the configuration cache).
+val shadowJarBaseName = shadowJar.get().archiveFileName.get().removeSuffix(".jar")
+
+sourceSets
+  .matching { it.name == "test" || it.name == "testFixtures" || it.name.endsWith("Test") }
+  .configureEach {
+    val mainOutput = sourceSets.main.get().output
+    // Local copy so the (serialized) filter spec captures a plain String, not the build script.
+    val baseName = shadowJarBaseName
+    compileClasspath =
+      mainOutput +
+        compileClasspath.filter {
+          it.name != "$baseName.jar" && !it.name.startsWith("$baseName-")
+        }
+  }
+
+tasks.withType<Test>().configureEach {
+  val mainOutput = sourceSets.main.get().output
+  // Local copy so the (serialized) filter spec captures a plain String, not the build script.
+  val baseName = shadowJarBaseName
+  classpath =
+    mainOutput +
+      classpath.filter { it.name != "$baseName.jar" && !it.name.startsWith("$baseName-") }
+}
+
 dependencies {
   val testCompilerVersion =
     providers.gradleProperty("metro.testCompilerVersion").orElse(libs.versions.kotlin).get()
-
-  setupCompilerVersionAttribute()
-  registerMultiReleasePluginTransform(
-    project.provider { KotlinToolingVersion(testCompilerVersion) }
-  )
 
   compileOnly(libs.kotlin.compiler)
   compileOnly(libs.kotlin.stdlib)
@@ -248,9 +314,7 @@ dependencies {
   add(embedded.name, libs.mordant)
   add(embedded.name, libs.wire.runtime)
   add(embedded.name, libs.kotlinx.serialization.json)
-  add(embedded.name, project(":compiler-compat")) {
-    kotlinCompilerVersion(KotlinToolingVersion(testCompilerVersion))
-  }
+  add(embedded.name, project(":compiler-compat"))
   rootProject.isolated.projectDirectory.dir("compiler-compat").asFile.listFiles()!!.forEach {
     if (it.isDirectory && it.name.startsWith("k") && File(it, "version.txt").exists()) {
       add(embedded.name, project(":compiler-compat:${it.name}"))
@@ -263,7 +327,6 @@ dependencies {
   testImplementation(libs.kotlin.reflect)
   testImplementation(libs.kotlin.stdlib)
 
-  testRuntimeOnly("org.jetbrains.kotlin:kotlin-compiler:$testCompilerVersion")
   // Cover for https://github.com/tschuchortdev/kotlin-compile-testing/issues/274
   testImplementation(libs.kotlin.aptEmbeddable)
   if (testCompilerVersion.startsWith("2.4")) {
@@ -272,6 +335,18 @@ dependencies {
   } else {
     testImplementation(libs.kct)
     testImplementation(libs.kct.ksp)
+  }
+  pluginConfig.kotlinVersionsToTestAgainst.all {
+    // TODO provide easier source set access by version
+    sourceSets.named("${versionName}Test") {
+      if (major == 2 && minor == 4) {
+        implementationConfigurationName("dev.zacsweers.kctfork:core:0.13.0")
+        implementationConfigurationName("dev.zacsweers.kctfork:ksp:0.13.0")
+      } else {
+        implementationConfigurationName(libs.kct)
+        implementationConfigurationName(libs.kct.ksp)
+      }
+    }
   }
   testImplementation(libs.okio)
   testImplementation(libs.junit)
@@ -284,3 +359,17 @@ dependencies {
   testImplementation(libs.anvil.annotations)
   testImplementation(libs.androidx.collection)
 }
+
+// Metro's compiler tests are JUnit 4 based: `kotlin.test.Test` maps to JUnit 4 and the shared
+// `MetroCompilerTest` base class relies on JUnit 4 `@Rule`s (e.g. TemporaryFolder). The devkit's
+// test fixtures pull in `kotlin-test-junit5` and switch the test tasks to `useJUnitPlatform()`,
+// which remaps `kotlin.test.Test` to JUnit 5 Jupiter and silently skips the JUnit 4 rules (tests
+// then fail with "the temporary folder has not yet been created"). Keep these tests on JUnit 4.
+configurations.configureEach {
+  val lower = name.lowercase()
+  if (lower.endsWith("testcompileclasspath") || lower.endsWith("testruntimeclasspath")) {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-test-junit5")
+  }
+}
+
+tasks.withType<Test>().configureEach { useJUnit() }
