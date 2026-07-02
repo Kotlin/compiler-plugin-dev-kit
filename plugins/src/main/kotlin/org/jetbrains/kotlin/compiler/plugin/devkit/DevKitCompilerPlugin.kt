@@ -12,6 +12,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
@@ -316,6 +317,19 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             }
         }
 
+        fun SourceSet.extendsFrom(
+            otherSourceSet: Provider<SourceSet>,
+            extractName: (SourceSet) -> String,
+        ) {
+            configurations.named(extractName(this)) {
+                extendsFrom(
+                    otherSourceSet.flatMap {
+                        configurations.named(extractName(it))
+                    }
+                )
+            }
+        }
+
         val versionMarker =
             // Registers task to generate empty version marker file
             tasks.register("versionMarker") {
@@ -347,6 +361,33 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         compileOnlyConfigurationName(
                             sourceSets.named("main").map { it.output.classesDirs }
                         )
+                    }
+                    extendsFrom(sourceSets.named("main")) { it.implementationConfigurationName }
+                    extendsFrom(sourceSets.named("main")) { it.compileOnlyConfigurationName }
+                }
+            val testFixtures =
+                sourceSets.register("${versionName}TestFixtures") {
+                    java.setSrcDirs(
+                        listOf(
+                            "$versionName/src/testFixtures/java",
+                            "$versionName/src/testFixtures/kotlin",
+                        )
+                    )
+                    resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
+                    forceKotlinVersion(this@all)
+                    dependencies {
+                        implementationConfigurationName(project())
+                        compileOnlyConfigurationName(kotlin("compiler"))
+                        // allow it to see shared test fixture sources
+                        compileOnlyConfigurationName(
+                            sourceSets.named("testFixtures").map { it.output.classesDirs }
+                        )
+                    }
+                    extendsFrom(sourceSets.named("testFixtures")) {
+                        it.implementationConfigurationName
+                    }
+                    extendsFrom(sourceSets.named("testFixtures")) {
+                        it.compileOnlyConfigurationName
                     }
                 }
 
@@ -384,20 +425,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     generateTests { addTestSourceSet(this@sources) }
                     tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
 
-                    configurations.named(implementationConfigurationName) {
-                        extendsFrom(
-                            sourceSets.named("test").flatMap {
-                                configurations.named(it.implementationConfigurationName)
-                            }
-                        )
-                    }
-                    configurations.named(compileOnlyConfigurationName) {
-                        extendsFrom(
-                            sourceSets.named("test").flatMap {
-                                configurations.named(it.compileOnlyConfigurationName)
-                            }
-                        )
-                    }
+                    extendsFrom(sourceSets.named("test")) { it.implementationConfigurationName }
+                    extendsFrom(sourceSets.named("test")) { it.compileOnlyConfigurationName }
+
                     configurations.named(runtimeClasspathConfigurationName) {
                         // force it to use version-specific jars when running tests
                         attributes.attribute(
@@ -437,12 +467,25 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             animalsniffer.signatures += files(signatureGenTask.map { it.outputFiles })
 
-            tasks.withType<Jar> {
+            tasks.named<Jar>("jar") {
                 metaInf {
                     into("kotlin/plugin/versions/$versionString") {
                         // Ensures the directory exists in the jar even if `main` has no output.
                         from(versionMarker)
                         from(main.map { it.output }) {
+                            exclude("META-INF/*kotlin_module")
+                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                        }
+                    }
+                }
+            }
+
+            tasks.named<Jar>("testFixturesJar") {
+                metaInf {
+                    into("kotlin/plugin/versions/$versionString") {
+                        // Ensures the directory exists in the jar even if `main` has no output.
+                        from(versionMarker)
+                        from(testFixtures.map { it.output }) {
                             exclude("META-INF/*kotlin_module")
                             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                         }

@@ -5,8 +5,7 @@ plugins {
 }
 
 pluginConfig {
-    kotlinVersionsToTestAgainst +=
-        listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
+    kotlinVersionsToTestAgainst += listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }
 
 sourceSets {
@@ -25,8 +24,13 @@ sourceSets {
     all {
         if (name.endsWith("Test")) return@all
         if (this in listOf(main, testFixtures, test).map { it.get() }) return@all
-        java.setSrcDirs(listOf("$name/src"))
-        resources.setSrcDirs(listOf("${name}/resources"))
+        if (name.endsWith("TestFixtures")) {
+            val folder = name.removeSuffix("TestFixtures")
+            java.setSrcDirs(listOf("$folder/test-fixtures"))
+        } else {
+            java.setSrcDirs(listOf("$name/src"))
+            resources.setSrcDirs(listOf("${name}/resources"))
+        }
     }
 }
 
