@@ -3,8 +3,6 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.drewhamilton.poko.gradle.PokoFirIdeMode
 import dev.zacsweers.metro.gradle.RequiresIdeSupport
-import org.jetbrains.kotlin.compiler.plugin.devkit.kotlinCompilerVersion
-import org.jetbrains.kotlin.compiler.plugin.devkit.versionName
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 // Bootstrap: add the Metro compiler plugin JAR to the buildscript classpath from Maven Central.
@@ -231,19 +229,17 @@ project.afterEvaluate {
 }
 
 pluginDevKit {
-  kotlinVersionsToTestAgainst.addAll(
-    listOf(
-        "2.3.0",
-        "2.3.20",
-        "2.4.0-dev-2124",
-        "2.4.0",
-        "2.4.20-dev-3583",
-        "2.4.20-dev-6138",
-        "2.4.20-Beta1",
-      )
-      .map(::KotlinToolingVersion)
-      .filter { it !in kotlinVersionsToTestAgainst }
-  )
+  listOf(
+      "2.3.0",
+      "2.3.20",
+      "2.4.0-dev-2124",
+      "2.4.0",
+      "2.4.20-dev-3583",
+      "2.4.20-dev-6138",
+      "2.4.20-Beta1",
+    )
+    .map(::KotlinToolingVersion)
+    .forEach { developFor(it) }
 }
 
 for (c in arrayOf("apiElements", "runtimeElements")) {
@@ -261,12 +257,15 @@ for (c in arrayOf("apiElements", "runtimeElements")) {
 // Swap the shaded JAR out for the raw, unshaded main output. All of the compiler's runtime deps are
 // already present unshaded on the test classpath via `embedded`, which extends testImplementation.
 //
-// The per-Kotlin-version test suites the devkit registers (e.g. `k240Test`) have no sources of their
+// The per-Kotlin-version test suites the devkit registers (e.g. `k240Test`) have no sources of
+// their
 // own; they re-run the shared `test` output against a version-specific runtime classpath. That
 // classpath carries the KotlinCompilerVersion attribute, so the shadowJar reaches it via the
-// MultiReleasePluginTransform under a version-suffixed name (e.g. `compiler-1.4.0-SNAPSHOT-2.4.0.jar`);
+// MultiReleasePluginTransform under a version-suffixed name (e.g.
+// `compiler-1.4.0-SNAPSHOT-2.4.0.jar`);
 // match both the base and transformed names. Because those suites capture their Test task classpath
-// before a source-set reassignment would take effect, the shaded JAR is stripped from the Test tasks
+// before a source-set reassignment would take effect, the shaded JAR is stripped from the Test
+// tasks
 // directly for runtime, and from the source sets for compilation.
 //
 // `archiveFileName` (a plain string derived from base name/version/classifier) is read rather than
@@ -328,15 +327,16 @@ dependencies {
   testImplementation(libs.kotlin.aptEmbeddable)
   testImplementation("dev.zacsweers.kctfork:core:0.13.0")
   testImplementation("dev.zacsweers.kctfork:ksp:0.13.0")
-  pluginDevKit.kotlinVersionsToTestAgainst.all {
-    // TODO provide easier source set access by version
-    sourceSets.named("${versionName}Test") {
-      if (major == 2 && minor == 4) {
-        implementationConfigurationName("dev.zacsweers.kctfork:core:0.13.0")
-        implementationConfigurationName("dev.zacsweers.kctfork:ksp:0.13.0")
-      } else {
-        implementationConfigurationName(libs.kct)
-        implementationConfigurationName(libs.kct.ksp)
+  pluginDevKit.testAgainst.configureEach {
+    testSuite {
+      sources {
+        if (version.major == 2 && version.minor == 4) {
+          implementationConfigurationName("dev.zacsweers.kctfork:core:0.13.0")
+          implementationConfigurationName("dev.zacsweers.kctfork:ksp:0.13.0")
+        } else {
+          implementationConfigurationName(libs.kct)
+          implementationConfigurationName(libs.kct.ksp)
+        }
       }
     }
   }

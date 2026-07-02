@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -15,5 +16,6 @@ kotlin {
 }
 
 pluginDevKit {
-    kotlinVersionsToTestAgainst += listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
+    developForWithFixtures(kotlinToolingVersion)
+    developForWithFixtures(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }

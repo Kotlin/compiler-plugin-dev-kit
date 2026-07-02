@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.compiler.plugin.devkit.versionName
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 // Copyright (C) 2025 Zac Sweers
@@ -57,18 +56,22 @@ pluginDevKit {
   // TODO extract into file
   val versions =
     listOf(
-      "2.3.0",
-      "2.3.20",
-      "2.4.0-dev-2124",
-      "2.4.0",
-      "2.4.20-dev-3583",
-      "2.4.20-dev-6138",
-      "2.4.20-Beta1",
-    ).map(::KotlinToolingVersion)
-  kotlinVersionsToTestAgainst.addAll(versions.filter { it !in kotlinVersionsToTestAgainst })
+        "2.3.0",
+        "2.3.20",
+        "2.4.0-dev-2124",
+        "2.4.0",
+        "2.4.20-dev-3583",
+        "2.4.20-dev-6138",
+        "2.4.20-Beta1",
+      )
+      .map(::KotlinToolingVersion)
   versions.forEachIndexed { i, version ->
-    sourceSets.named(version.versionName) {
-      for (lower in versions.subList(0, i)) dependOn(sourceSets.named(lower.versionName))
+    developFor(version) {
+      main {
+        for (lower in versions.subList(0, i)) dependOn(
+          developFor.named(lower.toString()).flatMap { it.main }
+        )
+      }
     }
   }
 }

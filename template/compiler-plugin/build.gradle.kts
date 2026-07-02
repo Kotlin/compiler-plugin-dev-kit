@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -5,7 +6,29 @@ plugins {
 }
 
 pluginDevKit {
-    kotlinVersionsToTestAgainst += listOf(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
+    developForWithFixtures(kotlinToolingVersion)
+    developForWithFixtures(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
+    developFor.configureEach {
+        main {
+            java.setSrcDirs(listOf("$versionName/src"))
+            resources.setSrcDirs(listOf("$versionName/resources"))
+        }
+    }
+    withFixtures.configureEach {
+        testFixtures {
+            java.setSrcDirs(listOf("$versionName/test-fixtures"))
+        }
+    }
+    testAgainst.configureEach {
+        testSuite {
+            sources {
+                java.setSrcDirs(
+                    listOf("$versionName/test", pluginDevKit.testGenDirectory.dir(name))
+                )
+                resources.setSrcDirs(listOf("$versionName/testData"))
+            }
+        }
+    }
 }
 
 sourceSets {
@@ -19,31 +42,5 @@ sourceSets {
     test {
         java.setSrcDirs(listOf("test", pluginDevKit.testGenDirectory.dir(name)))
         resources.setSrcDirs(listOf("testData"))
-    }
-
-    all {
-        if (name.endsWith("Test")) return@all
-        if (this in listOf(main, testFixtures, test).map { it.get() }) return@all
-        if (name.endsWith("TestFixtures")) {
-            val folder = name.removeSuffix("TestFixtures")
-            java.setSrcDirs(listOf("$folder/test-fixtures"))
-        } else {
-            java.setSrcDirs(listOf("$name/src"))
-            resources.setSrcDirs(listOf("${name}/resources"))
-        }
-    }
-}
-
-@Suppress("UnstableApiUsage")
-testing {
-    suites {
-        withType<JvmTestSuite> {
-            sources {
-                if (this == sourceSets.test.get()) return@sources
-                val folder = name.removeSuffix("Test")
-                java.setSrcDirs(listOf("$folder/test", pluginDevKit.testGenDirectory.dir(name)))
-                resources.setSrcDirs(listOf("$folder/testData"))
-            }
-        }
     }
 }

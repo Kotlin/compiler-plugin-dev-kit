@@ -1,7 +1,12 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
-import org.gradle.api.DomainObjectSet
+import java.io.File
+import org.gradle.api.Action
+import org.gradle.api.Named
+import org.gradle.api.NamedDomainObjectCollection
+import org.gradle.api.NamedDomainObjectProvider
+import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
@@ -18,15 +23,23 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
-import org.gradle.kotlin.dsl.*
+import org.gradle.kotlin.dsl.attributes
+import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.invoke
+import org.gradle.kotlin.dsl.kotlin
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.the
+import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.api.GeneratorTask
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 import org.gradle.testing.base.TestingExtension
-import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
@@ -34,16 +47,173 @@ import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
-import java.io.File
 
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
-public interface DevKitCompilerPluginConfigExtension {
-    public val pluginAnnotations: Property<Project>
-    public val generateTestsClass: Property<String>
-    public val testGenDirectory: DirectoryProperty
-    public val kotlinVersionsToTestAgainst: DomainObjectSet<KotlinToolingVersion>
+public interface DevKitKotlinCompilerTestTarget : Named {
+    override fun getName(): String = version.versionString
+
+    public val versionName: String
+        get() = version.versionName
+
+    public val version: KotlinToolingVersion
+    public val testSuite: NamedDomainObjectProvider<JvmTestSuite>
+}
+
+public interface DevKitKotlinCompilerTestFixturesTarget : DevKitKotlinCompilerTestTarget {
+    public val testFixtures: NamedDomainObjectProvider<SourceSet>
+}
+
+public interface DevKitKotlinCompilerMainTarget : DevKitKotlinCompilerTestTarget {
+    public val main: NamedDomainObjectProvider<SourceSet>
+}
+
+public interface DevKitKotlinCompilerTarget :
+    DevKitKotlinCompilerMainTarget, DevKitKotlinCompilerTestFixturesTarget
+
+private class DevKitKotlinCompilerTestTargetImpl(
+    override val version: KotlinToolingVersion,
+    override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+) : DevKitKotlinCompilerTestTarget {
+    override fun equals(other: Any?): Boolean =
+        other is DevKitKotlinCompilerTestTarget && other.version == version
+
+    override fun hashCode(): Int = version.hashCode()
+}
+
+public fun Project.DevKitKotlinCompilerTestTarget(
+    version: KotlinToolingVersion
+): DevKitKotlinCompilerTestTarget =
+    DevKitKotlinCompilerTestTargetImpl(
+        version,
+        project.extensions
+            .getByType<TestingExtension>()
+            .suites
+            .register<JvmTestSuite>("${version.versionName}Test"),
+    )
+
+private class DevKitKotlinCompilerTestFixturesTargetImpl(
+    override val version: KotlinToolingVersion,
+    override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    override val testFixtures: NamedDomainObjectProvider<SourceSet>,
+) : DevKitKotlinCompilerTestFixturesTarget {
+    override fun equals(other: Any?): Boolean =
+        other is DevKitKotlinCompilerTestTarget && other.version == version
+
+    override fun hashCode(): Int = version.hashCode()
+}
+
+public fun Project.DevKitKotlinCompilerTestFixturesTarget(
+    version: KotlinToolingVersion
+): DevKitKotlinCompilerTestFixturesTarget =
+    DevKitKotlinCompilerTestFixturesTargetImpl(
+        version,
+        project.extensions
+            .getByType<TestingExtension>()
+            .suites
+            .register<JvmTestSuite>("${version.versionName}Test"),
+        project.extensions
+            .getByType<SourceSetContainer>()
+            .register("${version.versionName}TestFixtures"),
+    )
+
+private class DevKitKotlinCompilerMainTargetImpl(
+    override val version: KotlinToolingVersion,
+    override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    override val main: NamedDomainObjectProvider<SourceSet>,
+) : DevKitKotlinCompilerMainTarget {
+    override fun equals(other: Any?): Boolean =
+        other is DevKitKotlinCompilerTestTarget && other.version == version
+
+    override fun hashCode(): Int = version.hashCode()
+}
+
+public fun Project.DevKitKotlinCompilerMainTarget(
+    version: KotlinToolingVersion
+): DevKitKotlinCompilerMainTarget =
+    DevKitKotlinCompilerMainTargetImpl(
+        version,
+        project.extensions
+            .getByType<TestingExtension>()
+            .suites
+            .register<JvmTestSuite>("${version.versionName}Test"),
+        project.extensions.getByType<SourceSetContainer>().register(version.versionName),
+    )
+
+private class DevKitKotlinCompilerTargetImpl(
+    override val version: KotlinToolingVersion,
+    override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    override val testFixtures: NamedDomainObjectProvider<SourceSet>,
+    override val main: NamedDomainObjectProvider<SourceSet>,
+) : DevKitKotlinCompilerTarget {
+    override fun equals(other: Any?): Boolean =
+        other is DevKitKotlinCompilerTestTarget && other.version == version
+
+    override fun hashCode(): Int = version.hashCode()
+}
+
+public fun Project.DevKitKotlinCompilerTarget(
+    version: KotlinToolingVersion
+): DevKitKotlinCompilerTarget =
+    DevKitKotlinCompilerTargetImpl(
+        version,
+        project.extensions
+            .getByType<TestingExtension>()
+            .suites
+            .register<JvmTestSuite>("${version.versionName}Test"),
+        project.extensions
+            .getByType<SourceSetContainer>()
+            .register("${version.versionName}TestFixtures"),
+        project.extensions.getByType<SourceSetContainer>().register(version.versionName),
+    )
+
+public abstract class DevKitCompilerPluginConfigExtension(override val project: Project) :
+    HasProject {
+    public abstract val pluginAnnotations: Property<Project>
+    public abstract val generateTestsClass: Property<String>
+    public abstract val testGenDirectory: DirectoryProperty
+    public abstract val testAgainst: NamedDomainObjectSet<DevKitKotlinCompilerTestTarget>
+    public val developFor: NamedDomainObjectCollection<DevKitKotlinCompilerMainTarget> =
+        testAgainst.withType<DevKitKotlinCompilerMainTarget>()
+    public val withFixtures: NamedDomainObjectCollection<DevKitKotlinCompilerTestFixturesTarget> =
+        testAgainst.withType<DevKitKotlinCompilerTestFixturesTarget>()
+
+    public fun kotlinVersionsToTestAgainst(
+        block: Action<NamedDomainObjectSet<DevKitKotlinCompilerTestTarget>>
+    ): Unit = block.execute(testAgainst)
+
+    public fun testAgainst(
+        version: KotlinToolingVersion,
+        action: Action<DevKitKotlinCompilerTestTarget> = Action {},
+    ): DevKitKotlinCompilerTestTarget =
+        project.DevKitKotlinCompilerTestTarget(version).also(testAgainst::add).also {
+            action.execute(it)
+        }
+
+    public fun testAgainstWithFixtures(
+        version: KotlinToolingVersion,
+        action: Action<DevKitKotlinCompilerTestFixturesTarget> = Action {},
+    ): DevKitKotlinCompilerTestFixturesTarget =
+        project.DevKitKotlinCompilerTestFixturesTarget(version).also(testAgainst::add).also {
+            action.execute(it)
+        }
+
+    public fun developFor(
+        version: KotlinToolingVersion,
+        action: Action<DevKitKotlinCompilerMainTarget> = Action {},
+    ): DevKitKotlinCompilerMainTarget =
+        project.DevKitKotlinCompilerMainTarget(version).also(testAgainst::add).also {
+            action.execute(it)
+        }
+
+    public fun developForWithFixtures(
+        version: KotlinToolingVersion,
+        action: Action<DevKitKotlinCompilerTarget> = Action {},
+    ): DevKitKotlinCompilerTarget =
+        project.DevKitKotlinCompilerTarget(version).also(testAgainst::add).also {
+            action.execute(it)
+        }
 }
 
 public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
@@ -67,11 +237,7 @@ public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     }
 }
 
-@OptIn(
-    ExperimentalWasmDsl::class,
-    ExperimentalKotlinGradlePluginApi::class,
-    ExperimentalBuildToolsApi::class,
-)
+@OptIn(ExperimentalWasmDsl::class)
 public class DevKitCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project): Unit = project.run {
         val resourceLoader = this@DevKitCompilerPlugin.javaClass.classLoader
@@ -89,7 +255,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         val kotlinExtension = extensions.getByType<KotlinJvmProjectExtension>()
         val sourceSets = extensions.getByType<SourceSetContainer>()
-        val testing = extensions.getByType<TestingExtension>()
         val animalsniffer = extensions.getByType<AnimalSnifferExtension>()
         val buildConfig = extensions.getByType<BuildConfigExtension>()
         val idea = extensions.getByType<IdeaModel>()
@@ -112,16 +277,14 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             }
 
         val pluginDevKit =
-            project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit")
+            project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit", project)
         val pluginAnnotations = pluginDevKit.pluginAnnotations
         val generateTestsClass = pluginDevKit.generateTestsClass.convention("GenerateTestsKt")
         val testGenDirectory =
             pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
-        val kotlinVersionsToTestAgainst = pluginDevKit.kotlinVersionsToTestAgainst
 
-        kotlinVersionsToTestAgainst.addLater(
-            kotlinExtension.compilerVersion.map(::KotlinToolingVersion)
-        )
+        // force configuration
+        afterEvaluate { pluginDevKit.testAgainst.toList() }
 
         rootProject.childProjects.values.forEach {
             var noMultiplatformProjects = true
@@ -281,7 +444,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 outputs.dir(testGenDirectory).withPropertyName("generatedTests")
 
                 classpath = sourceSets.named("testFixtures").get().runtimeClasspath
-                mainClass = generateTestsClass
+                mainClass.set(generateTestsClass)
                 workingDir = rootDir
             }
 
@@ -346,58 +509,85 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         // Based on mrjar and Gradle test-fixtures sourceSet setup
         // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
         // https://github.com/melix/mrjar-gradle-plugin
-        kotlinVersionsToTestAgainst.all {
-            val main =
-                sourceSets.register(versionName) {
-                    java.setSrcDirs(
-                        listOf("$versionName/src/main/java", "$versionName/src/main/kotlin")
+        pluginDevKit.developFor.configureEach {
+            main {
+                java.setSrcDirs(
+                    listOf("$versionName/src/main/java", "$versionName/src/main/kotlin")
+                )
+                resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
+                forceKotlinVersion(version)
+                dependencies {
+                    compileOnlyConfigurationName(kotlin("compiler"))
+                    // allow it to see shared main sources
+                    // TODO test this
+                    compileOnlyConfigurationName(
+                        sourceSets.named("main").map { it.output.classesDirs }
                     )
-                    resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
-                    forceKotlinVersion(this@all)
-                    dependencies {
-                        compileOnlyConfigurationName(kotlin("compiler"))
-                        // allow it to see shared main sources
-                        // TODO test this
-                        compileOnlyConfigurationName(
-                            sourceSets.named("main").map { it.output.classesDirs }
-                        )
-                    }
-                    extendsFrom(sourceSets.named("main")) { it.implementationConfigurationName }
-                    extendsFrom(sourceSets.named("main")) { it.compileOnlyConfigurationName }
                 }
-            val testFixtures =
-                sourceSets.register("${versionName}TestFixtures") {
-                    java.setSrcDirs(
-                        listOf(
-                            "$versionName/src/testFixtures/java",
-                            "$versionName/src/testFixtures/kotlin",
-                        )
-                    )
-                    resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
-                    forceKotlinVersion(this@all)
-                    dependencies {
-                        implementationConfigurationName(project())
-                        compileOnlyConfigurationName(kotlin("compiler"))
-                        // allow it to see shared test fixture sources
-                        compileOnlyConfigurationName(
-                            sourceSets.named("testFixtures").map { it.output.classesDirs }
-                        )
-                    }
-                    extendsFrom(sourceSets.named("testFixtures")) {
-                        it.implementationConfigurationName
-                    }
-                    extendsFrom(sourceSets.named("testFixtures")) {
-                        it.compileOnlyConfigurationName
+                extendsFrom(sourceSets.named("main")) { it.implementationConfigurationName }
+                extendsFrom(sourceSets.named("main")) { it.compileOnlyConfigurationName }
+            }
+            tasks.named<Jar>("jar") {
+                metaInf {
+                    into("kotlin/plugin/versions/$version") {
+                        // Ensures the directory exists in the jar even if `main` has no output.
+                        from(versionMarker)
+                        from(main.map { it.output }) {
+                            exclude("META-INF/*kotlin_module")
+                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                        }
                     }
                 }
+            }
+        }
+        pluginDevKit.withFixtures.configureEach {
+            testFixtures {
+                java.setSrcDirs(
+                    listOf(
+                        "$versionName/src/testFixtures/java",
+                        "$versionName/src/testFixtures/kotlin",
+                    )
+                )
+                resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
+                forceKotlinVersion(version)
+                dependencies {
+                    implementationConfigurationName(project())
+                    compileOnlyConfigurationName(kotlin("compiler"))
+                    // allow it to see shared test fixture sources
+                    compileOnlyConfigurationName(
+                        sourceSets.named("testFixtures").map { it.output.classesDirs }
+                    )
+                }
+                extendsFrom(sourceSets.named("testFixtures")) {
+                    it.implementationConfigurationName
+                }
+                extendsFrom(sourceSets.named("testFixtures")) {
+                    it.compileOnlyConfigurationName
+                }
+            }
 
-            val testArtifacts = testArtifacts.withKotlinVersion(this)
+            tasks.named<Jar>("testFixturesJar") {
+                metaInf {
+                    into("kotlin/plugin/versions/$version") {
+                        // Ensures the directory exists in the jar even if `testFixtures` has no
+                        // output.
+                        from(versionMarker)
+                        from(testFixtures.map { it.output }) {
+                            exclude("META-INF/*kotlin_module")
+                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                        }
+                    }
+                }
+            }
+        }
+        pluginDevKit.testAgainst.configureEach {
+            val testArtifacts = testArtifacts.withKotlinVersion(version)
 
             val annotationsJvmRuntimeClasspath = annotationsJvmRuntimeClasspath.flatMap {
-                it.withKotlinVersion(this)
+                it.withKotlinVersion(version)
             }
             val annotationsJsRuntimeClasspath = annotationsJsRuntimeClasspath.flatMap {
-                it.withKotlinVersion(this) {
+                it.withKotlinVersion(version) {
                     attributes {
                         attribute(
                             Usage.USAGE_ATTRIBUTE,
@@ -408,7 +598,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             }
 
-            testing.suites.register<JvmTestSuite>("${versionName}Test") {
+            testSuite {
                 dependencies {
                     implementation(testFixtures(project()))
                     // allow it to see shared test sources
@@ -421,7 +611,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     )
                     resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
                     addTestGenDir()
-                    forceKotlinVersion(this@all)
+                    forceKotlinVersion(version)
                     generateTests { addTestSourceSet(this@sources) }
                     tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
 
@@ -432,7 +622,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         // force it to use version-specific jars when running tests
                         attributes.attribute(
                             KotlinCompilerVersion.attribute,
-                            KotlinCompilerVersion(this@all),
+                            KotlinCompilerVersion(version),
                         )
                     }
                 }
@@ -451,14 +641,14 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     }
                 }
 
-                tasks.named("test") { dependsOn(this@register) }
+                tasks.named("test") { dependsOn(this@testSuite) }
             }
 
             val signature = configurations.create("${versionName}Signature")
             dependencies {
                 // TODO add all Kotlin lib signatures, not just compiler
-                signature(kotlin("compiler", versionString))
-                signature(kotlin("compiler-internal-test-framework", versionString))
+                signature(kotlin("compiler", version.versionString))
+                signature(kotlin("compiler-internal-test-framework", version.versionString))
             }
             val signatureGenTask =
                 tasks.register<BuildSignatureTask>("${versionName}Signature") {
@@ -467,33 +657,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             animalsniffer.signatures += files(signatureGenTask.map { it.outputFiles })
 
-            tasks.named<Jar>("jar") {
-                metaInf {
-                    into("kotlin/plugin/versions/$versionString") {
-                        // Ensures the directory exists in the jar even if `main` has no output.
-                        from(versionMarker)
-                        from(main.map { it.output }) {
-                            exclude("META-INF/*kotlin_module")
-                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                        }
-                    }
-                }
-            }
-
-            tasks.named<Jar>("testFixturesJar") {
-                metaInf {
-                    into("kotlin/plugin/versions/$versionString") {
-                        // Ensures the directory exists in the jar even if `main` has no output.
-                        from(versionMarker)
-                        from(testFixtures.map { it.output }) {
-                            exclude("META-INF/*kotlin_module")
-                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                        }
-                    }
-                }
-            }
-
-            dependencies.registerMultiReleasePluginTransform(project.provider { this@all })
+            dependencies.registerMultiReleasePluginTransform(project.provider { version })
         }
 
         sourceSets.named("test") { addTestGenDir() }
