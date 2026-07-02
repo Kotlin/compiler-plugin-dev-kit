@@ -298,9 +298,6 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
-  val testCompilerVersion =
-    providers.gradleProperty("metro.testCompilerVersion").orElse(libs.versions.kotlin).get()
-
   compileOnly(libs.kotlin.compiler)
   compileOnly(libs.kotlin.stdlib)
   compileOnly(libs.poko.annotations)
@@ -329,13 +326,8 @@ dependencies {
 
   // Cover for https://github.com/tschuchortdev/kotlin-compile-testing/issues/274
   testImplementation(libs.kotlin.aptEmbeddable)
-  if (testCompilerVersion.startsWith("2.4")) {
-    testImplementation("dev.zacsweers.kctfork:core:0.13.0")
-    testImplementation("dev.zacsweers.kctfork:ksp:0.13.0")
-  } else {
-    testImplementation(libs.kct)
-    testImplementation(libs.kct.ksp)
-  }
+  testImplementation("dev.zacsweers.kctfork:core:0.13.0")
+  testImplementation("dev.zacsweers.kctfork:ksp:0.13.0")
   pluginConfig.kotlinVersionsToTestAgainst.all {
     // TODO provide easier source set access by version
     sourceSets.named("${versionName}Test") {
