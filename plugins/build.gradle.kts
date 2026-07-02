@@ -1,11 +1,36 @@
 plugins {
-    `kotlin-dsl`
+    `embedded-kotlin`
+    embeddedKotlin("plugin.sam.with.receiver")
+    embeddedKotlin("plugin.assignment")
+    `java-gradle-plugin`
 }
 
+samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
+
+assignment { annotation("org.gradle.api.SupportsKotlinAssignmentOverloading") }
+
 dependencies {
+    implementation(gradleKotlinDsl())
     implementation(libs.kotlin.jvm)
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)
     api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
+}
+
+gradlePlugin {
+    plugins {
+        create("compilerPlugin") {
+            id = "org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin"
+            implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPlugin"
+        }
+        create("gradlePlugin") {
+            id = "org.jetbrains.kotlin.compiler.plugin.devkit.gradle-plugin"
+            implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
+        }
+    }
+}
+
+kotlin {
+    explicitApi()
 }

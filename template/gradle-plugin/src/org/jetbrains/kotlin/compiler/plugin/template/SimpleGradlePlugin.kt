@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
 
 @Suppress("unused") // Used via reflection.
-class SimpleGradlePlugin : DevKitCompilerGradlePlugin(BuildConfig.PLUGIN_INFO) {
+class SimpleGradlePlugin : DevKitCompilerGradlePlugin(PluginInfo.PLUGIN_INFO) {
     override fun apply(target: Project) {
         target.extensions.create("simplePlugin", SimpleGradleExtension::class.java)
     }
@@ -15,7 +15,7 @@ class SimpleGradlePlugin : DevKitCompilerGradlePlugin(BuildConfig.PLUGIN_INFO) {
     override fun Project.applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> {
         kotlinCompilation.compileTaskProvider.configure {
             // Run this compiler plugin before Compose plugin.
-            it.compilerOptions.freeCompilerArgs.add("-Xcompiler-plugin-order=${BuildConfig.KOTLIN_PLUGIN_ID}>androidx.compose.compiler.plugins.kotlin")
+            it.compilerOptions.freeCompilerArgs.add("-Xcompiler-plugin-order=${PluginInfo.KOTLIN_PLUGIN_ID}>androidx.compose.compiler.plugins.kotlin")
         }
         return super.applyToCompilation(kotlinCompilation)
     }

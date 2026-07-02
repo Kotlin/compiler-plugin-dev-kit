@@ -6,13 +6,13 @@ import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-val KotlinToolingVersion.versionString
+public val KotlinToolingVersion.versionString: String
     get() = toString()
 
 // From Metro
 // https://github.com/ZacSweers/metro/blob/f4fb09ea6b6894aa7816f02d52398d65f9be404d/compiler-compat/src/main/kotlin/dev/zacsweers/metro/compiler/compat/KotlinToolingVersion.kt
 internal val KotlinToolingVersion.isDev: Boolean
-    get() = this.maturity == KotlinToolingVersion.Maturity.DEV
+    get() = this.maturity == DEV
 
 internal val KotlinToolingVersion.isIdeBuild: Boolean
     get() = classifier?.startsWith("ij", ignoreCase = true) == true
@@ -22,19 +22,20 @@ internal fun KotlinToolingVersion.hasSameBaseVersionAs(other: KotlinToolingVersi
 
 // Uses same convention as Metro
 // https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
-val KotlinToolingVersion.baseVersionName
+public val KotlinToolingVersion.baseVersionName: String
     get() = versionString.replace(".", "").replace("-", "_").lowercase()
-val KotlinToolingVersion.versionName
+public val KotlinToolingVersion.versionName: String
     get() = "k$baseVersionName"
 
-fun DependencyHandler.registerMultiReleasePluginTransform(version: Provider<KotlinToolingVersion>) {
+public fun DependencyHandler.registerMultiReleasePluginTransform(
+    version: Provider<KotlinToolingVersion>
+) {
     registerTransform(MultiReleasePluginTransform::class.java) {
-        it.parameters { it.kotlinVersion.set(version.map(KotlinToolingVersion::versionString)) }
-        it.from
+        parameters { kotlinVersion.set(version.map(KotlinToolingVersion::versionString)) }
+        from
             .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-            .attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
-        it.to
-            .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
+            .attribute(KotlinCompilerVersion.attribute, noVersion)
+        to.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
             .attributeProvider(
                 KotlinCompilerVersion.attribute,
                 version.map(::KotlinCompilerVersion),
@@ -42,25 +43,28 @@ fun DependencyHandler.registerMultiReleasePluginTransform(version: Provider<Kotl
     }
 }
 
-fun DependencyHandler.setupCompilerVersionAttribute() {
+public fun DependencyHandler.setupCompilerVersionAttribute() {
     artifactTypes {
-        it.named("jar") {
-            it.attributes.attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.none)
+        named("jar") {
+            attributes.attribute(KotlinCompilerVersion.attribute, noVersion)
         }
     }
 }
 
-fun ModuleDependency.kotlinCompilerVersion(version: KotlinToolingVersion) = attributes {
-    it.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-    it.attribute(
-        KotlinCompilerVersion.attribute,
-        KotlinCompilerVersion(version),
-    )
-}
+public fun ModuleDependency.kotlinCompilerVersion(version: KotlinToolingVersion): ModuleDependency =
+    attributes {
+        attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
+        attribute(
+            KotlinCompilerVersion.attribute,
+            KotlinCompilerVersion(version),
+        )
+    }
 
-fun ModuleDependency.kotlinCompilerVersion(version: Provider<KotlinToolingVersion>) = attributes {
-    it.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-    it.attributeProvider(
+public fun ModuleDependency.kotlinCompilerVersion(
+    version: Provider<KotlinToolingVersion>
+): ModuleDependency = attributes {
+    attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
+    attributeProvider(
         KotlinCompilerVersion.attribute,
         version.map(::KotlinCompilerVersion),
     )

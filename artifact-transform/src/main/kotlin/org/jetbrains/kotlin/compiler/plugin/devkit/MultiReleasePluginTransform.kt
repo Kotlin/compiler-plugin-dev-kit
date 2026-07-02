@@ -14,16 +14,16 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 private const val PLUGIN_VERSIONS_PATH = "META-INF/kotlin/plugin/versions"
 
 @CacheableTransform
-abstract class MultiReleasePluginTransform :
+public abstract class MultiReleasePluginTransform :
     TransformAction<MultiReleasePluginTransform.Parameters> {
 
-    interface Parameters : TransformParameters {
+    public interface Parameters : TransformParameters {
         @get:Input
-        val kotlinVersion: Property<String>
+        public val kotlinVersion: Property<String>
     }
 
     @get:[Classpath InputArtifact]
-    abstract val inputArtifact: Provider<FileSystemLocation>
+    protected abstract val inputArtifact: Provider<FileSystemLocation>
 
     // TODO support more than just jars?
     @OptIn(ExperimentalPathApi::class)
@@ -65,9 +65,9 @@ abstract class MultiReleasePluginTransform :
                     followLinks = false,
                 ) { src, dst ->
                     when {
-                        dst == markerFile -> CopyActionResult.SKIP_SUBTREE
-                        dst == outputVersionsDir -> CopyActionResult.SKIP_SUBTREE
-                        dst.exists() -> CopyActionResult.CONTINUE
+                        dst == markerFile -> SKIP_SUBTREE
+                        dst == outputVersionsDir -> SKIP_SUBTREE
+                        dst.exists() -> CONTINUE
                         else -> src.copyToIgnoringExistingDirectory(dst, followLinks = false)
                     }
                 }

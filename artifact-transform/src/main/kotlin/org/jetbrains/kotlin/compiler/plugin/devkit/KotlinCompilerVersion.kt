@@ -4,10 +4,10 @@ import java.io.Serializable
 import org.gradle.api.attributes.Attribute
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-data class KotlinCompilerVersion(val version: KotlinToolingVersion?) : Serializable {
-    companion object {
-        val attribute =
+public data class KotlinCompilerVersion(val version: KotlinToolingVersion?) : Serializable {
+    public companion object {
+        public val attribute: Attribute<KotlinCompilerVersion> =
             Attribute.of("org.jetbrains.kotlin.compiler.version", KotlinCompilerVersion::class.java)
-        val none = KotlinCompilerVersion(null)
+        public val noVersion: KotlinCompilerVersion = KotlinCompilerVersion(null)
     }
 }
