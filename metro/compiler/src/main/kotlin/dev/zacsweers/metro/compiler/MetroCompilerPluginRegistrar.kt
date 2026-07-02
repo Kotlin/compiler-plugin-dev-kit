@@ -66,7 +66,7 @@ public class MetroCompilerPluginRegistrar : CompilerPluginRegistrar() {
 
     val compatContext =
       try {
-        CompatContext.create(version)
+        CompatContext.create()
       } catch (t: Throwable) {
         System.err.println(
           "[METRO] Skipping enabling Metro extensions, unable to create CompatContext for version $version"

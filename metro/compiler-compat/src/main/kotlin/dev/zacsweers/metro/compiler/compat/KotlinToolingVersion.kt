@@ -31,18 +31,6 @@ public fun KotlinToolingVersion(kotlinVersionString: String): KotlinToolingVersi
   )
 }
 
-internal fun KotlinToolingVersion(
-  kotlinVersion: KotlinVersion,
-  classifier: String? = null,
-): KotlinToolingVersion {
-  return KotlinToolingVersion(
-    kotlinVersion.major,
-    kotlinVersion.minor,
-    kotlinVersion.patch,
-    classifier,
-  )
-}
-
 public class KotlinToolingVersion(
   public val major: Int,
   public val minor: Int,
@@ -171,35 +159,6 @@ public class KotlinToolingVersion(
     return "$major.$minor.$patch" + if (classifier != null) "-$classifier" else ""
   }
 }
-
-internal fun KotlinToolingVersion.toKotlinVersion(): KotlinVersion =
-  KotlinVersion(major, minor, patch)
-
-internal fun KotlinVersion.toKotlinToolingVersion(
-  classifier: String? = null
-): KotlinToolingVersion = KotlinToolingVersion(this, classifier)
-
-internal val KotlinToolingVersion.isSnapshot: Boolean
-  get() = this.maturity == KotlinToolingVersion.Maturity.SNAPSHOT
-
-internal val KotlinToolingVersion.isDev: Boolean
-  get() = this.maturity == KotlinToolingVersion.Maturity.DEV
-
-internal val KotlinToolingVersion.isIdeBuild: Boolean
-  get() = classifier?.startsWith("ij", ignoreCase = true) == true
-
-internal fun KotlinToolingVersion.hasSameBaseVersionAs(other: KotlinToolingVersion): Boolean {
-  return major == other.major && minor == other.minor && patch == other.patch
-}
-
-internal val KotlinToolingVersion.isMilestone: Boolean
-  get() = this.maturity == KotlinToolingVersion.Maturity.MILESTONE
-
-internal val KotlinToolingVersion.isAlpha: Boolean
-  get() = this.maturity == KotlinToolingVersion.Maturity.ALPHA
-
-internal val KotlinToolingVersion.isBeta: Boolean
-  get() = this.maturity == KotlinToolingVersion.Maturity.BETA
 
 internal val KotlinToolingVersion.isRC: Boolean
   get() = this.maturity == KotlinToolingVersion.Maturity.RC
