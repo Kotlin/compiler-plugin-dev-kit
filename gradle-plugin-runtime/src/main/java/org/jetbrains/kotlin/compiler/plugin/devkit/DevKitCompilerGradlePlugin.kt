@@ -37,18 +37,7 @@ abstract class DevKitCompilerGradlePlugin(val info: DevKitPluginInfo) :
             implementation(info.libraryCoordinates)
         }
         val version = kotlin.compilerVersion.map(::KotlinToolingVersion)
-        val pluginClasspathName =
-            lowerCamelCaseName(
-                PLUGIN_CLASSPATH_CONFIGURATION_NAME,
-                kotlinCompilation.target.disambiguationClassifier,
-                kotlinCompilation.name,
-            )
-        project.configurations.named(pluginClasspathName) {
-            it.attributes.attributeProvider(
-                KotlinCompilerVersion.attribute,
-                version.map(::KotlinCompilerVersion),
-            )
-        }
+        kotlinCompilation.requireCompilerVersionForPluginClasspath(version)
         project.dependencies.setupCompilerVersionAttribute()
         project.dependencies.registerMultiReleasePluginTransform(version)
 
@@ -59,27 +48,3 @@ abstract class DevKitCompilerGradlePlugin(val info: DevKitPluginInfo) :
         kotlinCompilation: KotlinCompilation<*>
     ): Provider<List<SubpluginOption>> = provider { emptyList() }
 }
-
-private fun lowerCamelCaseName(vararg nameParts: String?): String {
-    val nonEmptyParts = nameParts.mapNotNull { it?.takeIf(String::isNotEmpty) }
-    return nonEmptyParts
-        .drop(1)
-        .joinToString(
-            separator = "",
-            prefix = nonEmptyParts.firstOrNull().orEmpty(),
-            transform = String::capitalizeAsciiOnly,
-        )
-}
-
-private fun String.capitalizeAsciiOnly(): String {
-    if (isEmpty()) return this
-    val c = this[0]
-    return if (c in 'a'..'z')
-        buildString(length) {
-            append(c.uppercaseChar())
-            append(this@capitalizeAsciiOnly, 1, this@capitalizeAsciiOnly.length)
-        }
-    else this
-}
-
-private const val PLUGIN_CLASSPATH_CONFIGURATION_NAME = "kotlinCompilerPluginClasspath"

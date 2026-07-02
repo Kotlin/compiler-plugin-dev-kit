@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.provider.Provider
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public val KotlinToolingVersion.versionString: String
@@ -54,3 +55,44 @@ public fun ModuleDependency.kotlinCompilerVersion(
 ): ModuleDependency = attributes {
     attributeProvider(KotlinCompilerVersion.attribute, version.map(::KotlinCompilerVersion))
 }
+
+public fun KotlinCompilation<*>.requireCompilerVersionForPluginClasspath(
+    version: Provider<KotlinToolingVersion>
+) {
+    project.configurations.named(
+        lowerCamelCaseName(
+            PLUGIN_CLASSPATH_CONFIGURATION_NAME,
+            target.disambiguationClassifier,
+            name,
+        )
+    ) {
+        attributes.attributeProvider(
+            KotlinCompilerVersion.attribute,
+            version.map(::KotlinCompilerVersion),
+        )
+    }
+}
+
+private fun lowerCamelCaseName(vararg nameParts: String?): String {
+    val nonEmptyParts = nameParts.mapNotNull { it?.takeIf(String::isNotEmpty) }
+    return nonEmptyParts
+        .drop(1)
+        .joinToString(
+            separator = "",
+            prefix = nonEmptyParts.firstOrNull().orEmpty(),
+            transform = String::capitalizeAsciiOnly,
+        )
+}
+
+private fun String.capitalizeAsciiOnly(): String {
+    if (isEmpty()) return this
+    val c = this[0]
+    return if (c in 'a'..'z')
+        buildString(length) {
+            append(c.uppercaseChar())
+            append(this@capitalizeAsciiOnly, 1, this@capitalizeAsciiOnly.length)
+        }
+    else this
+}
+
+private const val PLUGIN_CLASSPATH_CONFIGURATION_NAME = "kotlinCompilerPluginClasspath"
