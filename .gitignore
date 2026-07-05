@@ -8,3 +8,4 @@ template/.idea/*
 .kotlin/
 build/
 out/
+local.properties

@@ -17,7 +17,7 @@ cd benchmark && ./run_benchmarks.sh metro  # Performance benchmarks
 
 Run with `--quiet` to reduce noise. Do not add `--info`, `--no-daemon`, or other extra flags. Always run `./gradlew` from the directory containing the wrapper; never `cd` into a module first.
 
-Never run tests without asking first — failures often require context to debug.
+Tests are slow, so don't run them gratuitously — but when the task at hand is a failing test or verifying a fix, running tests is expected, no need to ask first. Prefer the narrowest target that answers the question (a single `--tests` filter, a single `k<version>Test` suite) over a full suite; widen scope only once you need the bigger picture.
 
 ## Architecture
 
@@ -64,7 +64,7 @@ Add a file there, then run `generateTests` to produce the JUnit test class.
 - Edit only the exact file specified. Do not touch adjacent modules or "nearby" code unless asked. If unsure which file, ask first.
 - Explain the plan before making edits on non-trivial changes; wait for approval.
 - Do not make changes beyond what was asked. If something adjacent should also change, mention it but don't do it.
-- Never explore `.gradle` directories or external library internals. Check official docs via WebFetch instead.
+- Check official docs via WebFetch first, but it's fine to dig into `.gradle` caches or other library/dependency internals (e.g. decompiling or reading resolved sources) when that's what it takes to pin down exact behavior — this comes up often with the Kotlin compiler test framework, whose internals aren't well documented externally.
 - Avoid dense expression chains with trailing Elvis (`?: run { ... }`) fallbacks. Prefer named local values, early returns, or small helpers.
 - Avoid large stacked boolean conditions. Split into named boolean values describing the state.
 - Reuse existing infrastructure. Grep before adding anything new.
