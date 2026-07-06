@@ -48,27 +48,10 @@ jobs:
       - name: Check formatting
         run: kempt check
 
-  generate-matrix:
-    name: "⊹ generate compiler matrix ⊹"
-    runs-on: ubuntu-slim
-    outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Generate matrix
-        id: generate
-        run: ./scripts/generate-ci-matrix.sh
-
   core:
-    name: "core artifacts / ${{ matrix.kotlin-compiler }}"
+    name: "core artifacts"
     runs-on: ubuntu-latest
-    needs: generate-matrix
     timeout-minutes: 40
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-      fail-fast: false
     permissions:
       contents: read
       checks: write
@@ -83,20 +66,19 @@ jobs:
           encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           konan: true
-          kotlin-compiler-version: ${{ matrix.kotlin-compiler }}
 
       - name: Check root project
         run: |
           echo "Running checks..."
           # metro.functionalTestKmpTarget=jvm scopes IC test parameterization to JVM only here. The
           # kmp-functional job (main only) fans the remaining targets out into parallel runners.
-          ./gradlew check --continue --quiet '-Pmetro.testCompilerVersion=${{ matrix.kotlin-compiler }}' -Pmetro.excludeJsBoxTests -Pmetro.functionalTestKmpTarget=jvm ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
+          ./gradlew check --continue --quiet -Pmetro.excludeJsBoxTests -Pmetro.functionalTestKmpTarget=jvm ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
 
       - name: (Fail-only) Upload reports
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: reports-core-${{ matrix.kotlin-compiler }}
+          name: reports-core
           path: |
             **/build/reports/**
 
@@ -105,7 +87,7 @@ jobs:
         if: failure()
         with:
           report_paths: '**/build/test-results/**/TEST-*.xml'
-          check_name: 'Test Report - core / ${{ matrix.kotlin-compiler }}'
+          check_name: 'Test Report - core'
 
   js-box:
     name: ${{ format('js box / {0}', github.ref == 'refs/heads/main' && 'full' || 'smoke') }}
