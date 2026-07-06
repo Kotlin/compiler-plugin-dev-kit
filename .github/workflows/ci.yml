@@ -72,7 +72,7 @@ jobs:
           echo "Running checks..."
           # metro.functionalTestKmpTarget=jvm scopes IC test parameterization to JVM only here. The
           # kmp-functional job (main only) fans the remaining targets out into parallel runners.
-          ./gradlew check --continue --quiet -Pmetro.excludeJsBoxTests -Pmetro.functionalTestKmpTarget=jvm ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
+          ./gradlew check --continue -Pmetro.excludeJsBoxTests -Pmetro.functionalTestKmpTarget=jvm ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
 
       - name: (Fail-only) Upload reports
         if: failure()
@@ -110,7 +110,7 @@ jobs:
       - name: Run JS box smoke tests
         if: github.ref != 'refs/heads/main'
         run: |
-          ./gradlew :compiler-tests:test --quiet \
+          ./gradlew :compiler-tests:test \
             --tests 'dev.zacsweers.metro.compiler.JsBoxTestGenerated$Inject$Assisted.testBasicAssistedInject' \
             --tests 'dev.zacsweers.metro.compiler.JsBoxTestGenerated$Multibindings.testMapProviderLazyValues' \
             ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
@@ -118,7 +118,7 @@ jobs:
       - name: Run JS box tests
         if: github.ref == 'refs/heads/main'
         run: |
-          ./gradlew :compiler-tests:test --continue --quiet -Pmetro.jsBoxTestRetries=3 \
+          ./gradlew :compiler-tests:test --continue -Pmetro.jsBoxTestRetries=3 \
             --tests 'dev.zacsweers.metro.compiler.JsBoxTestGenerated*' \
             --tests 'dev.zacsweers.metro.compiler.JsFastInitBoxTestGenerated*' \
             --tests 'dev.zacsweers.metro.compiler.JsContributionProvidersBoxTestGenerated*'
@@ -177,7 +177,7 @@ jobs:
 
       - name: ':gradle-plugin:functionalTest'
         if: github.ref == 'refs/heads/main'
-        run: ./gradlew :gradle-plugin:functionalTest --continue --quiet -Pmetro.functionalTestKmpTarget=${{ matrix.target }}
+        run: ./gradlew :gradle-plugin:functionalTest --continue -Pmetro.functionalTestKmpTarget=${{ matrix.target }}
 
       - name: (Fail-only) Upload reports
         if: failure() && github.ref == 'refs/heads/main'
