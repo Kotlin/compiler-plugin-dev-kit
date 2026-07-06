@@ -2,6 +2,10 @@ on:
   pull_request: { }
   push:
 
+defaults:
+  run:
+    working-directory: template
+
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
 
@@ -17,7 +21,7 @@ jobs:
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew build -p ./template --continue
+      - run: ./gradlew build --continue
 
       - uses: mikepenz/action-junit-report@v5
         if: success() || failure()

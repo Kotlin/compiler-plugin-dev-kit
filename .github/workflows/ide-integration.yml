@@ -1,5 +1,9 @@
 name: IDE Integration Tests
 
+defaults:
+  run:
+    working-directory: metro
+
 on:
   push:
     paths-ignore:

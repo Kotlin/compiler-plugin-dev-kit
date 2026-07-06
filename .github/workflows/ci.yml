@@ -1,5 +1,9 @@
 name: CI
 
+defaults:
+  run:
+    working-directory: metro
+
 on:
   # Only run push on main
   push:
