@@ -3,8 +3,6 @@ name: CI
 on:
   # Only run push on main
   push:
-    branches:
-      - main
     paths-ignore:
       - '**/*.md'
   # Always run on PRs
@@ -170,7 +168,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [js, wasmJs, linuxX64]
+        target: [ js, wasmJs, linuxX64 ]
 
     steps:
       - name: Skip on PRs

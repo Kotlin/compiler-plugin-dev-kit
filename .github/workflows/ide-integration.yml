@@ -2,8 +2,6 @@ name: IDE Integration Tests
 
 on:
   push:
-    branches:
-      - main
     paths-ignore:
       - '**/*.md'
   pull_request:

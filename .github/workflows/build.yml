@@ -1,8 +1,6 @@
 on:
   pull_request: { }
   push:
-    branches:
-      - template-refactoring-poc
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
