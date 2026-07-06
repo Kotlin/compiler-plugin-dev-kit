@@ -58,7 +58,7 @@ Tests are spread across a few areas.
 
 ### Versions
 
-To test different versions of Kotlin (backed by the `:compiler-compat` system, see its README for more details), set the `metro.testCompilerVersion` property to the Kotlin version you want to test. This is automatically used by all the tests in `:compiler`, `:compiler-tests`, and `:gradle-plugin` functional tests when specified.
+To test different versions of Kotlin (backed by the `:compiler-compat` system, see its README for more details), set the `metro.testCompilerVersion` property to the Kotlin version you want to test. This is automatically used by all the tests in `:compiler`, `:compiler-tests`, and `:gradle-plugin` functional tests when specified. Each of these projects registers a test task per supported Kotlin version, but only the one matching `metro.testCompilerVersion` actually runs; the rest are skipped. If unset, it defaults to the Kotlin version from the version catalog, so a plain `./gradlew check` stays fast.
 
 ### Local Publishing
 

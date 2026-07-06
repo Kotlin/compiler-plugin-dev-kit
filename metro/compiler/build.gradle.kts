@@ -221,6 +221,15 @@ project.afterEvaluate {
   }
 }
 
+val versionAliases =
+  rootProject.isolated.projectDirectory
+    .dir("compiler-compat")
+    .file("version-aliases.txt")
+    .asFile
+    .readLines()
+    .filterNot { it.isBlank() || it.startsWith('#') }
+    .map(::KotlinToolingVersion)
+
 pluginDevKit {
   addRuntimeDependency = false
 
@@ -235,6 +244,21 @@ pluginDevKit {
     )
     .map(::KotlinToolingVersion)
     .forEach { developFor(it) }
+
+  // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
+  // metro.testCompilerVersion always has a matching task to select.
+  versionAliases.filterNot { alias -> testAgainst.any { it.version == alias } }.forEach { testAgainst(it) }
+}
+
+// Picks which single registered Kotlin version's test task actually runs; every other version's
+// suite is disabled. Defaults to the version-catalog Kotlin so plain `./gradlew check` stays fast.
+val testCompilerVersion =
+  KotlinToolingVersion(
+    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
+  )
+
+pluginDevKit.testAgainst.configureEach {
+  testSuite { targets.all { testTask { enabled = version == testCompilerVersion } } }
 }
 
 for (c in arrayOf("apiElements", "runtimeElements")) {

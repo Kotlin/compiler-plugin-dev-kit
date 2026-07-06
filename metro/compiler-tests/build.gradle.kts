@@ -21,6 +21,15 @@ plugins {
 
 project.plugins.apply(D8Plugin::class.java)
 
+val versionAliases =
+  rootProject.isolated.projectDirectory
+    .dir("compiler-compat")
+    .file("version-aliases.txt")
+    .asFile
+    .readLines()
+    .filterNot { it.isBlank() || it.startsWith('#') }
+    .map(::KotlinToolingVersion)
+
 pluginDevKit {
   listOf(
       "2.3.0",
@@ -40,7 +49,18 @@ pluginDevKit {
         }
       }
     }
+
+  // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
+  // metro.testCompilerVersion always has a matching task to select.
+  versionAliases.filterNot { alias -> testAgainst.any { it.version == alias } }.forEach { testAgainst(it) }
 }
+
+// Picks which single registered Kotlin version's test task actually runs; every other version's
+// suite is disabled. Defaults to the version-catalog Kotlin so plain `./gradlew check` stays fast.
+val testCompilerVersion =
+  KotlinToolingVersion(
+    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
+  )
 
 // Configure the compiler-version-related test properties per registered devkit test suite, so
 // each `<version>Test` suite reports its own pinned version at runtime rather than a single
@@ -56,6 +76,7 @@ pluginDevKit.testAgainst.configureEach {
           "metro.test.overrideCompilerVersion",
           true,
         )
+        enabled = version == testCompilerVersion
       }
     }
   }
