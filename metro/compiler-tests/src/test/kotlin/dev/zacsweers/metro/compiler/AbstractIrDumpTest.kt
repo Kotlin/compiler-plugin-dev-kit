@@ -8,6 +8,10 @@ import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.handlers.IrSourceRangesDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.IrTreeVerifierHandler
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
+import org.jetbrains.kotlin.test.configuration.additionalK2ConfigurationForIrTextTest
+import org.jetbrains.kotlin.test.configuration.commonHandlersForCodegenTest
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.DUMP_IR
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.DUMP_KT_IR
@@ -36,14 +40,16 @@ open class AbstractIrDumpTest : MetroTestBaseWithTargetBackend(TargetBackend.JVM
 
       // Register IR handlers with our custom handler instead of IrPrettyKotlinDumpHandler
       val compatContext = CompatContext.create()
-      configureIrHandlersStep(
-        ::irTextDumpHandlerCtor,
-        ::IrTreeVerifierHandler,
-        { testServices, artifactKind ->
-          MetroIrPrettyKotlinDumpHandler(testServices, artifactKind, compatContext)
-        },
-        ::IrSourceRangesDumpHandler,
-      )
+      configureIrHandlersStep {
+        useHandlers(
+          ::irTextDumpHandlerCtor,
+          ::IrTreeVerifierHandler,
+          { testServices, artifactKind ->
+            MetroIrPrettyKotlinDumpHandler(testServices, artifactKind, compatContext)
+          },
+          ::IrSourceRangesDumpHandler,
+        )
+      }
 
       useIrDumpFailureSuppressorsCompat()
       enableMetaInfoHandler()

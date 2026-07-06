@@ -6,6 +6,11 @@ import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
+import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
+import org.jetbrains.kotlin.test.builders.configureJvmArtifactsHandlersStep
+import org.jetbrains.kotlin.test.configuration.commonBackendHandlersForCodegenTest
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.FULL_JDK
@@ -13,6 +18,7 @@ import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirective
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.RUN_PIPELINE_TILL
+import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
@@ -25,7 +31,8 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.PsiLightTreeMetaInfoProce
 import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTest
 import org.jetbrains.kotlin.test.services.TestPhase
 
-open class AbstractDiagnosticTest : MetroDelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
+open class AbstractDiagnosticTest :
+  MetroDelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
   override fun configure(builder: TestConfigurationBuilder) {
     if (NEEDS_LEGACY_GOLDEN_NAMING) {
       configureWithMetroDiagnosticHandlers(builder)
@@ -71,22 +78,28 @@ open class AbstractDiagnosticTest : MetroDelegatingTestBase(AbstractPhasedJvmDia
       setupJvmPipelineSteps(FirParser.LightTree)
       configureFirParser(FirParser.LightTree)
 
-      configureFirHandlersStep(
-        ::MetroFirDiagnosticsHandler,
-        ::FirDumpHandler,
-        ::FirCfgDumpHandler,
-        ::FirVFirDumpHandler,
-        ::FirInferenceLogsHandler,
-        ::FirCfgConsistencyHandler,
-        ::FirResolvedTypesVerifier,
-        ::FirScopeDumpHandler,
-        ::NoFirCompilationErrorsHandler,
-      )
-      tagsGeneratorCheckerHandler?.let { configureFirHandlersStep(it) }
+      configureFirHandlersStep {
+        useHandlers(
+          ::MetroFirDiagnosticsHandler,
+          ::FirDumpHandler,
+          ::FirCfgDumpHandler,
+          ::FirVFirDumpHandler,
+          ::FirInferenceLogsHandler,
+          ::FirCfgConsistencyHandler,
+          ::FirResolvedTypesVerifier,
+          ::FirScopeDumpHandler,
+          ::NoFirCompilationErrorsHandler,
+        )
+        tagsGeneratorCheckerHandler?.let { useHandlers(it) }
+      }
 
-      configureIrHandlersStep(::MetroIrDiagnosticsHandler, noIrCompilationErrorsHandlerCtor)
+      configureIrHandlersStep {
+        useHandlers(::MetroIrDiagnosticsHandler, noIrCompilationErrorsHandlerCtor)
+      }
 
-      commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
+      configureJvmArtifactsHandlersStep {
+        commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
+      }
 
       useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
       val tagsAfter = tagsGeneratorCheckerAfterAnalysis

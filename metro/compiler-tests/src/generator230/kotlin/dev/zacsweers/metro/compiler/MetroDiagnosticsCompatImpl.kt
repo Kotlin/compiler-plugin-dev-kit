@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.js.test.ir.commonConfigurationForJsTest
 import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
+import org.jetbrains.kotlin.test.WrappedException
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
@@ -23,8 +24,10 @@ import org.jetbrains.kotlin.test.backend.handlers.findByPath
 import org.jetbrains.kotlin.test.backend.ir.BackendCliJvmFacade
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.configuration.commonConfigurationForJvmTest
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_IDENTICAL
+import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
@@ -100,18 +103,7 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
       parser = FirParser.LightTree,
     )
 
-  private fun TestConfigurationBuilder.useVersionSpecificConfig(
-    config: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder.() -> Unit
-  ) =
-    configureUsing(
-      object : AbstractKotlinCompilerTest() {
-        override fun configure(
-          builder: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-        ) = config(builder)
-      }
-    )
-
-  override fun createKotlinStandardLibrariesPathProvider(
+  override fun createStandardLibrariesPathProvider(
     from: KTStandardLibrariesPathProvider
   ): KotlinStandardLibrariesPathProvider =
     object : KotlinStandardLibrariesPathProvider {
@@ -150,22 +142,34 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
         error("Unavailable in this version")
     }
 
-  override fun TestConfigurationBuilder.commonConfigurationForJsTest() = useVersionSpecificConfig {
+  override fun createKotlinStandardLibrariesPathProvider(
+    from: KotlinStandardLibrariesPathProvider
+  ): KTStandardLibrariesPathProvider =
+    object : KTStandardLibrariesPathProvider(), KotlinStandardLibrariesPathProvider by from {}
+
+  override fun TestConfigurationBuilder.commonConfigurationForJsTest() =
     commonConfigurationForJsTest(
       targetFrontend = FrontendKinds.FIR,
       frontendFacade = ::FirCliWebFacade,
       frontendToIrConverter = ::Fir2IrCliWebFacade,
       serializerFacade = ::FirKlibSerializerCliWebFacade,
     )
-  }
 
   override fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) =
-    useVersionSpecificConfig {
-      commonConfigurationForJvmTest(
-        targetFrontend = FrontendKinds.FIR,
-        frontendFacade = ::FirCliJvmFacade,
-        frontendToBackendConverter = ::Fir2IrCliJvmFacade,
-        backendFacade = ::BackendCliJvmFacade,
-      )
+    commonConfigurationForJvmTest(
+      targetFrontend = FrontendKinds.FIR,
+      frontendFacade = ::FirCliJvmFacade,
+      frontendToBackendConverter = ::Fir2IrCliJvmFacade,
+      backendFacade = ::BackendCliJvmFacade,
+    )
+
+  override fun afterAnalysisChecker(
+    testServices: TestServices,
+    directives: List<DirectivesContainer>?,
+    check: context(TestServices) (thereWereFailures: Boolean) -> Unit,
+  ): AfterAnalysisChecker =
+    object : AfterAnalysisChecker(testServices) {
+      override fun check(failedAssertions: List<WrappedException>) =
+        check(testServices, failedAssertions.isNotEmpty())
     }
 }

@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
-import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
+import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest as realCommonConfigurationForJsTest
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
@@ -15,7 +15,9 @@ import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
-import org.jetbrains.kotlin.test.configuration.setupJvmPipelineSteps
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.configuration.setupJvmPipelineSteps as realSetupJvmPipelineSteps
+import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.AnalysisHandler
@@ -68,17 +70,13 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
   override val tagsGeneratorCheckerAfterAnalysis: Constructor<AfterAnalysisChecker>? = null
 
   override fun TestConfigurationBuilder.useIrDumpFailureSuppressorsCompat() =
-    useVersionSpecificConfig {
-      useFailureSuppressors(
-        ::BlackBoxCodegenSuppressor,
-        ::PhasedPipelineChecker.bind(TestPhase.BACKEND),
-      )
-    }
+    useFailureSuppressors(
+      ::BlackBoxCodegenSuppressor,
+      ::PhasedPipelineChecker.bind(TestPhase.BACKEND),
+    )
 
   override fun TestConfigurationBuilder.usePhasedPipelineFailureSuppressorCompat() =
-    useVersionSpecificConfig {
-      useFailureSuppressors(::PhasedPipelineChecker)
-    }
+    useFailureSuppressors(::PhasedPipelineChecker)
 
   override fun RegisteredDirectivesBuilder.firIdenticalCompat() = Unit
 
@@ -90,28 +88,28 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
         parser = FirParser.LightTree,
       ) {}
 
-  private fun TestConfigurationBuilder.useVersionSpecificConfig(
-    config: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder.() -> Unit
-  ) =
-    configureUsing(
-      object : AbstractKotlinCompilerTest() {
-        override fun configure(
-          builder: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-        ) = config(builder)
-      }
-    )
-
-  override fun createKotlinStandardLibrariesPathProvider(
+  override fun createStandardLibrariesPathProvider(
     from: KTStandardLibrariesPathProvider
   ): KotlinStandardLibrariesPathProvider =
     object : KTStandardLibrariesPathProvider by from, KotlinStandardLibrariesPathProvider {}
 
-  override fun TestConfigurationBuilder.commonConfigurationForJsTest() = useVersionSpecificConfig {
-    commonConfigurationForJsTest()
-  }
+  override fun createKotlinStandardLibrariesPathProvider(
+    from: KotlinStandardLibrariesPathProvider
+  ): KTStandardLibrariesPathProvider =
+    object : KTStandardLibrariesPathProvider, KotlinStandardLibrariesPathProvider by from {}
+
+  override fun TestConfigurationBuilder.commonConfigurationForJsTest() =
+    realCommonConfigurationForJsTest()
 
   override fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) =
-    useVersionSpecificConfig {
-      setupJvmPipelineSteps(parser)
+    realSetupJvmPipelineSteps(parser)
+
+  override fun afterAnalysisChecker(
+    testServices: TestServices,
+    directives: List<DirectivesContainer>?,
+    check: context(TestServices) (thereWereFailures: Boolean) -> Unit,
+  ): AfterAnalysisChecker =
+    object : AfterAnalysisChecker(testServices) {
+      override fun check(thereWereFailures: Boolean) = check(testServices, thereWereFailures)
     }
 }

@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionCh
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.AnalysisHandler
@@ -56,13 +58,23 @@ interface MetroDiagnosticsCompat {
 
   fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest
 
-  fun createKotlinStandardLibrariesPathProvider(
+  fun createStandardLibrariesPathProvider(
     from: KTStandardLibrariesPathProvider
   ): KotlinStandardLibrariesPathProvider
+
+  fun createKotlinStandardLibrariesPathProvider(
+    from: KotlinStandardLibrariesPathProvider
+  ): KTStandardLibrariesPathProvider
 
   fun TestConfigurationBuilder.commonConfigurationForJsTest()
 
   fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser)
+
+  fun afterAnalysisChecker(
+    testServices: TestServices,
+    directives: List<DirectivesContainer>?,
+    check: context(TestServices) (thereWereFailures: Boolean) -> Unit,
+  ): AfterAnalysisChecker
 
   companion object :
     MetroDiagnosticsCompat by ServiceLoader.load(MetroDiagnosticsCompat::class.java).firstOrNull()

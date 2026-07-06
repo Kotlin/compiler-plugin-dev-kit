@@ -41,12 +41,10 @@ pluginDevKit {
     .forEach {
       developForWithFixtures(it) {
         testFixtures {
-          java.setSrcDirs(
-            listOf(
-              "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/kotlin"
-            )
+          java.srcDirs(
+            "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/kotlin"
           )
-          resources.setSrcDirs(
+          resources.srcDirs(
             listOf(
               "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/resources"
             )
@@ -60,14 +58,13 @@ pluginDevKit {
   versionAliases
     .filterNot { alias -> testAgainst.any { it.version == alias } }
     .forEach { testAgainst(it) }
-}
 
-// Picks which single registered Kotlin version's test task actually runs; every other version's
-// suite is disabled. Defaults to the version-catalog Kotlin so plain `./gradlew check` stays fast.
-val testCompilerVersion =
-  KotlinToolingVersion(
-    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
-  )
+  // Picks which single registered Kotlin version's test task actually runs when running test task
+  defaultTestVersion =
+    KotlinToolingVersion(
+      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
+    )
+}
 
 // Configure the compiler-version-related test properties per registered devkit test suite, so
 // each `<version>Test` suite reports its own pinned version at runtime rather than a single

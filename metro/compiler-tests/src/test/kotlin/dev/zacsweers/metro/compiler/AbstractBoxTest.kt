@@ -7,6 +7,8 @@ import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.jvm.javaConstructor
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.FULL_JDK
@@ -47,10 +49,11 @@ open class AbstractBoxTest : MetroDelegatingTestBase(AbstractFirLightTreeBlackBo
         +IGNORE_DEXING // Avoids loading R8 from the classpath.
       }
 
-      // Errors in compiler plugin backend should fail test without running box function.
-      configureIrHandlersStep({
-        NoIrCompilationErrorsHandler.primaryConstructor!!.javaConstructor!!.newInstance(it)
-      })
+      configureIrHandlersStep {
+        useHandlers(
+          // Errors in compiler plugin backend should fail test without running box function.
+          { NoIrCompilationErrorsHandler.primaryConstructor!!.javaConstructor!!.newInstance(it) })
+      }
     }
   }
 }

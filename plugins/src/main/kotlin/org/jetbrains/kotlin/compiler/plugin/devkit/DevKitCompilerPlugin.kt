@@ -12,6 +12,7 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
+import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
@@ -176,15 +177,15 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
     public abstract val testGenDirectory: DirectoryProperty
 
     /**
-     * Whether to add an implementation dependency on `compiler-plugin-runtime`. Plugins that
-     * don't use its APIs can turn this off to avoid an unused dependency leaking into their
-     * published POM.
+     * Whether to add an implementation dependency on `compiler-plugin-runtime`. Plugins that don't
+     * use its APIs can turn this off to avoid an unused dependency leaking into their published
+     * POM.
      */
     public abstract val addRuntimeDependency: Property<Boolean>
 
     /**
-     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to
-     * the Kotlin Gradle Plugin version currently applied to this build. If no [testAgainst] entry
+     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to the
+     * Kotlin Gradle Plugin version currently applied to this build. If no [testAgainst] entry
      * matches, `test` is left alone.
      */
     public abstract val defaultTestVersion: Property<KotlinToolingVersion>
@@ -209,14 +210,16 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerTestFixturesTarget> = Action {},
     ): DevKitKotlinCompilerTestFixturesTarget =
-        project.DevKitKotlinCompilerTestFixturesTarget(version).also(testAgainst::add).also(action::execute)
+        project
+            .DevKitKotlinCompilerTestFixturesTarget(version)
+            .also(testAgainst::add)
+            .also(action::execute)
 
     public fun developFor(
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerMainTarget> = Action {},
     ): DevKitKotlinCompilerMainTarget =
         project.DevKitKotlinCompilerMainTarget(version).also(testAgainst::add).also(action::execute)
-
 
     public fun developForWithFixtures(
         version: KotlinToolingVersion,
@@ -435,7 +438,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         // its suite (see the `${versionName}Test` suites below) instead of running anything
         // itself; every other suite stays independently runnable by name.
         afterEvaluate {
-            val target = pluginDevKit.testAgainst.find { it.version == pluginDevKit.defaultTestVersion.get() }
+            val target =
+                pluginDevKit.testAgainst.find {
+                    it.version == pluginDevKit.defaultTestVersion.get()
+                }
             if (target != null) {
                 tasks.named<Test>("test") {
                     enabled = false
@@ -566,21 +572,37 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         "$versionName/src/testFixtures/kotlin",
                     )
                 )
+                // recompile shared test fixture sources. allSource (not .java) is required here:
+                // the Kotlin plugin only mirrors java.srcDirs into kotlin.srcDirs, never the
+                // other direction, so "testFixtures"'s own .java set never contains
+                // src/testFixtures/kotlin.
+                java.srcDir(sourceSets.named("testFixtures").map { it.allSource.sourceDirectories })
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
                 forceKotlinVersion(version)
                 dependencies {
                     implementationConfigurationName(project())
                     compileOnlyConfigurationName(kotlin("compiler"))
-                    // allow it to see shared test fixture sources
-                    compileOnlyConfigurationName(
-                        sourceSets.named("testFixtures").map { it.output.classesDirs }
-                    )
                 }
                 extendsFrom(sourceSets.named("testFixtures")) {
                     it.implementationConfigurationName
                 }
                 extendsFrom(sourceSets.named("testFixtures")) {
                     it.compileOnlyConfigurationName
+                }
+                // KGP automatically associates the sourceSet literally named "testFixtures" with
+                // "main", granting access to its internal API.
+                kotlinExtension.target.compilations.named(name) {
+                    associateWith(kotlinExtension.target.compilations.getByName("main"))
+                }
+            }
+
+            testSuite {
+                sources {
+                    // KGP automatically associates "test" with "testFixtures" (in addition to
+                    // "test" with "main"), granting access to its internal API.
+                    kotlinExtension.target.compilations.named(name) {
+                        associateWith(kotlinExtension.target.compilations.getByName(testFixtures.get().name))
+                    }
                 }
             }
 
@@ -619,23 +641,43 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testSuite {
                 dependencies {
                     implementation(testFixtures(project()))
-                    // allow it to see shared test sources
-                    // TODO test this
-                    compileOnly(files(sourceSets.named("test").map { it.output.classesDirs }))
                 }
                 sources {
                     java.setSrcDirs(
                         listOf("$versionName/src/test/java", "$versionName/src/test/kotlin")
                     )
+                    // recompile shared test sources. allSource (not .java) is required here
+                    java.srcDir(sourceSets.named("test").map { it.allSource.sourceDirectories })
                     resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
                     addTestGenDir()
                     forceKotlinVersion(version)
+                    // KGP automatically associates the sourceSet literally named "test" with
+                    // "main", granting access to its internal API.
+                    kotlinExtension.target.compilations.named(name) {
+                        associateWith(kotlinExtension.target.compilations.getByName("main"))
+                    }
                     generateTests { addTestSourceSet(this@sources) }
                     tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
 
                     extendsFrom(sourceSets.named("test")) { it.implementationConfigurationName }
                     extendsFrom(sourceSets.named("test")) { it.compileOnlyConfigurationName }
 
+                    configurations.named(compileClasspathConfigurationName) {
+                        // Force resolution of the packed testFixtures jar (not the raw classes
+                        // directory Gradle otherwise substitutes on compile classpaths), since
+                        // MultiReleasePluginTransform only understands jar inputs: it looks for
+                        // the per-version overlay under a jar's META-INF, which a plain classes
+                        // directory doesn't have.
+                        attributes.attribute(
+                            LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                            objects.named(LibraryElements.JAR),
+                        )
+                        // force it to use version-specific jars when compiling tests
+                        attributes.attribute(
+                            KotlinCompilerVersion.attribute,
+                            KotlinCompilerVersion(version),
+                        )
+                    }
                     configurations.named(runtimeClasspathConfigurationName) {
                         // force it to use version-specific jars when running tests
                         attributes.attribute(

@@ -37,13 +37,12 @@ import dev.zacsweers.metro.compiler.ir.MetroIrGenerationExtension
 import dev.zacsweers.metro.compiler.test.TEST_COMPILER_VERSION
 import dev.zacsweers.metro.compiler.tracing.TraceContext
 import kotlin.io.path.Path
-import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
@@ -154,7 +153,7 @@ class MetroExtensionRegistrarConfigurator(
       val reportsDir =
         module.directives.singleOrZeroValue(MetroDirectives.REPORTS_DESTINATION)
           ?: if (module.directives[MetroDirectives.CHECK_REPORTS].isNotEmpty()) {
-            MetroReportsChecker.DEFAULT_REPORTS_DIR
+            DEFAULT_REPORTS_DIR
           } else {
             null
           }
@@ -166,7 +165,7 @@ class MetroExtensionRegistrarConfigurator(
       val tracesDir =
         module.directives.singleOrZeroValue(MetroDirectives.TRACE_DESTINATION)
           ?: if (MetroDirectives.CHECK_TRACES in module.directives) {
-            MetroReportsChecker.DEFAULT_TRACES_DIR
+            DEFAULT_TRACES_DIR
           } else {
             null
           }
@@ -368,9 +367,7 @@ class MetroExtensionRegistrarConfigurator(
           )
         )
         if (options.enableCircuitCodegen) {
-          registerIrExtensionCompat(
-            ComposePluginRegistrar.createComposeIrExtension(configuration)
-          )
+          registerIrExtensionCompat(ComposePluginRegistrar.createComposeIrExtension(configuration))
         }
       }
     }
