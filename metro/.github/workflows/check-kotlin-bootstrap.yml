@@ -14,6 +14,7 @@ jobs:
   check-versions:
     runs-on: ubuntu-slim
     permissions:
+      contents: read
       issues: write
 
     steps:

@@ -70,6 +70,7 @@ jobs:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
       fail-fast: false
     permissions:
+      contents: read
       checks: write
 
     steps:
@@ -114,6 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
+      contents: read
       checks: write
 
     steps:
@@ -168,6 +170,7 @@ jobs:
     name: ${{ format('kmp functional / {0}{1}', matrix.target, github.ref != 'refs/heads/main' && ' (skipped)' || '') }}
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
     strategy:
       fail-fast: false
@@ -218,6 +221,7 @@ jobs:
     name: samples
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
 
     steps:
@@ -256,6 +260,7 @@ jobs:
     name: idea-plugin
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
 
     steps:
@@ -292,6 +297,7 @@ jobs:
     name: ${{ format('multiplatform / {0}{1}', matrix.os, github.ref != 'refs/heads/main' && ' (skipped)' || '') }}
     runs-on: ${{ github.ref == 'refs/heads/main' && matrix.os || 'ubuntu-latest' }}
     permissions:
+      contents: read
       checks: write
     # Windows runners default to PowerShell, which mis-parses gradle `-Pkey.with.dots=value` args
     # (splits on the dot). Forcing bash everywhere keeps `./gradlew … -P…` consistent across OSes;
