@@ -113,7 +113,7 @@ class MetroIrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(
         )
 
     return testServices.sourceFileProvider
-      .getContentOfSourceFile(file)
+      .getContentOfSourceFileCompat(file)
       .byteInputStream()
       .reader()
       .use { reader ->

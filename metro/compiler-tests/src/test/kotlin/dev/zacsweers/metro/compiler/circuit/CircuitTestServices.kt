@@ -3,11 +3,11 @@
 package dev.zacsweers.metro.compiler.circuit
 
 import dev.zacsweers.metro.compiler.MetroDirectives
+import dev.zacsweers.metro.compiler.TestConfigurationBuilder
 import dev.zacsweers.metro.compiler.isJsBackend
 import java.io.File
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.RuntimeClasspathProvider

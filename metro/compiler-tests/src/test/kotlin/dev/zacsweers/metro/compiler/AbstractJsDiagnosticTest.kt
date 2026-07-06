@@ -8,32 +8,17 @@ import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionCh
 import org.jetbrains.kotlin.test.backend.handlers.KlibBackendDiagnosticsHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.ir.IrDiagnosticsHandler
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
-import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
-import org.jetbrains.kotlin.test.builders.configureLoweredIrHandlersStep
-import org.jetbrains.kotlin.test.builders.klibArtifactsHandlersStep
-import org.jetbrains.kotlin.test.configuration.setupHandlersForDiagnosticTest
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.RUN_PIPELINE_TILL
-import org.jetbrains.kotlin.test.directives.configureFirParser
-import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
-import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.TestPhase
 
-open class AbstractJsDiagnosticTest : AbstractKotlinCompilerTest() {
-  override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider {
-    return ClasspathBasedStandardLibrariesPathProvider
-  }
-
+open class AbstractJsDiagnosticTest : MetroTestBaseWithTargetBackend(TargetBackend.JS_IR) {
   override fun configure(builder: TestConfigurationBuilder) =
     with(builder) {
-      globalDefaults { targetBackend = TargetBackend.JS_IR }
-
-      setupMetroJsPipeline(FirParser.LightTree)
+      commonConfigurationForJsTest()
       configureFirParser(FirParser.LightTree)
       configurePlugin()
 
@@ -50,32 +35,26 @@ open class AbstractJsDiagnosticTest : AbstractKotlinCompilerTest() {
         LATEST_PHASE_IN_PIPELINE.with(TestPhase.BACKEND)
       }
 
-      configureFirHandlersStep {
-        if (NEEDS_LEGACY_GOLDEN_NAMING) {
-          useHandlers(::MetroFirDiagnosticsHandler)
-        } else {
-          setupHandlersForDiagnosticTest()
-        }
-        useHandlers(::NoFirCompilationErrorsHandler)
+      if (NEEDS_LEGACY_GOLDEN_NAMING) {
+        configureFirHandlersStep(::MetroFirDiagnosticsHandler)
+      } else {
+        setupHandlersForDiagnosticTest()
+      }
+      configureFirHandlersStep(::NoFirCompilationErrorsHandler)
+
+      if (NEEDS_LEGACY_GOLDEN_NAMING) {
+        configureIrHandlersStep(::MetroIrDiagnosticsHandler)
+      } else {
+        configureIrHandlersStep(::IrDiagnosticsHandler)
       }
 
-      configureIrHandlersStep {
-        if (NEEDS_LEGACY_GOLDEN_NAMING) {
-          useHandlers(::MetroIrDiagnosticsHandler)
-        } else {
-          useHandlers(::IrDiagnosticsHandler)
-        }
+      if (NEEDS_LEGACY_GOLDEN_NAMING) {
+        configureLoweredIrHandlersStep(::MetroIrDiagnosticsHandler)
+      } else {
+        configureLoweredIrHandlersStep(::IrDiagnosticsHandler)
       }
 
-      configureLoweredIrHandlersStep {
-        if (NEEDS_LEGACY_GOLDEN_NAMING) {
-          useHandlers(::MetroIrDiagnosticsHandler)
-        } else {
-          useHandlers(::IrDiagnosticsHandler)
-        }
-      }
-
-      klibArtifactsHandlersStep { useHandlers(::KlibBackendDiagnosticsHandler) }
+      klibArtifactsHandlersStep(::KlibBackendDiagnosticsHandler)
 
       enableMetaInfoHandler()
       useAdditionalService(::LibraryProvider)

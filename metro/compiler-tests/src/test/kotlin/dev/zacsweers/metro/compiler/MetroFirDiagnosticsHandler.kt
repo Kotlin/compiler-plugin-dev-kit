@@ -117,7 +117,7 @@ class MetroFirDiagnosticsHandler(testServices: TestServices) : FirAnalysisHandle
         )
 
     return testServices.sourceFileProvider
-      .getContentOfSourceFile(file)
+      .getContentOfSourceFileCompat(file)
       .byteInputStream()
       .reader()
       .use { reader ->

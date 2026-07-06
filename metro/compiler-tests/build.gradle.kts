@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 @file:OptIn(ExperimentalWasmDsl::class)
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion
-import org.jetbrains.kotlin.compiler.plugin.devkit.kotlinCompilerVersion
-import org.jetbrains.kotlin.compiler.plugin.devkit.registerMultiReleasePluginTransform
-import org.jetbrains.kotlin.compiler.plugin.devkit.setupCompilerVersionAttribute
+import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
@@ -16,26 +13,34 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
-buildscript {
-  dependencies {
-    classpath("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
-  }
-}
-
 plugins {
   alias(libs.plugins.kotlin.jvm)
-  alias(libs.plugins.buildConfig)
+  alias(libs.plugins.kotlin.compiler.plugin.devkit)
   alias(libs.plugins.gradleTestRetry)
   java
 }
 
 project.plugins.apply(D8Plugin::class.java)
 
-sourceSets {
-  register("generator230")
-  register("generator2320")
-  register("generator240")
-  register("generator2420")
+pluginDevKit {
+  listOf(
+      "2.3.0",
+      "2.3.20",
+      "2.4.0",
+      "2.4.20-dev-6138",
+    )
+    .map(::KotlinToolingVersion)
+    .forEach {
+      developForWithFixtures(it) {
+        testFixtures {
+          java.setSrcDirs(
+            listOf(
+              "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/kotlin"
+            )
+          )
+        }
+      }
+    }
 }
 
 val testCompilerVersionProvider = providers.gradleProperty("metro.testCompilerVersion")
@@ -63,31 +68,22 @@ val kotlinArtifactsVersion =
     testCompilerVersion
   }
 
-buildConfig {
-  generateAtSync = true
-  packageName("dev.zacsweers.metro.compiler.test")
-  kotlin {
-    useKotlinOutput {
-      internalVisibility = true
-      topLevelConstants = true
+// Configure the compiler-version-related test properties per registered devkit test suite, so
+// each `<version>Test` suite reports its own pinned version at runtime rather than a single
+// global value.
+pluginDevKit.testAgainst.configureEach {
+  testSuite {
+    targets.all {
+      testTask {
+        systemProperty("metro.test.compilerVersion", version.toString())
+        systemProperty("metro.test.jvmTarget", libs.versions.jvmTarget.get())
+        systemProperty("metro.test.buildCompilerVersion", libs.versions.kotlin.get())
+        systemProperty(
+          "metro.test.overrideCompilerVersion",
+          true,
+        )
+      }
     }
-  }
-  sourceSets.named("test") {
-    // Not a Boolean to avoid warnings about constants in if conditions
-    buildConfigField(
-      "String",
-      "OVERRIDE_COMPILER_VERSION",
-      "\"${testCompilerVersionProvider.isPresent}\"",
-    )
-    buildConfigField("String", "JVM_TARGET", libs.versions.jvmTarget.map { "\"$it\"" })
-    buildConfigField("String", "BUILD_COMPILER_VERSION", libs.versions.kotlin.map { "\"$it\"" })
-    buildConfigField("String", "TEST_COMPILER_VERSION", "\"$testCompilerVersion\"")
-    buildConfigField(
-      "kotlin.KotlinVersion",
-      "COMPILER_VERSION",
-      "KotlinVersion(${testKotlinVersion.major}, ${testKotlinVersion.minor}, ${testKotlinVersion.patch})",
-    )
-    buildConfigField("String", "COMPILER_TOOLING_VERSION", "\"$testCompilerVersion\"")
   }
 }
 
@@ -150,91 +146,30 @@ val wasmKlibClasspath =
     }
   }
 
-// IntelliJ maven repo doesn't carry compiler test framework versions, so we'll pull from that as
-// needed for those tests
-var compilerTestFrameworkVersion: String
-var reflectVersion: String
-var generatorConfigToUse: String
-
 check(testKotlinVersion >= kotlin23) {
   "compiler-tests requires Kotlin 2.3.0 or newer, but metro.testCompilerVersion=$testCompilerVersion"
 }
 
-generatorConfigToUse =
-  // Any 2.4.20 dev test version compiles against the fallback 2420 artifacts (see
-  // kotlinArtifactsVersion above), so the helpers must match that framework.
-  if (useKotlin2420DevFallbackArtifacts || testKotlinVersion >= kotlin2420Dev6138) {
-    "generator2420"
-  } else if (testKotlinVersion >= kotlin24Beta1) {
-    "generator240"
-  } else if (testKotlinVersion.toKotlinVersion() >= KotlinVersion(2, 3, 20)) {
-    "generator2320"
-  } else {
-    "generator230"
-  }
-
-compilerTestFrameworkVersion =
-  if (useKotlin2420DevFallbackArtifacts) {
-    kotlin2420Dev6138Version
-  } else {
-    testCompilerVersion
-  }
-
-reflectVersion =
-  if (testKotlinVersion.minor == 3 && testKotlinVersion.isDev) {
-    "2.3.20"
-  } else if (useKotlin2420DevFallbackArtifacts) {
-    kotlin2420Dev6138Version
-  } else {
-    testCompilerVersion
-  }
-
 dependencies {
-  setupCompilerVersionAttribute()
-  registerMultiReleasePluginTransform(project.provider { testKotlinVersion })
-  // 2.3.0 changed the test gen APIs around into different packages
-  "generator230CompileOnly"(
-    "org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:$compilerTestFrameworkVersion"
-  )
-  "generator230CompileOnly"("org.jetbrains.kotlin:kotlin-compiler:$compilerTestFrameworkVersion")
-  "generator2320CompileOnly"("org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:2.3.20")
-  "generator2320CompileOnly"("org.jetbrains.kotlin:kotlin-compiler:2.3.20")
-  // Pinned to Beta2 (not Beta1) because Beta2 dropped `diagnosticsByFilePath` for
-  // `diagnosticsByFile` -- the same late-on-the-2.4.0-branch rename 2.3.21 did.
-  "generator240CompileOnly"(
-    "org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:2.4.0-Beta2"
-  )
-  "generator240CompileOnly"("org.jetbrains.kotlin:kotlin-compiler:2.4.0-Beta2")
-  // 2.4.20 dev builds renamed `commonConfigurationForJvmTest` to `setupJvmPipelineSteps`. Compile
-  // this helper against the same 2.4.20 artifact set used at test runtime so its erased builder
-  // receiver ABI matches the fallback artifacts.
-  "generator2420CompileOnly"(
-    "org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:$kotlinArtifactsVersion"
-  )
-  "generator2420CompileOnly"("org.jetbrains.kotlin:kotlin-compiler:$kotlinArtifactsVersion")
-
-  testImplementation(sourceSets.named(generatorConfigToUse).map { it.output })
-  testImplementation(
-    "org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:$compilerTestFrameworkVersion"
-  )
-  testImplementation("org.jetbrains.kotlin:kotlin-compiler:$kotlinArtifactsVersion")
-  testImplementation("org.jetbrains.kotlin:kotlin-compose-compiler-plugin:$kotlinArtifactsVersion")
-
-  testImplementation(project(":compiler"))
-  testImplementation(project(":compiler-compat")) {
-    kotlinCompilerVersion(KotlinToolingVersion(testCompilerVersion))
+  configurations.testFixturesApi.configure {
+    exclude(
+      group = "org.jetbrains.kotlin.compiler.plugin.devkit",
+      module = "compiler-plugin-runtime",
+    )
   }
-  testCompileOnly(project(":metro-common"))
+  testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin:$kotlinArtifactsVersion")
 
-  testImplementation(libs.kotlin.testJunit5)
+  testFixturesApi(project(":compiler"))
+  testFixturesApi(project(":compiler-compat"))
+  testFixturesCompileOnlyApi(project(":metro-common"))
 
-  testRuntimeOnly(libs.ksp.symbolProcessing)
-  testImplementation(libs.ksp.symbolProcessing.aaEmbeddable)
-  testImplementation(libs.ksp.symbolProcessing.commonDeps)
-  testImplementation(libs.ksp.symbolProcessing.api)
-  testImplementation(libs.dagger.compiler)
-  testImplementation(libs.hilt.compiler)
-  testImplementation(libs.hilt.core)
+  testFixturesRuntimeOnly(libs.ksp.symbolProcessing) // TODO might be unnecessary
+  testFixturesApi(libs.ksp.symbolProcessing.aaEmbeddable)
+  testFixturesApi(libs.ksp.symbolProcessing.commonDeps)
+  testFixturesApi(libs.ksp.symbolProcessing.api)
+  testFixturesApi(libs.dagger.compiler)
+  testFixturesApi(libs.hilt.compiler)
+  testFixturesApi(libs.hilt.core)
 
   metroRuntimeClasspath(project(":runtime"))
   metroRuntimeKlibClasspath(project(path = ":runtime", configuration = "jsRuntimeElements"))
@@ -278,19 +213,21 @@ dependencies {
 
   // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
   // ServiceLoader
-  testRuntimeOnly(libs.anvil.kspCompiler)
+  testFixturesRuntimeOnly(libs.anvil.kspCompiler)
 
   // Dependencies required to run the internal test framework.
   // Use the test compiler version because 2.3.20+ uses new APIs from here
-  testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:$reflectVersion")
-  testRuntimeOnly(libs.junit)
-  testRuntimeOnly(libs.kotlin.test)
+  testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect")
   testRuntimeOnly(libs.kotlin.scriptRuntime)
   testRuntimeOnly(libs.kotlin.annotationsJvm)
 }
 
+tasks.named("generateTests") {
+  enabled = false
+}
+
 val generateTests =
-  tasks.register<JavaExec>("generateTests") {
+  tasks.register<JavaExec>("generateTests2") {
     inputs
       .dir(layout.projectDirectory.dir("src/test/data"))
       .withPropertyName("testData")
@@ -298,7 +235,7 @@ val generateTests =
 
     inputs.property("testCompilerVersion", testCompilerVersion)
 
-    outputs.dir(layout.projectDirectory.dir("src/test/java")).withPropertyName("generatedTests")
+    outputs.dir(layout.projectDirectory.dir("src/test/java"))
 
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("dev.zacsweers.metro.compiler.GenerateTestsKt")
@@ -399,7 +336,7 @@ tasks.withType<Test> {
     }
   }
 
-  val testRuntimeClasspath = project.configurations.testRuntimeClasspath.get()
+  val testRuntimeClasspath = configurations.testRuntimeClasspath
   setLibraryProperty("kotlin.minimal.stdlib.path", "kotlin-stdlib", "jar", testRuntimeClasspath)
   setLibraryProperty("kotlin.full.stdlib.path", "kotlin-stdlib-jdk8", "jar", testRuntimeClasspath)
   setLibraryProperty("kotlin.reflect.jar.path", "kotlin-reflect", "jar", testRuntimeClasspath)
@@ -479,7 +416,9 @@ tasks.withType<Test> {
   systemProperty("jakartaInterop.classpath", jakartaInteropClasspath.asPath)
   systemProperty("circuit.classpath", circuitRuntimeClasspath.asPath)
   systemProperty("circuit.klibClasspath", circuitRuntimeKlibClasspath.asPath)
-  systemProperty("ksp.testRuntimeClasspath", configurations.testRuntimeClasspath.get().asPath)
+  jvmArgumentProviders.add(
+    ClasspathSystemPropertyArgumentProvider("ksp.testRuntimeClasspath", testRuntimeClasspath)
+  )
 
   // Properties required to run the internal test framework.
   systemProperty("idea.ignore.disabled.plugins", "true")
@@ -495,4 +434,35 @@ fun Test.setLibraryProperty(
   val regex = "$jarName-\\d.*$extension".toRegex()
   val path = configuration.files.find { regex.matches(it.name) }?.absolutePath ?: return
   systemProperty(propName, path)
+}
+
+// Lazy overload: resolves `configuration` only when this task forks its test JVM, via
+// jvmArgumentProviders.
+fun Test.setLibraryProperty(
+  propName: String,
+  jarName: String,
+  extension: String,
+  configuration: Provider<out FileCollection>,
+) {
+  jvmArgumentProviders.add(LibraryPathArgumentProvider(propName, jarName, extension, configuration))
+}
+
+private class LibraryPathArgumentProvider(
+  @get:Internal val propName: String,
+  @get:Internal val jarName: String,
+  @get:Internal val extension: String,
+  @get:Internal val configuration: Provider<out FileCollection>,
+) : CommandLineArgumentProvider {
+  override fun asArguments(): Iterable<String> {
+    val regex = "$jarName-\\d.*$extension".toRegex()
+    val path = configuration.get().files.find { regex.matches(it.name) }?.absolutePath
+    return if (path != null) listOf("-D$propName=$path") else emptyList()
+  }
+}
+
+private class ClasspathSystemPropertyArgumentProvider(
+  @get:Internal val propName: String,
+  @get:Internal val configuration: Provider<out FileCollection>,
+) : CommandLineArgumentProvider {
+  override fun asArguments(): Iterable<String> = listOf("-D$propName=${configuration.get().asPath}")
 }

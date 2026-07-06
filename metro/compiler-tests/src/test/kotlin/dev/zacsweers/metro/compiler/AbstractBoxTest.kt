@@ -7,15 +7,12 @@ import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.jvm.javaConstructor
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.FULL_JDK
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.JVM_TARGET
 import org.jetbrains.kotlin.test.model.BackendInputHandler
 import org.jetbrains.kotlin.test.runners.codegen.AbstractFirLightTreeBlackBoxCodegenTest
-import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 
 @Suppress("UNCHECKED_CAST")
 private val NoIrCompilationErrorsHandler =
@@ -30,11 +27,7 @@ private val NoIrCompilationErrorsHandler =
     .kotlin as KClass<BackendInputHandler<IrBackendInput>>?
     ?: error("Could not find NoIrCompilationErrorsHandler for the current kotlin version")
 
-open class AbstractBoxTest : AbstractFirLightTreeBlackBoxCodegenTest() {
-  override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider {
-    return ClasspathBasedStandardLibrariesPathProvider
-  }
-
+open class AbstractBoxTest : MetroDelegatingTestBase(AbstractFirLightTreeBlackBoxCodegenTest()) {
   override fun configure(builder: TestConfigurationBuilder) {
     super.configure(builder)
 
@@ -54,11 +47,10 @@ open class AbstractBoxTest : AbstractFirLightTreeBlackBoxCodegenTest() {
         +IGNORE_DEXING // Avoids loading R8 from the classpath.
       }
 
-      configureIrHandlersStep {
-        useHandlers(
-          // Errors in compiler plugin backend should fail test without running box function.
-          { NoIrCompilationErrorsHandler.primaryConstructor!!.javaConstructor!!.newInstance(it) })
-      }
+      // Errors in compiler plugin backend should fail test without running box function.
+      configureIrHandlersStep({
+        NoIrCompilationErrorsHandler.primaryConstructor!!.javaConstructor!!.newInstance(it)
+      })
     }
   }
 }

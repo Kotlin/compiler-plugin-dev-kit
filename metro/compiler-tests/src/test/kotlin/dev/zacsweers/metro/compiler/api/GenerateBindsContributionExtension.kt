@@ -36,7 +36,6 @@ import org.jetbrains.kotlin.fir.extensions.NestedClassGenerationContext
 import org.jetbrains.kotlin.fir.extensions.predicate.LookupPredicate
 import org.jetbrains.kotlin.fir.extensions.predicateBasedProvider
 import org.jetbrains.kotlin.fir.moduleData
-import org.jetbrains.kotlin.fir.plugin.createMemberFunction
 import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
@@ -85,8 +84,8 @@ private val BINDS_CLASS_ID = ClassId(FqName("dev.zacsweers.metro"), Name.identif
  *
  * This exercises the scenario where a `@Binds` function exists inside a *generated* interface.
  */
-internal class GenerateBindsContributionExtension(session: FirSession) :
-  MetroFirDeclarationGenerationExtension(session), MetroContributionHintExtension {
+internal class GenerateBindsContributionExtension(session: FirSession, compatContext: CompatContext) :
+  MetroFirDeclarationGenerationExtension(session), MetroContributionHintExtension, CompatContext by compatContext {
 
   companion object {
     val ANNOTATION_FQ_NAME = FqName("test.GenerateBindsContribution")
@@ -274,7 +273,7 @@ internal class GenerateBindsContributionExtension(session: FirSession) :
       session: FirSession,
       options: MetroOptions,
       compatContext: CompatContext,
-    ): MetroFirDeclarationGenerationExtension = GenerateBindsContributionExtension(session)
+    ): MetroFirDeclarationGenerationExtension = GenerateBindsContributionExtension(session, compatContext)
   }
 }
 

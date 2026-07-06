@@ -4,8 +4,9 @@ package dev.zacsweers.metro.compiler
 
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import org.jetbrains.kotlin.platform.wasm.WasmTarget
 
-object ClasspathBasedStandardLibrariesPathProvider : MetroKotlinStandardLibrariesPathProvider() {
+object ClasspathBasedStandardLibrariesPathProvider : KotlinStandardLibrariesPathProvider {
   private val fileCache = ConcurrentHashMap<String, File>()
 
   private fun getFile(propName: String): File {
@@ -46,12 +47,12 @@ object ClasspathBasedStandardLibrariesPathProvider : MetroKotlinStandardLibrarie
   override fun webStdlibForTests(): File = getFile("kotlin.web.stdlib.path")
 
   // kotlin-stdlib-<WasmTarget>.klib
-  override fun fullWasmStdlib(target: String): File {
-    return getFile("kotlin.wasm.stdlib.$target.path")
+  override fun fullWasmStdlib(target: WasmTarget): File {
+    return getFile("kotlin.wasm.stdlib.${target.alias}.path")
   }
 
   // kotlin-test-<WasmTarget>.klib
-  override fun kotlinTestWasmKLib(target: String): File {
-    return getFile("kotlin.wasm.test.$target.path")
+  override fun kotlinTestWasmKLib(target: WasmTarget): File {
+    return getFile("kotlin.wasm.test.${target.alias}.path")
   }
 }

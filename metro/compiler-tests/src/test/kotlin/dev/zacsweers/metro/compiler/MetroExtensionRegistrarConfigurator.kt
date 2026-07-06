@@ -44,7 +44,6 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.test.TargetBackend
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
@@ -246,117 +245,134 @@ class MetroExtensionRegistrarConfigurator(
 
     val classIds = ClassIds.fromOptions(options)
     val traceContext = TraceContext(options)
-    FirExtensionRegistrarAdapter.registerExtension(
-      MetroFirExtensionRegistrar(
-        classIds = classIds,
-        options = options,
-        isIde = false,
-        compatContext = compatContext,
-        traceContext = traceContext,
-        loadExternalDeclarationExtensions = { session, options, compatContext ->
-          buildList {
-            add(GenerateImplExtension.Factory().create(session, options, compatContext))
-            add(
-              GenerateProvidesContributionExtension.Factory()
-                .create(session, options, compatContext)
-            )
-            add(
-              GenerateBindsContributionExtension.Factory().create(session, options, compatContext)
-            )
-            add(GenerateDependencyGraphExtension.Factory().create(session, options, compatContext))
-            add(GenerateGraphExtensionExtension.Factory().create(session, options, compatContext))
-            add(GenerateProvidesInGraphExtension.Factory().create(session, options, compatContext))
-            if (options.enableCircuitCodegen) {
-              add(CircuitFirExtension.Factory().create(session, options, compatContext)!!)
-            }
-            if (options.enableHiltInterop) {
-              HiltFirDeclarationExtension.Factory()
-                .create(session, options, compatContext)
-                ?.let(::add)
-            }
-          }
-        },
-        loadExternalContributionHintExtensions = { session, options, compatContext ->
-          buildList {
-            addAll(
-              listOfNotNull(
-                GenerateProvidesContributionExtension.Factory()
-                  .create(session, options, compatContext) as? MetroContributionHintExtension,
-                GenerateBindsContributionExtension.Factory().create(session, options, compatContext)
-                  as? MetroContributionHintExtension,
-                GenerateGraphExtensionExtension.Factory().create(session, options, compatContext)
-                  as? MetroContributionHintExtension,
-              )
-            )
-            if (options.enableCircuitCodegen && !options.generateClassesInIr) {
-              add(
-                CircuitFirExtension.Factory().create(session, options, compatContext)!!
-                  as MetroContributionHintExtension
-              )
-            }
-            if (options.enableHiltInterop) {
-              HiltFirDeclarationExtension.HintFactory()
-                .create(session, options, compatContext)
-                ?.let(::add)
-            }
-          }
-        },
-        loadExternalContributionExtensions = { session, options, compatContext ->
-          buildList {
-            add(GenerateImplContributionExtension.Factory().create(session, options, compatContext))
-            add(
-              GenerateProvidesContributionMetroExtension.Factory()
-                .create(session, options, compatContext)
-            )
-            add(
-              GenerateBindsContributionMetroExtension.Factory()
-                .create(session, options, compatContext)
-            )
-            add(
-              GenerateGraphExtensionContributionExtension.Factory()
-                .create(session, options, compatContext)
-            )
-            if (options.enableCircuitCodegen && !options.generateClassesInIr) {
-              add(CircuitContributionExtension.Factory().create(session, options, compatContext)!!)
-            }
-            if (options.enableHiltInterop) {
-              HiltContributionExtension.Factory()
-                .create(session, options, compatContext)
-                ?.let(::add)
-            }
-          }
-        },
-      )
-    )
-    if (options.enableCircuitCodegen) {
-      FirExtensionRegistrarAdapter.registerExtension(ComposeFirExtensionRegistrar())
-      IrGenerationExtension.registerExtension(
-        CircuitIrExtension.create(
-          generateClassesInIr = options.generateClassesInIr,
-          classIds = classIds,
-          compatContext = compatContext,
+    with(compatContext) {
+      // not really used
+      with(MetroCompilerPluginRegistrar()) {
+        registerFirExtensionCompat(
+          MetroFirExtensionRegistrar(
+            classIds = classIds,
+            options = options,
+            isIde = false,
+            compatContext = compatContext,
+            traceContext = traceContext,
+            loadExternalDeclarationExtensions = { session, options, compatContext ->
+              buildList {
+                add(GenerateImplExtension.Factory().create(session, options, compatContext))
+                add(
+                  GenerateProvidesContributionExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                add(
+                  GenerateBindsContributionExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                add(
+                  GenerateDependencyGraphExtension.Factory().create(session, options, compatContext)
+                )
+                add(
+                  GenerateGraphExtensionExtension.Factory().create(session, options, compatContext)
+                )
+                add(
+                  GenerateProvidesInGraphExtension.Factory().create(session, options, compatContext)
+                )
+                if (options.enableCircuitCodegen) {
+                  add(CircuitFirExtension.Factory().create(session, options, compatContext)!!)
+                }
+                if (options.enableHiltInterop) {
+                  HiltFirDeclarationExtension.Factory()
+                    .create(session, options, compatContext)
+                    ?.let(::add)
+                }
+              }
+            },
+            loadExternalContributionHintExtensions = { session, options, compatContext ->
+              buildList {
+                addAll(
+                  listOfNotNull(
+                    GenerateProvidesContributionExtension.Factory()
+                      .create(session, options, compatContext) as? MetroContributionHintExtension,
+                    GenerateBindsContributionExtension.Factory()
+                      .create(session, options, compatContext) as? MetroContributionHintExtension,
+                    GenerateGraphExtensionExtension.Factory()
+                      .create(session, options, compatContext) as? MetroContributionHintExtension,
+                  )
+                )
+                if (options.enableCircuitCodegen && !options.generateClassesInIr) {
+                  add(
+                    CircuitFirExtension.Factory().create(session, options, compatContext)!!
+                      as MetroContributionHintExtension
+                  )
+                }
+                if (options.enableHiltInterop) {
+                  HiltFirDeclarationExtension.HintFactory()
+                    .create(session, options, compatContext)
+                    ?.let(::add)
+                }
+              }
+            },
+            loadExternalContributionExtensions = { session, options, compatContext ->
+              buildList {
+                add(
+                  GenerateImplContributionExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                add(
+                  GenerateProvidesContributionMetroExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                add(
+                  GenerateBindsContributionMetroExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                add(
+                  GenerateGraphExtensionContributionExtension.Factory()
+                    .create(session, options, compatContext)
+                )
+                if (options.enableCircuitCodegen && !options.generateClassesInIr) {
+                  add(
+                    CircuitContributionExtension.Factory().create(session, options, compatContext)!!
+                  )
+                }
+                if (options.enableHiltInterop) {
+                  HiltContributionExtension.Factory()
+                    .create(session, options, compatContext)
+                    ?.let(::add)
+                }
+              }
+            },
+          )
         )
-      )
-    }
-    IrGenerationExtension.registerExtension(GenerateImplIrExtension())
-    IrGenerationExtension.registerExtension(GenerateProvidesContributionIrExtension())
-    IrGenerationExtension.registerExtension(GenerateProvidersInGraphIrExtension())
-    IrGenerationExtension.registerExtension(
-      MetroIrGenerationExtension(
-        messageCollector = with(compatContext) { configuration.messageCollectorCompat() },
-        classIds = classIds,
-        options = options,
-        // TODO ever support this in tests?
-        lookupTracker = null,
-        expectActualTracker = ExpectActualTracker.DoNothing,
-        compatContext = compatContext,
-        traceContext = traceContext,
-      )
-    )
-    if (options.enableCircuitCodegen) {
-      IrGenerationExtension.registerExtension(
-        ComposePluginRegistrar.createComposeIrExtension(configuration)
-      )
+        if (options.enableCircuitCodegen) {
+          registerFirExtensionCompat(ComposeFirExtensionRegistrar())
+          registerIrExtensionCompat(
+            CircuitIrExtension.create(
+              generateClassesInIr = options.generateClassesInIr,
+              classIds = classIds,
+              compatContext = compatContext,
+            )
+          )
+        }
+        registerIrExtensionCompat(GenerateImplIrExtension())
+        registerIrExtensionCompat(GenerateProvidesContributionIrExtension())
+        registerIrExtensionCompat(GenerateProvidersInGraphIrExtension())
+        registerIrExtensionCompat(
+          MetroIrGenerationExtension(
+            messageCollector = with(compatContext) { configuration.messageCollectorCompat() },
+            classIds = classIds,
+            options = options,
+            // TODO ever support this in tests?
+            lookupTracker = null,
+            expectActualTracker = ExpectActualTracker.DoNothing,
+            compatContext = compatContext,
+            traceContext = traceContext,
+          )
+        )
+        if (options.enableCircuitCodegen) {
+          registerIrExtensionCompat(
+            ComposePluginRegistrar.createComposeIrExtension(configuration)
+          )
+        }
+      }
     }
   }
 }

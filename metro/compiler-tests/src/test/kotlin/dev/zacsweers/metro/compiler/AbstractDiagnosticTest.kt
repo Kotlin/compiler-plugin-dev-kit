@@ -6,12 +6,6 @@ import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
-import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
-import org.jetbrains.kotlin.test.builders.configureJvmArtifactsHandlersStep
-import org.jetbrains.kotlin.test.configuration.commonBackendHandlersForCodegenTest
-import org.jetbrains.kotlin.test.configuration.configureCommonDiagnosticTestPaths
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.FULL_JDK
@@ -19,7 +13,6 @@ import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirective
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.RUN_PIPELINE_TILL
-import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
@@ -30,14 +23,9 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.NonSourceErrorMessagesHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.PsiLightTreeMetaInfoProcessor
 import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTest
-import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.TestPhase
 
-open class AbstractDiagnosticTest : AbstractPhasedJvmDiagnosticLightTreeTest() {
-  override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider {
-    return ClasspathBasedStandardLibrariesPathProvider
-  }
-
+open class AbstractDiagnosticTest : MetroDelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
   override fun configure(builder: TestConfigurationBuilder) {
     if (NEEDS_LEGACY_GOLDEN_NAMING) {
       configureWithMetroDiagnosticHandlers(builder)
@@ -80,32 +68,25 @@ open class AbstractDiagnosticTest : AbstractPhasedJvmDiagnosticLightTreeTest() {
         LANGUAGE + "+EnableDfaWarningsInK2"
       }
 
-      setupMetroJvmPipelineCompat(FirParser.LightTree)
+      setupJvmPipelineSteps(FirParser.LightTree)
       configureFirParser(FirParser.LightTree)
-      configureCommonDiagnosticTestPaths()
 
-      configureFirHandlersStep {
-        useHandlers(
-          ::MetroFirDiagnosticsHandler,
-          ::FirDumpHandler,
-          ::FirCfgDumpHandler,
-          ::FirVFirDumpHandler,
-          ::FirInferenceLogsHandler,
-          ::FirCfgConsistencyHandler,
-          ::FirResolvedTypesVerifier,
-          ::FirScopeDumpHandler,
-        )
-        useHandlers(::NoFirCompilationErrorsHandler)
-        tagsGeneratorCheckerHandler?.let { useHandlers(it) }
-      }
+      configureFirHandlersStep(
+        ::MetroFirDiagnosticsHandler,
+        ::FirDumpHandler,
+        ::FirCfgDumpHandler,
+        ::FirVFirDumpHandler,
+        ::FirInferenceLogsHandler,
+        ::FirCfgConsistencyHandler,
+        ::FirResolvedTypesVerifier,
+        ::FirScopeDumpHandler,
+        ::NoFirCompilationErrorsHandler,
+      )
+      tagsGeneratorCheckerHandler?.let { configureFirHandlersStep(it) }
 
-      configureIrHandlersStep {
-        useHandlers(::MetroIrDiagnosticsHandler, noIrCompilationErrorsHandlerCtor)
-      }
+      configureIrHandlersStep(::MetroIrDiagnosticsHandler, noIrCompilationErrorsHandlerCtor)
 
-      configureJvmArtifactsHandlersStep {
-        commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
-      }
+      commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
 
       useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
       val tagsAfter = tagsGeneratorCheckerAfterAnalysis

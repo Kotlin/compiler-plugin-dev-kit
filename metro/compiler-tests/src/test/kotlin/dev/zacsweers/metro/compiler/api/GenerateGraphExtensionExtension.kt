@@ -31,7 +31,6 @@ import org.jetbrains.kotlin.fir.extensions.NestedClassGenerationContext
 import org.jetbrains.kotlin.fir.extensions.predicate.LookupPredicate
 import org.jetbrains.kotlin.fir.extensions.predicateBasedProvider
 import org.jetbrains.kotlin.fir.moduleData
-import org.jetbrains.kotlin.fir.plugin.createMemberFunction
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.kotlinScopeProvider
@@ -87,8 +86,8 @@ private val CREATE_NAME = Name.identifier("create")
  * }
  * ```
  */
-internal class GenerateGraphExtensionExtension(session: FirSession) :
-  MetroFirDeclarationGenerationExtension(session), MetroContributionHintExtension {
+internal class GenerateGraphExtensionExtension(session: FirSession, compatContext: CompatContext) :
+  MetroFirDeclarationGenerationExtension(session), MetroContributionHintExtension, CompatContext by compatContext {
 
   companion object {
     val ANNOTATION_FQ_NAME = FqName("test.GenerateGraphExtension")
@@ -251,7 +250,7 @@ internal class GenerateGraphExtensionExtension(session: FirSession) :
     // Add @Provides annotation to the text parameter
     createFunction.valueParameters[0].replaceAnnotations(listOf(buildProvidesAnnotation()))
 
-    return listOf(createFunction.symbol)
+    return listOf(createFunction.symbol as FirNamedFunctionSymbol)
   }
 
   // -- Annotation builders --
@@ -362,7 +361,7 @@ internal class GenerateGraphExtensionExtension(session: FirSession) :
       session: FirSession,
       options: MetroOptions,
       compatContext: CompatContext,
-    ): MetroFirDeclarationGenerationExtension = GenerateGraphExtensionExtension(session)
+    ): MetroFirDeclarationGenerationExtension = GenerateGraphExtensionExtension(session, compatContext)
   }
 }
 

@@ -5,26 +5,39 @@ package dev.zacsweers.metro.compiler
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
 import org.jetbrains.kotlin.test.Constructor
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.WrappedException
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
+import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.handlers.findByPath
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_IDENTICAL
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.TagsGeneratorChecker
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.AnalysisHandler
+import org.jetbrains.kotlin.test.model.BackendKind
 import org.jetbrains.kotlin.test.model.TestFile
+import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
+import org.jetbrains.kotlin.test.services.SourceFileProvider
 import org.jetbrains.kotlin.test.services.TestPhase
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 import org.jetbrains.kotlin.utils.bind
+
+fun SourceFileProvider.getContentOfSourceFileCompat(file: TestFile): String =
+  getContentOfSourceFile(file)
+
+fun irTextDumpHandlerCtor(
+  testServices: TestServices,
+  backendKind: BackendKind<IrBackendInput>,
+): IrTextDumpHandler = IrTextDumpHandler(testServices, backendKind)
 
 fun mainFirFilesCompat(info: FirOutputArtifact): Map<TestFile, FirFile> =
   info.mainFirFilesByTestFile
@@ -97,11 +110,10 @@ fun RegisteredDirectivesBuilder.firIdenticalCompat() {
   +FIR_IDENTICAL
 }
 
-abstract class MetroReportsCheckerCompat(testServices: TestServices) :
-  AfterAnalysisChecker(testServices) {
-  final override fun check(failedAssertions: List<WrappedException>) {
-    checkMetroReports(failedAssertions.isNotEmpty())
-  }
-
-  abstract fun checkMetroReports(thereWereFailures: Boolean)
-}
+fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest =
+  object :
+    AbstractJsTest(
+      pathToTestDir = "compiler-tests/src/test/data/box",
+      testGroupOutputDirPrefix = "box/js/",
+      parser = FirParser.LightTree,
+    ) {}
