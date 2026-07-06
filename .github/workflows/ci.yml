@@ -180,6 +180,7 @@ jobs:
     steps:
       - name: Skip on PRs
         if: github.ref != 'refs/heads/main'
+        working-directory: ${{ github.workspace }}
         run: echo "Skipping kmp functional tests on PRs to reduce CI time"
 
       - name: Checkout
@@ -314,6 +315,7 @@ jobs:
     steps:
       - name: Skip on PRs
         if: github.ref != 'refs/heads/main'
+        working-directory: ${{ github.workspace }}
         run: echo "Skipping multiplatform tests on PRs to reduce CI time"
 
       - name: Checkout
