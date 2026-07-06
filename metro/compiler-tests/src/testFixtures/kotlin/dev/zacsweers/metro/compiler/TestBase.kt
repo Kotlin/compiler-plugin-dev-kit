@@ -27,7 +27,7 @@ fun TestBase.postConfigure(builder: TestConfigurationBuilder) {
         targetBackend = myTargetBackend
       } else {
         require(targetBackend == myTargetBackend) {
-          """Target backend in configuration specified to $targetBackend but in 
+          """Target backend in configuration specified to $targetBackend but in
                           |AbstractKotlinCompilerWithTargetBackendTest parent it is set to $myTargetBackend"""
             .trimMargin()
         }
