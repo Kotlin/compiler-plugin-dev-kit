@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitKotlinCompilerTestFixturesTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -31,27 +32,38 @@ val versionAliases =
     .map(::KotlinToolingVersion)
 
 pluginDevKit {
+  fun DevKitKotlinCompilerTestFixturesTarget.setupFixtures() {
+    testFixtures {
+      java.srcDirs(
+        "src/generator${KotlinToolingVersion(version.toKotlinVersion()).baseVersionName}/kotlin"
+      )
+      resources.srcDirs(
+        listOf(
+          "src/generator${KotlinToolingVersion(version.toKotlinVersion()).baseVersionName}/resources"
+        )
+      )
+    }
+  }
   listOf(
       "2.3.0",
-      "2.3.20",
       "2.4.0",
       "2.4.20-dev-6138",
     )
     .map(::KotlinToolingVersion)
     .forEach {
-      developForWithFixtures(it) {
-        testFixtures {
-          java.srcDirs(
-            "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/kotlin"
-          )
-          resources.srcDirs(
-            listOf(
-              "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/resources"
-            )
-          )
-        }
-      }
+      developForWithFixtures(it) { setupFixtures() }
     }
+  val k2320Target = developForWithFixtures(KotlinToolingVersion("2.3.20")) { setupFixtures() }
+
+  // 2.4.0-dev-2124 predates the TestConfigurationBuilder rename (like 2.3.0/2.3.20/2.4.0), so
+  // reuse generator2320's sources rather than a dedicated directory(generator240 doesn't fit:
+  // its KotlinStandardLibrariesPathProvider impl assumes wasm stdlib APIs this dev build lacks.)
+  developForWithFixtures(KotlinToolingVersion("2.4.0-dev-2124")) {
+    testFixtures {
+      java.srcDirs(k2320Target.testFixtures.map { it.java.sourceDirectories })
+      resources.srcDirs(k2320Target.testFixtures.map { it.resources.srcDirs })
+    }
+  }
 
   // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
   // metro.testCompilerVersion always has a matching task to select.

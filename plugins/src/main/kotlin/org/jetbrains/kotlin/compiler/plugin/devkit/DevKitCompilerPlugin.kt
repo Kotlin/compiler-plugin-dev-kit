@@ -16,6 +16,7 @@ import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
@@ -52,6 +53,15 @@ import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
+
+// The Kotlin plugin adds a "kotlin" extension SourceDirectorySet to every SourceSet, defaulting
+// to src/<name>/kotlin plus a mirror of .java.srcDirs (never the other direction - see the
+// recompile-shared-sources comments below). Going through this instead of .allSource keeps
+// resources dirs out of what gets fed into another SourceDirectorySet's srcDir(...): passing a
+// SourceDirectorySet itself (rather than its .sourceDirectories) elsewhere would make Gradle
+// iterate it as a FileTree of matched leaf files, not root directories.
+private val SourceSet.kotlin: SourceDirectorySet
+    get() = extensions.getByName("kotlin") as SourceDirectorySet
 
 public interface DevKitKotlinCompilerTestTarget : Named {
     override fun getName(): String = version.versionString
@@ -572,12 +582,17 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         "$versionName/src/testFixtures/kotlin",
                     )
                 )
-                // recompile shared test fixture sources. allSource (not .java) is required here:
-                // the Kotlin plugin only mirrors java.srcDirs into kotlin.srcDirs, never the
+                // Recompile the shared testFixtures sources, feeding each kind into the matching
+                // SourceDirectorySet on this suite - .kotlin dirs into .kotlin (so they only hit
+                // the Kotlin compile task), .java into .java, .resources into .resources - rather
+                // than lumping everything through one. Read via .kotlin (not .java) on the source
+                // side: the Kotlin plugin only mirrors java.srcDirs into kotlin.srcDirs, never the
                 // other direction, so "testFixtures"'s own .java set never contains
                 // src/testFixtures/kotlin.
-                java.srcDir(sourceSets.named("testFixtures").map { it.allSource.sourceDirectories })
+                kotlin.srcDir(sourceSets.named("testFixtures").map { it.kotlin.sourceDirectories })
+                java.srcDir(sourceSets.named("testFixtures").map { it.java.sourceDirectories })
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
+                resources.srcDir(sourceSets.named("testFixtures").map { it.resources.sourceDirectories })
                 forceKotlinVersion(version)
                 dependencies {
                     implementationConfigurationName(project())
@@ -646,9 +661,17 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     java.setSrcDirs(
                         listOf("$versionName/src/test/java", "$versionName/src/test/kotlin")
                     )
-                    // recompile shared test sources. allSource (not .java) is required here
-                    java.srcDir(sourceSets.named("test").map { it.allSource.sourceDirectories })
+                    // Recompile the shared test sources, feeding each kind into the matching
+                    // SourceDirectorySet on this suite - .kotlin dirs into .kotlin (so they only
+                    // hit the Kotlin compile task), .java into .java, .resources into .resources -
+                    // rather than lumping everything through one. Read via .kotlin (not .java) on
+                    // the source side: the Kotlin plugin only mirrors java.srcDirs into
+                    // kotlin.srcDirs, never the other direction, so "test"'s own .java set never
+                    // contains src/test/kotlin.
+                    kotlin.srcDir(sourceSets.named("test").map { it.kotlin.sourceDirectories })
+                    java.srcDir(sourceSets.named("test").map { it.java.sourceDirectories })
                     resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
+                    resources.srcDir(sourceSets.named("test").map { it.resources.sourceDirectories })
                     addTestGenDir()
                     forceKotlinVersion(version)
                     // KGP automatically associates the sourceSet literally named "test" with
