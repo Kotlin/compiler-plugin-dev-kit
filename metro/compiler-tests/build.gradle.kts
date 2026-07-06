@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.gradle.targets.js.KotlinJsCompilerAttribute
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 plugins {
@@ -42,31 +41,6 @@ pluginDevKit {
       }
     }
 }
-
-val testCompilerVersionProvider = providers.gradleProperty("metro.testCompilerVersion")
-
-val testCompilerVersion = testCompilerVersionProvider.orElse(libs.versions.kotlin).get()
-
-val testKotlinVersion = KotlinToolingVersion(testCompilerVersion)
-
-val kotlin23 = KotlinToolingVersion(KotlinVersion(2, 3))
-
-val kotlin24Beta1 = KotlinToolingVersion(KotlinVersion(2, 4), "Beta1")
-
-// Minimum supported 2.4.20 dev build. 2.4.20 dev builds ship KT-85292:
-// `commonConfigurationForJvmTest` was renamed to `setupJvmPipelineSteps`, and the diagnostic / IR
-// dump golden file extensions lost their `.fir.` infix. Anything < this still uses the legacy
-// names + helper.
-val kotlin2420Dev6138Version = "2.4.20-dev-6138"
-val kotlin2420Dev6138 = KotlinToolingVersion(kotlin2420Dev6138Version)
-val useKotlin2420DevFallbackArtifacts =
-  testKotlinVersion.toKotlinVersion() == KotlinVersion(2, 4, 20) && testKotlinVersion.isDev
-val kotlinArtifactsVersion =
-  if (useKotlin2420DevFallbackArtifacts) {
-    kotlin2420Dev6138Version
-  } else {
-    testCompilerVersion
-  }
 
 // Configure the compiler-version-related test properties per registered devkit test suite, so
 // each `<version>Test` suite reports its own pinned version at runtime rather than a single
@@ -146,10 +120,6 @@ val wasmKlibClasspath =
     }
   }
 
-check(testKotlinVersion >= kotlin23) {
-  "compiler-tests requires Kotlin 2.3.0 or newer, but metro.testCompilerVersion=$testCompilerVersion"
-}
-
 dependencies {
   configurations.testFixturesApi.configure {
     exclude(
@@ -157,7 +127,7 @@ dependencies {
       module = "compiler-plugin-runtime",
     )
   }
-  testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin:$kotlinArtifactsVersion")
+  testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin")
 
   testFixturesApi(project(":compiler"))
   testFixturesApi(project(":compiler-compat"))
@@ -204,12 +174,12 @@ dependencies {
   circuitRuntimeKlibClasspath(libs.kotlinInject.runtime)
   circuitRuntimeKlibClasspath(libs.kotlinx.browser)
 
-  jsKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-js:$kotlinArtifactsVersion")
-  jsKlibClasspath("org.jetbrains.kotlin:kotlin-test-js:$kotlinArtifactsVersion")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-js:$kotlinArtifactsVersion")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-wasi:$kotlinArtifactsVersion")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-js:$kotlinArtifactsVersion")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-wasi:$kotlinArtifactsVersion")
+  jsKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-js")
+  jsKlibClasspath("org.jetbrains.kotlin:kotlin-test-js")
+  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-js")
+  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-wasi")
+  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-js")
+  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-wasi")
 
   // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
   // ServiceLoader
@@ -232,8 +202,6 @@ val generateTests =
       .dir(layout.projectDirectory.dir("src/test/data"))
       .withPropertyName("testData")
       .withPathSensitivity(PathSensitivity.RELATIVE)
-
-    inputs.property("testCompilerVersion", testCompilerVersion)
 
     outputs.dir(layout.projectDirectory.dir("src/test/java"))
 
