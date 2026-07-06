@@ -2,8 +2,10 @@
 buildconfig = "6.0.10"
 node-gradle = "7.0.2"
 animal-sniffer = "2.0.1"
+testkit = "0.18"
 
 [libraries]
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
 node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
+testkit = { group = "com.autonomousapps", name = "gradle-testkit-plugin", version.ref = "testkit" }

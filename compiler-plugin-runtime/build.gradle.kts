@@ -16,6 +16,9 @@ kotlin {
 }
 
 pluginDevKit {
+    // This *is* compiler-plugin-runtime, so it can't depend on itself.
+    addRuntimeDependency = false
+
     developForWithFixtures(kotlinToolingVersion)
     developForWithFixtures(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
 }

@@ -173,6 +173,14 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
     public abstract val pluginAnnotations: Property<Project>
     public abstract val generateTestsClass: Property<String>
     public abstract val testGenDirectory: DirectoryProperty
+
+    /**
+     * Whether to add an implementation dependency on `compiler-plugin-runtime`. Plugins that
+     * don't use its APIs can turn this off to avoid an unused dependency leaking into their
+     * published POM.
+     */
+    public abstract val addRuntimeDependency: Property<Boolean>
+
     public abstract val testAgainst: NamedDomainObjectSet<DevKitKotlinCompilerTestTarget>
     public val developFor: NamedDomainObjectCollection<DevKitKotlinCompilerMainTarget> =
         testAgainst.withType<DevKitKotlinCompilerMainTarget>()
@@ -187,33 +195,26 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerTestTarget> = Action {},
     ): DevKitKotlinCompilerTestTarget =
-        project.DevKitKotlinCompilerTestTarget(version).also(testAgainst::add).also {
-            action.execute(it)
-        }
+        project.DevKitKotlinCompilerTestTarget(version).also(testAgainst::add).also(action::execute)
 
     public fun testAgainstWithFixtures(
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerTestFixturesTarget> = Action {},
     ): DevKitKotlinCompilerTestFixturesTarget =
-        project.DevKitKotlinCompilerTestFixturesTarget(version).also(testAgainst::add).also {
-            action.execute(it)
-        }
+        project.DevKitKotlinCompilerTestFixturesTarget(version).also(testAgainst::add).also(action::execute)
 
     public fun developFor(
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerMainTarget> = Action {},
     ): DevKitKotlinCompilerMainTarget =
-        project.DevKitKotlinCompilerMainTarget(version).also(testAgainst::add).also {
-            action.execute(it)
-        }
+        project.DevKitKotlinCompilerMainTarget(version).also(testAgainst::add).also(action::execute)
+
 
     public fun developForWithFixtures(
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerTarget> = Action {},
     ): DevKitKotlinCompilerTarget =
-        project.DevKitKotlinCompilerTarget(version).also(testAgainst::add).also {
-            action.execute(it)
-        }
+        project.DevKitKotlinCompilerTarget(version).also(testAgainst::add).also(action::execute)
 }
 
 public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
@@ -279,6 +280,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         val pluginDevKit =
             project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit", project)
         val pluginAnnotations = pluginDevKit.pluginAnnotations
+        pluginDevKit.addRuntimeDependency.convention(true)
         val generateTestsClass = pluginDevKit.generateTestsClass.convention("GenerateTestsKt")
         val testGenDirectory =
             pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
@@ -664,17 +666,25 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         dependencies {
             "compileOnly"(kotlin("compiler"))
-            if (group != DEV_KIT_GROUP) "implementation"("$DEV_KIT_GROUP:compiler-plugin-runtime")
 
             "testFixturesApi"(kotlin("stdlib"))
             "testFixturesApi"(kotlin("test-junit5"))
             "testFixturesApi"(kotlin("compiler-internal-test-framework"))
             "testFixturesApi"(kotlin("compiler"))
-            if (group != DEV_KIT_GROUP)
-                "testFixturesApi"(testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime"))
             "testFixturesRuntimeOnly"("junit:junit:4.13.2") // TODO don't force junit version
 
             annotationsRuntimeClasspath(pluginAnnotations)
+        }
+
+        // Deferred so consuming build scripts get a chance to call
+        // `pluginDevKit.addRuntimeDependency.set(false)` before we decide whether to add it.
+        afterEvaluate {
+            if (pluginDevKit.addRuntimeDependency.get()) {
+                dependencies {
+                    "implementation"("$DEV_KIT_GROUP:compiler-plugin-runtime")
+                    "testFixturesApi"(testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime"))
+                }
+            }
         }
 
         animalsniffer.sourceSets =

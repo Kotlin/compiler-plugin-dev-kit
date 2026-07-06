@@ -218,17 +218,12 @@ project.afterEvaluate {
   }
   configurations.named("implementation") {
     dependencies.removeIf { it is ExternalDependency && it.group == "dev.drewhamilton.poko" }
-    // The devkit adds an unversioned implementation dependency on its compiler-plugin-runtime.
-    // That module has no `main` output (only test fixtures) and Metro's compiler doesn't use it, so
-    // it contributes nothing here. Left in place it leaks into the published POM without a version,
-    // which breaks resolution for external consumers of dev.zacsweers.metro:compiler.
-    dependencies.removeIf {
-      it is ExternalDependency && it.group == "org.jetbrains.kotlin.compiler.plugin.devkit"
-    }
   }
 }
 
 pluginDevKit {
+  addRuntimeDependency = false
+
   listOf(
       "2.3.0",
       "2.3.20",

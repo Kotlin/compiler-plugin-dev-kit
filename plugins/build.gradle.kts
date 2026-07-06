@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)
+    implementation(libs.testkit)
     api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
 }
 

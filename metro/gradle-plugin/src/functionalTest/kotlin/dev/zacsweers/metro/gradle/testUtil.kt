@@ -156,7 +156,7 @@ fun BuildResult.assertOutputContainsOnDifferentKotlinVersions(map: Map<String, S
 }
 
 fun getTestCompilerVersion(): String =
-  System.getProperty("dev.zacsweers.metro.gradle.test.kotlin-version")
+  System.getProperty("org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kotlin-version")
 
 fun getTestCompilerToolingVersion(): KotlinToolingVersion =
   KotlinToolingVersion(getTestCompilerVersion())
