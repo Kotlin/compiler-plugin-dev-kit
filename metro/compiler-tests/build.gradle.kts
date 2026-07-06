@@ -47,7 +47,6 @@ pluginDevKit {
   listOf(
       "2.3.0",
       "2.4.0",
-      "2.4.20-dev-6138",
     )
     .map(::KotlinToolingVersion)
     .forEach {
@@ -64,12 +63,23 @@ pluginDevKit {
       resources.srcDirs(k2320Target.testFixtures.map { it.resources.srcDirs })
     }
   }
+  val k2420Target =
+    developForWithFixtures(KotlinToolingVersion("2.4.20-dev-6138")) { setupFixtures() }
 
   // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
   // metro.testCompilerVersion always has a matching task to select.
   versionAliases
     .filterNot { alias -> testAgainst.any { it.version == alias } }
-    .forEach { testAgainst(it) }
+    .forEach {
+      if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
+        developForWithFixtures(it) {
+          testFixtures {
+            java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
+            resources.srcDirs(k2420Target.testFixtures.map { it.resources.srcDirs })
+          }
+        }
+      else testAgainst(it)
+    }
 
   // Picks which single registered Kotlin version's test task actually runs when running test task
   defaultTestVersion =
