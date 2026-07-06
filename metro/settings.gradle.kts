@@ -50,13 +50,6 @@ include(
   ":runtime",
 )
 
-// Include compiler-compat versions
-rootProject.projectDir.resolve("compiler-compat").listFiles()!!.forEach {
-  if (it.isDirectory && it.name.startsWith("k") && File(it, "version.txt").exists()) {
-    include(":compiler-compat:${it.name}")
-  }
-}
-
 val VERSION_NAME: String by extra.properties
 
 develocity {

@@ -42,11 +42,6 @@ apiValidation {
     add("metro-common")
     add("compiler-tests")
     add("compiler-compat")
-    layout.projectDirectory.dir("compiler-compat").asFile.listFiles()!!.forEach {
-      if (it.isDirectory && it.name.startsWith("k") && File(it, "version.txt").exists()) {
-        add(it.name)
-      }
-    }
   }
   ignoredPackages +=
     listOf(
