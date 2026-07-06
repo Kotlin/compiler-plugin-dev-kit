@@ -4,7 +4,8 @@ package dev.zacsweers.metro.compiler
 
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 
-open class AbstractJsBoxTest : MetroDelegatingTestBase(createKotlinJsBoxTestBase()) {
+open class AbstractJsBoxTest :
+  MetroDelegatingTestBase(MetroDiagnosticsCompat.createKotlinJsBoxTestBase()) {
   override fun configure(builder: TestConfigurationBuilder) {
     super.configure(builder)
 

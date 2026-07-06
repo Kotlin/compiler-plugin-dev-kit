@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import java.util.*
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.test.Constructor
-import org.jetbrains.kotlin.test.WrappedException
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
@@ -20,43 +20,41 @@ import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.SourceFileProvider
 import org.jetbrains.kotlin.test.services.TestServices
 
-private fun stub(): Nothing = error("overridden in version-specific sources")
+interface MetroDiagnosticsCompat {
+  fun SourceFileProvider.getContentOfSourceFileCompat(file: TestFile): String
 
-fun SourceFileProvider.getContentOfSourceFileCompat(file: TestFile): String = stub()
+  fun irTextDumpHandlerCtor(
+    testServices: TestServices,
+    backendKind: BackendKind<IrBackendInput>,
+  ): IrTextDumpHandler
 
-fun irTextDumpHandlerCtor(
-  testServices: TestServices,
-  backendKind: BackendKind<IrBackendInput>,
-): IrTextDumpHandler = stub()
+  fun mainFirFilesCompat(info: FirOutputArtifact): Map<TestFile, FirFile>
 
-fun mainFirFilesCompat(info: FirOutputArtifact): Map<TestFile, FirFile> = stub()
+  fun severityToStringCompat(severity: Severity): String
 
-fun severityToStringCompat(severity: Severity): String = stub()
+  fun irDiagnosticsForFileCompat(
+    info: IrBackendInput,
+    file: TestFile,
+    testServices: TestServices,
+  ): List<KtDiagnostic>?
 
-fun irDiagnosticsForFileCompat(
-  info: IrBackendInput,
-  file: TestFile,
-  testServices: TestServices,
-): List<KtDiagnostic>? = stub()
+  val noIrCompilationErrorsHandlerCtor: Constructor<AnalysisHandler<IrBackendInput>>
 
-val noIrCompilationErrorsHandlerCtor: Constructor<AnalysisHandler<IrBackendInput>> = stub()
+  val suppressionCheckerCtor: Constructor<SuppressionChecker>
 
-val suppressionCheckerCtor: Constructor<SuppressionChecker> = stub()
+  val tagsGeneratorCheckerHandler: Constructor<AnalysisHandler<FirOutputArtifact>>?
 
-val tagsGeneratorCheckerHandler: Constructor<AnalysisHandler<FirOutputArtifact>>? = stub()
+  val tagsGeneratorCheckerAfterAnalysis: Constructor<AfterAnalysisChecker>?
 
-val tagsGeneratorCheckerAfterAnalysis: Constructor<AfterAnalysisChecker>? = stub()
+  fun TestConfigurationBuilder.useIrDumpFailureSuppressorsCompat()
 
-fun TestConfigurationBuilder.useIrDumpFailureSuppressorsCompat() {
-  stub()
+  fun TestConfigurationBuilder.usePhasedPipelineFailureSuppressorCompat()
+
+  fun RegisteredDirectivesBuilder.firIdenticalCompat()
+
+  fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest
+
+  companion object :
+    MetroDiagnosticsCompat by ServiceLoader.load(MetroDiagnosticsCompat::class.java).firstOrNull()
+      as MetroDiagnosticsCompat
 }
-
-fun TestConfigurationBuilder.usePhasedPipelineFailureSuppressorCompat() {
-  stub()
-}
-
-fun RegisteredDirectivesBuilder.firIdenticalCompat() {
-  stub()
-}
-
-fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest = stub()

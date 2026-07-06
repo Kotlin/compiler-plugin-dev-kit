@@ -46,13 +46,20 @@ pluginDevKit {
               "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/kotlin"
             )
           )
+          resources.setSrcDirs(
+            listOf(
+              "src/generator${KotlinToolingVersion(it.toKotlinVersion()).baseVersionName}/resources"
+            )
+          )
         }
       }
     }
 
   // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
   // metro.testCompilerVersion always has a matching task to select.
-  versionAliases.filterNot { alias -> testAgainst.any { it.version == alias } }.forEach { testAgainst(it) }
+  versionAliases
+    .filterNot { alias -> testAgainst.any { it.version == alias } }
+    .forEach { testAgainst(it) }
 }
 
 // Picks which single registered Kotlin version's test task actually runs; every other version's

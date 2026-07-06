@@ -38,7 +38,8 @@ import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
  * Wired in by [AbstractDiagnosticTest] only when [NEEDS_LEGACY_GOLDEN_NAMING] is true. Once Metro's
  * floor is 2.4.20+, this class can be deleted.
  */
-class MetroFirDiagnosticsHandler(testServices: TestServices) : FirAnalysisHandler(testServices) {
+class MetroFirDiagnosticsHandler(testServices: TestServices) :
+  FirAnalysisHandler(testServices), MetroDiagnosticsCompat by MetroDiagnosticsCompat {
   private val delegate = FirDiagnosticsHandler(testServices)
   private val dumper = MultiModuleInfoDumper(moduleHeaderTemplate = "// -- Module: <%s> --")
 
