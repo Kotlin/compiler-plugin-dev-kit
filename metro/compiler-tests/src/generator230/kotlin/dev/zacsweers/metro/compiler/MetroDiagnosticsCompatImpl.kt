@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import java.io.File
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.js.test.converters.Fir2IrCliWebFacade
+import org.jetbrains.kotlin.js.test.converters.FirCliWebFacade
+import org.jetbrains.kotlin.js.test.converters.FirKlibSerializerCliWebFacade
 import org.jetbrains.kotlin.js.test.fir.AbstractFirJsTest
+import org.jetbrains.kotlin.js.test.ir.commonConfigurationForJsTest
+import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
@@ -14,16 +20,22 @@ import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionCh
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.handlers.findByPath
+import org.jetbrains.kotlin.test.backend.ir.BackendCliJvmFacade
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
+import org.jetbrains.kotlin.test.configuration.commonConfigurationForJvmTest
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_IDENTICAL
+import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
+import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.TagsGeneratorChecker
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.AnalysisHandler
 import org.jetbrains.kotlin.test.model.BackendKind
+import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
+import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider as KTStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.SourceFileProvider
 import org.jetbrains.kotlin.test.services.TestPhase
@@ -87,4 +99,73 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
       testGroupOutputDirPrefix = "box/js/",
       parser = FirParser.LightTree,
     )
+
+  private fun TestConfigurationBuilder.useVersionSpecificConfig(
+    config: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder.() -> Unit
+  ) =
+    configureUsing(
+      object : AbstractKotlinCompilerTest() {
+        override fun configure(
+          builder: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+        ) = config(builder)
+      }
+    )
+
+  override fun createKotlinStandardLibrariesPathProvider(
+    from: KTStandardLibrariesPathProvider
+  ): KotlinStandardLibrariesPathProvider =
+    object : KotlinStandardLibrariesPathProvider {
+      override fun runtimeJarForTests(): File = from.runtimeJarForTests()
+
+      override fun runtimeJarForTestsWithJdk8(): File = from.runtimeJarForTestsWithJdk8()
+
+      override fun minimalRuntimeJarForTests(): File = from.minimalRuntimeJarForTests()
+
+      override fun reflectJarForTests(): File = from.reflectJarForTests()
+
+      override fun kotlinTestJarForTests(): File = from.kotlinTestJarForTests()
+
+      override fun scriptRuntimeJarForTests(): File = from.scriptRuntimeJarForTests()
+
+      override fun jvmAnnotationsForTests(): File = from.jvmAnnotationsForTests()
+
+      override fun getAnnotationsJar(): File = from.getAnnotationsJar()
+
+      override fun fullJsStdlib(): File = from.fullJsStdlib()
+
+      override fun defaultJsStdlib(): File = from.defaultJsStdlib()
+
+      override fun kotlinTestJsKLib(): File = from.kotlinTestJsKLib()
+
+      override fun commonStdlibForTests(): File = from.commonStdlibForTests()
+
+      override fun scriptingPluginFilesForTests(): Collection<File> =
+        from.scriptingPluginFilesForTests()
+
+      override fun webStdlibForTests(): File = error("Unavailable in this version")
+
+      override fun fullWasmStdlib(target: WasmTarget): File = error("Unavailable in this version")
+
+      override fun kotlinTestWasmKLib(target: WasmTarget): File =
+        error("Unavailable in this version")
+    }
+
+  override fun TestConfigurationBuilder.commonConfigurationForJsTest() = useVersionSpecificConfig {
+    commonConfigurationForJsTest(
+      targetFrontend = FrontendKinds.FIR,
+      frontendFacade = ::FirCliWebFacade,
+      frontendToIrConverter = ::Fir2IrCliWebFacade,
+      serializerFacade = ::FirKlibSerializerCliWebFacade,
+    )
+  }
+
+  override fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) =
+    useVersionSpecificConfig {
+      commonConfigurationForJvmTest(
+        targetFrontend = FrontendKinds.FIR,
+        frontendFacade = ::FirCliJvmFacade,
+        frontendToBackendConverter = ::Fir2IrCliJvmFacade,
+        backendFacade = ::BackendCliJvmFacade,
+      )
+    }
 }

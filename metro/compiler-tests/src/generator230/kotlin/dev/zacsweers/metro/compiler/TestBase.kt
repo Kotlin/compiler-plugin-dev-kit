@@ -1,11 +1,9 @@
 package dev.zacsweers.metro.compiler
 
-import java.io.File
 import org.jetbrains.kotlin.js.test.converters.Fir2IrCliWebFacade
 import org.jetbrains.kotlin.js.test.converters.FirCliWebFacade
 import org.jetbrains.kotlin.js.test.converters.FirKlibSerializerCliWebFacade
 import org.jetbrains.kotlin.js.test.ir.commonConfigurationForJsTest
-import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
@@ -41,44 +39,8 @@ abstract class TestBase : AbstractKotlinCompilerTest() {
       KTStandardLibrariesPathProvider(),
       KotlinStandardLibrariesPathProvider by createStandardLibrariesPathProvider() {}
 
-  open fun createStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider {
-    val s = super.createKotlinStandardLibrariesPathProvider()
-    return object : KTStandardLibrariesPathProvider(), KotlinStandardLibrariesPathProvider {
-      override fun runtimeJarForTests(): File = s.runtimeJarForTests()
-
-      override fun runtimeJarForTestsWithJdk8(): File = s.runtimeJarForTestsWithJdk8()
-
-      override fun minimalRuntimeJarForTests(): File = s.minimalRuntimeJarForTests()
-
-      override fun reflectJarForTests(): File = s.reflectJarForTests()
-
-      override fun kotlinTestJarForTests(): File = s.kotlinTestJarForTests()
-
-      override fun scriptRuntimeJarForTests(): File = s.scriptRuntimeJarForTests()
-
-      override fun jvmAnnotationsForTests(): File = s.jvmAnnotationsForTests()
-
-      override fun getAnnotationsJar(): File = s.getAnnotationsJar()
-
-      override fun fullJsStdlib(): File = s.fullJsStdlib()
-
-      override fun defaultJsStdlib(): File = s.defaultJsStdlib()
-
-      override fun kotlinTestJsKLib(): File = s.kotlinTestJsKLib()
-
-      override fun commonStdlibForTests(): File = s.commonStdlibForTests()
-
-      override fun scriptingPluginFilesForTests(): Collection<File> =
-        s.scriptingPluginFilesForTests()
-
-      override fun webStdlibForTests(): File = error("Unavailable in this version")
-
-      override fun fullWasmStdlib(target: WasmTarget): File = error("Unavailable in this version")
-
-      override fun kotlinTestWasmKLib(target: WasmTarget): File =
-        error("Unavailable in this version")
-    }
-  }
+  open fun createStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider =
+    MetroDiagnosticsCompat.createKotlinStandardLibrariesPathProvider(super.createKotlinStandardLibrariesPathProvider())
 
   override fun configure(builder: TCBuilder) =
     TestConfigurationBuilderImpl(builder).run {
@@ -91,22 +53,6 @@ abstract class TestBase : AbstractKotlinCompilerTest() {
 
 class TestConfigurationBuilderImpl(val builder: TCBuilder) : TestConfigurationBuilder {
   override fun configureUsing(testBase: AbstractKotlinCompilerTest) = testBase.configure(builder)
-
-  override fun commonConfigurationForJsTest() =
-    builder.commonConfigurationForJsTest(
-      targetFrontend = FrontendKinds.FIR,
-      frontendFacade = ::FirCliWebFacade,
-      frontendToIrConverter = ::Fir2IrCliWebFacade,
-      serializerFacade = ::FirKlibSerializerCliWebFacade,
-    )
-
-  override fun setupJvmPipelineSteps(parser: FirParser) =
-    builder.commonConfigurationForJvmTest(
-      targetFrontend = FrontendKinds.FIR,
-      frontendFacade = ::FirCliJvmFacade,
-      frontendToBackendConverter = ::Fir2IrCliJvmFacade,
-      backendFacade = ::BackendCliJvmFacade,
-    )
 
   override fun defaultDirectives(init: RegisteredDirectivesBuilder.() -> Unit) =
     builder.defaultDirectives(init)

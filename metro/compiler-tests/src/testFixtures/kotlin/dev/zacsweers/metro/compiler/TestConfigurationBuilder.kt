@@ -53,10 +53,6 @@ import org.jetbrains.kotlin.test.services.service
 interface TestConfigurationBuilder {
   fun configureUsing(testBase: AbstractKotlinCompilerTest)
 
-  fun commonConfigurationForJsTest()
-
-  fun setupJvmPipelineSteps(parser: FirParser)
-
   fun defaultDirectives(init: RegisteredDirectivesBuilder.() -> Unit)
 
   fun globalDefaults(init: DefaultsProviderBuilder.() -> Unit)

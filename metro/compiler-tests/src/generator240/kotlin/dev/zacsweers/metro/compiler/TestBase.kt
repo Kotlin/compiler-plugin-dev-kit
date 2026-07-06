@@ -37,9 +37,7 @@ abstract class TestBase : AbstractKotlinCompilerTest() {
       KotlinStandardLibrariesPathProvider by createStandardLibrariesPathProvider() {}
 
   open fun createStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider =
-    object :
-      KTStandardLibrariesPathProvider by super.createKotlinStandardLibrariesPathProvider(),
-      KotlinStandardLibrariesPathProvider {}
+    MetroDiagnosticsCompat.createKotlinStandardLibrariesPathProvider(super.createKotlinStandardLibrariesPathProvider())
 
   override fun configure(builder: TCBuilder) =
     TestConfigurationBuilderImpl(builder).run {
@@ -52,16 +50,6 @@ abstract class TestBase : AbstractKotlinCompilerTest() {
 
 class TestConfigurationBuilderImpl(val builder: TCBuilder) : TestConfigurationBuilder {
   override fun configureUsing(testBase: AbstractKotlinCompilerTest) = testBase.configure(builder)
-
-  override fun commonConfigurationForJsTest() = builder.commonConfigurationForJsTest()
-
-  override fun setupJvmPipelineSteps(parser: FirParser) =
-    builder.commonConfigurationForJvmTest(
-      targetFrontend = FrontendKinds.FIR,
-      frontendFacade = ::FirCliJvmFacade,
-      frontendToBackendConverter = ::Fir2IrCliJvmFacade,
-      backendFacade = ::BackendCliJvmFacade,
-    )
 
   override fun defaultDirectives(init: RegisteredDirectivesBuilder.() -> Unit) =
     builder.defaultDirectives(init)

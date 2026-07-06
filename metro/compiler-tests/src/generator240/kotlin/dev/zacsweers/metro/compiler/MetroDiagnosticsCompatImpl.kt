@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
+import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
@@ -13,16 +14,22 @@ import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionCh
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.handlers.findByPath
+import org.jetbrains.kotlin.test.backend.ir.BackendCliJvmFacade
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
+import org.jetbrains.kotlin.test.configuration.commonConfigurationForJvmTest
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_IDENTICAL
+import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
+import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.TagsGeneratorChecker
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.AnalysisHandler
 import org.jetbrains.kotlin.test.model.BackendKind
+import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
+import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider as KTStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.SourceFileProvider
 import org.jetbrains.kotlin.test.services.TestPhase
@@ -119,4 +126,34 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
         testGroupOutputDirPrefix = "box/js/",
         parser = FirParser.LightTree,
       ) {}
+
+  private fun TestConfigurationBuilder.useVersionSpecificConfig(
+    config: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder.() -> Unit
+  ) =
+    configureUsing(
+      object : AbstractKotlinCompilerTest() {
+        override fun configure(
+          builder: org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+        ) = config(builder)
+      }
+    )
+
+  override fun createKotlinStandardLibrariesPathProvider(
+    from: KTStandardLibrariesPathProvider
+  ): KotlinStandardLibrariesPathProvider =
+    object : KTStandardLibrariesPathProvider by from, KotlinStandardLibrariesPathProvider {}
+
+  override fun TestConfigurationBuilder.commonConfigurationForJsTest() = useVersionSpecificConfig {
+    commonConfigurationForJsTest()
+  }
+
+  override fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) =
+    useVersionSpecificConfig {
+      commonConfigurationForJvmTest(
+        targetFrontend = FrontendKinds.FIR,
+        frontendFacade = ::FirCliJvmFacade,
+        frontendToBackendConverter = ::Fir2IrCliJvmFacade,
+        backendFacade = ::BackendCliJvmFacade,
+      )
+    }
 }

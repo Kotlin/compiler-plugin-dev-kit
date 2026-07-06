@@ -83,7 +83,6 @@ pluginDevKit.testAgainst.configureEach {
           "metro.test.overrideCompilerVersion",
           true,
         )
-        enabled = version == testCompilerVersion
       }
     }
   }

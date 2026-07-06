@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.test.Constructor
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.test.model.AnalysisHandler
 import org.jetbrains.kotlin.test.model.BackendKind
 import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
+import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider as KTStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.SourceFileProvider
 import org.jetbrains.kotlin.test.services.TestServices
 
@@ -53,6 +55,14 @@ interface MetroDiagnosticsCompat {
   fun RegisteredDirectivesBuilder.firIdenticalCompat()
 
   fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest
+
+  fun createKotlinStandardLibrariesPathProvider(
+    from: KTStandardLibrariesPathProvider
+  ): KotlinStandardLibrariesPathProvider
+
+  fun TestConfigurationBuilder.commonConfigurationForJsTest()
+
+  fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser)
 
   companion object :
     MetroDiagnosticsCompat by ServiceLoader.load(MetroDiagnosticsCompat::class.java).firstOrNull()
