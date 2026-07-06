@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
@@ -181,6 +182,13 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
      */
     public abstract val addRuntimeDependency: Property<Boolean>
 
+    /**
+     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to
+     * the Kotlin Gradle Plugin version currently applied to this build. If no [testAgainst] entry
+     * matches, `test` is left alone.
+     */
+    public abstract val defaultTestVersion: Property<KotlinToolingVersion>
+
     public abstract val testAgainst: NamedDomainObjectSet<DevKitKotlinCompilerTestTarget>
     public val developFor: NamedDomainObjectCollection<DevKitKotlinCompilerMainTarget> =
         testAgainst.withType<DevKitKotlinCompilerMainTarget>()
@@ -281,6 +289,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit", project)
         val pluginAnnotations = pluginDevKit.pluginAnnotations
         pluginDevKit.addRuntimeDependency.convention(true)
+        pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
         val generateTestsClass = pluginDevKit.generateTestsClass.convention("GenerateTestsKt")
         val testGenDirectory =
             pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
@@ -421,11 +430,18 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testArtifacts(kotlin("test-js"))
         }
 
-        tasks.named<Test>("test") {
-            // The `test` task doesn't run any tests itself. The common tests are compiled into
-            // and executed by each version-specific test suite (see the `${versionName}Test`
-            // suites below), which this task aggregates via `dependsOn`.
-            enabled = false
+        // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
+        // `defaultTestVersion` first. If a matching version is registered, `test` delegates to
+        // its suite (see the `${versionName}Test` suites below) instead of running anything
+        // itself; every other suite stays independently runnable by name.
+        afterEvaluate {
+            val target = pluginDevKit.testAgainst.find { it.version == pluginDevKit.defaultTestVersion.get() }
+            if (target != null) {
+                tasks.named<Test>("test") {
+                    enabled = false
+                    dependsOn(target.testSuite.get())
+                }
+            }
         }
 
         fun JavaExec.addTestSourceSet(set: SourceSet) {
@@ -642,8 +658,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         )
                     }
                 }
-
-                tasks.named("test") { dependsOn(this@testSuite) }
             }
 
             val signature = configurations.create("${versionName}Signature")

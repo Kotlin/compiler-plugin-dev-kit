@@ -17,6 +17,7 @@ import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 /** A single Kotlin version that the consuming Gradle plugin's functional tests run against. */
@@ -81,6 +82,13 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
      */
     public abstract val addRuntimeDependency: Property<Boolean>
 
+    /**
+     * Which registered [testAgainst] version the generic `functionalTest` task delegates to.
+     * Defaults to the Kotlin Gradle Plugin version currently applied to this build. If no
+     * [testAgainst] entry matches, `functionalTest` is left alone.
+     */
+    public abstract val defaultTestVersion: Property<KotlinToolingVersion>
+
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
     public abstract val testAgainst: NamedDomainObjectSet<DevKitGradlePluginTestTarget>
 
@@ -110,6 +118,7 @@ public class DevKitGradlePlugin : Plugin<Project> {
         val pluginAnnotations = pluginDevKit.pluginAnnotations
         pluginDevKit.generatePluginInfo.convention(true)
         pluginDevKit.addRuntimeDependency.convention(true)
+        pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
 
         // Deferred so consuming build scripts get a chance to call
         // `pluginDevKit.addRuntimeDependency.set(false)` before we decide whether to add it.
@@ -140,12 +149,17 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
 
-        // functionalTest becomes a lifecycle task: it runs nothing itself, only fanning out to
-        // the per-Kotlin-version tasks registered via `pluginDevKit.testAgainst(...)`.
+        // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
+        // `defaultTestVersion` first. If a matching version is registered, `functionalTest`
+        // delegates to its task instead of running anything itself; every other per-version task
+        // stays independently runnable by name.
         afterEvaluate {
-            tasks.named<Test>("functionalTest") {
-                enabled = false
-                dependsOn(pluginDevKit.testAgainst.map { it.testTask })
+            val target = pluginDevKit.testAgainst.find { it.version == pluginDevKit.defaultTestVersion.get() }
+            if (target != null) {
+                tasks.named<Test>("functionalTest") {
+                    enabled = false
+                    dependsOn(target.testTask)
+                }
             }
         }
 

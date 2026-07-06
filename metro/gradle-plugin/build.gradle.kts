@@ -74,19 +74,13 @@ pluginDevKit {
   // the devkit's generated PluginInfo class or its gradle-plugin-runtime dependency.
   generatePluginInfo = false
   addRuntimeDependency = false
+  // Picks which single registered Kotlin version the plain `functionalTest` task delegates to.
+  // Every per-version task (functionalTestk<version>) stays independently runnable regardless.
+  defaultTestVersion =
+    KotlinToolingVersion(
+      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
+    )
   supportedVersions.forEach { testAgainst(it) }
-}
-
-// Picks which single registered Kotlin version's functional test task actually runs; every other
-// version's task is disabled. Defaults to the version-catalog Kotlin so plain `./gradlew check`
-// stays fast.
-val testCompilerVersion =
-  KotlinToolingVersion(
-    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
-  )
-
-pluginDevKit.testAgainst.configureEach {
-  testTask.configure { enabled = version == testCompilerVersion }
 }
 
 gradlePlugin {
