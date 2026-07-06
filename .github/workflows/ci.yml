@@ -87,9 +87,6 @@ jobs:
 
       - name: Check root project
         run: |
-          # Regenerate tests per-run on CI to support exclusions, which are unfortunately code-gen level right now
-          echo "Generating tests..."
-          ./gradlew :compiler-tests:generateTests2 --quiet '-Pmetro.testCompilerVersion=${{ matrix.kotlin-compiler }}' ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
           echo "Running checks..."
           # metro.functionalTestKmpTarget=jvm scopes IC test parameterization to JVM only here. The
           # kmp-functional job (main only) fans the remaining targets out into parallel runners.
@@ -127,9 +124,6 @@ jobs:
         with:
           encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-
-      - name: Generate tests
-        run: ./gradlew :compiler-tests:generateTests2 --quiet ${{ github.ref != 'refs/heads/main' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
 
       - name: Run JS box smoke tests
         if: github.ref != 'refs/heads/main'
