@@ -375,6 +375,7 @@ jobs:
       - samples
     steps:
       - name: Check
+        working-directory: ${{ github.workspace }}
         run: |
           results=$(tr -d '\n' <<< '${{ toJSON(needs.*.result) }}')
           if ! grep -q -v -E '(failure|cancelled)' <<< "$results"; then
