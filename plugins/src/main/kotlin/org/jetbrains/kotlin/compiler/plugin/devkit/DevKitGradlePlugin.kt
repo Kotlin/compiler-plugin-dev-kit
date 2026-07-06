@@ -106,11 +106,10 @@ public class DevKitGradlePlugin : Plugin<Project> {
             apply("org.jetbrains.kotlin.jvm")
             apply("com.github.gmazzo.buildconfig")
             apply("java-gradle-plugin")
-            apply("java-test-fixtures")
             apply("com.autonomousapps.testkit")
         }
 
-        dependencies { "implementation"(kotlin("gradle-plugin-api")) }
+        dependencies { "compileOnly"(kotlin("gradle-plugin-api")) }
 
         val pluginDevKit =
             project.extensions.create<GradlePluginConfigExtension>("pluginDevKit", project)
