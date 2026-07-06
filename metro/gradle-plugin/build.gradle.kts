@@ -42,6 +42,16 @@ listOf("runtimeElements", "apiElements").forEach { configurationName ->
 
 tasks.withType<ValidatePlugins>().configureEach { enableStricterValidation = true }
 
+// Collect all supported Kotlin versions from compiler-compat modules
+val versionAliasesFile =
+  rootProject.isolated.projectDirectory.dir("compiler-compat").file("version-aliases.txt")
+val supportedVersions =
+  versionAliasesFile.asFile
+    .readLines()
+    .filterNot { it.isBlank() || it.startsWith('#') }
+    .map { KotlinToolingVersion(it) }
+    .sorted()
+
 buildConfig {
   packageName("dev.zacsweers.metro.gradle")
   useKotlinOutput {
@@ -50,16 +60,6 @@ buildConfig {
   }
   buildConfigField("String", "VERSION", providers.gradleProperty("VERSION_NAME").map { "\"$it\"" })
   buildConfigField("String", "PLUGIN_ID", libs.versions.pluginId.map { "\"$it\"" })
-
-  // Collect all supported Kotlin versions from compiler-compat modules
-  val versionAliasesFile =
-    rootProject.isolated.projectDirectory.dir("compiler-compat").file("version-aliases.txt")
-  val supportedVersions =
-    versionAliasesFile.asFile
-      .readLines()
-      .filterNot { it.isBlank() || it.startsWith('#') }
-      .map { KotlinToolingVersion(it) }
-      .sorted()
 
   buildConfigField(
     "List<String>",
@@ -194,3 +194,30 @@ tasks.withType<Test>().configureEach {
 tasks
   .named { it == "publishTestKitSupportForJavaPublicationToFunctionalTestRepository" }
   .configureEach { mustRunAfter("signPluginMavenPublication") }
+
+// One functionalTest task per supported Kotlin version
+val functionalTestSourceSet = java.sourceSets.getByName("functionalTest")
+val functionalTestRepo =
+  rootProject.layout.projectDirectory.dir("build/functionalTestRepo").asFile.invariantSeparatorsPath
+
+for (kotlinVersion in supportedVersions) {
+  val versionString = kotlinVersion.toString()
+  tasks.register<Test>("functionalTestKotlin$versionString") {
+    group = "verification"
+    description = "Runs the functional tests against Kotlin $versionString."
+    testClassesDirs = functionalTestSourceSet.output.classesDirs
+    classpath = functionalTestSourceSet.runtimeClasspath
+    dependsOn("deleteOldFuncTests", "installForFunctionalTest")
+    mustRunAfter("test")
+    jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
+    systemProperty("com.autonomousapps.plugin-under-test.repo", functionalTestRepo)
+    systemProperty("dev.zacsweers.metro.gradle.test.kotlin-version", versionString)
+  }
+}
+
+// functionalTest becomes a lifecycle task: it runs nothing itself, only fanning out to the
+// per-Kotlin-version tasks above.
+tasks.named<Test>("functionalTest") {
+  actions.clear()
+  dependsOn(supportedVersions.map { "functionalTestKotlin$it" })
+}
