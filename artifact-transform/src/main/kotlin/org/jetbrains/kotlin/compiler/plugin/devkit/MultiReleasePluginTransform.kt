@@ -3,8 +3,20 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import java.nio.file.FileSystems.newFileSystem
 import java.nio.file.Path
 import java.util.jar.Manifest
-import kotlin.io.path.*
-import org.gradle.api.artifacts.transform.*
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.copyToRecursively
+import kotlin.io.path.div
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import org.gradle.api.artifacts.transform.CacheableTransform
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
@@ -73,9 +85,12 @@ public abstract class MultiReleasePluginTransform :
 
         val versionsDir = inputRoot / PLUGIN_VERSIONS_PATH
         if (!versionsDir.isDirectory()) return null
+        val realVersion =
+            CompilerVersionAliases.map(KotlinToolingVersion(parameters.kotlinVersion.get()))
+                ?: return null
 
         return VersionResolution.resolveVersion(
-            KotlinToolingVersion(parameters.kotlinVersion.get()),
+            realVersion,
             versionsDir.listDirectoryEntries().map { KotlinToolingVersion(it.name) },
         )
     }

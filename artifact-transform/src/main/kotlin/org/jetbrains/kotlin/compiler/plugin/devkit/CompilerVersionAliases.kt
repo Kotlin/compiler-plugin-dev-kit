@@ -4,8 +4,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-internal val BUILT_IN_COMPILER_VERSION_ALIASES: Map<String, String> = mapOf()
-
 internal object CompilerVersionAliases {
     /**
      * Sentinel value in alias mappings indicating a version that only works in CLI (Gradle) builds,
