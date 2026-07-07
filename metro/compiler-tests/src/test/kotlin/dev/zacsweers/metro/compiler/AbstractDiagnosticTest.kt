@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.noIrCompilationErrorsHandlerCtor
 import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.setupJvmPipelineSteps
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.suppressionCheckerCtor
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.tagsGeneratorCheckerAfterAnalysis
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.tagsGeneratorCheckerHandler
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.usePhasedPipelineFailureSuppressorCompat
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitTest
+import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
+import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
+import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
 import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
@@ -25,6 +24,7 @@ import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.RUN_PIPELINE_TILL
 import org.jetbrains.kotlin.test.directives.configureFirParser
+import org.jetbrains.kotlin.test.frontend.fir.TagsGeneratorChecker
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
@@ -35,18 +35,19 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.NonSourceErrorMessagesHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.PsiLightTreeMetaInfoProcessor
 import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTest
+import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.TestPhase
+import org.jetbrains.kotlin.utils.bind
 
-open class AbstractDiagnosticTest :
-  DelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
-  override fun configure(builder: TestConfigurationBuilder) {
+open class AbstractDiagnosticTest(vararg config: TestConfigurationBuilder.() -> Unit) :
+  DevKitTest(
+    TargetBackend.JVM_IR,
     if (NEEDS_LEGACY_GOLDEN_NAMING) {
-      configureWithMetroDiagnosticHandlers(builder)
+      TestConfigurationBuilder::configureWithMetroDiagnosticHandlers
     } else {
-      super.configure(builder)
-    }
-
-    with(builder) {
+      AbstractPhasedJvmDiagnosticLightTreeTest()::configure
+    },
+    {
       configurePlugin()
 
       useMetaTestConfigurators(::MetroTestConfigurator)
@@ -61,61 +62,55 @@ open class AbstractDiagnosticTest :
         // Unless overriden, assume the test will fail within the frontend.
         RUN_PIPELINE_TILL.with(TestPhase.FRONTEND)
       }
-    }
+    },
+    *config,
+  )
+
+/**
+ * Inlined copy of `AbstractFirPhasedDiagnosticTest.configure` (Kotlin 2.3.21) with the FIR and IR
+ * diagnostics handlers swapped for Metro variants that point the assertion at the post-KT-85292
+ * file naming (`<name>.diag.txt`, `<name>.ir.diag.txt`). Other handlers from
+ * `setupHandlersForDiagnosticTest` are inlined verbatim.
+ *
+ * Active only while [NEEDS_LEGACY_GOLDEN_NAMING] is true (Kotlin < 2.4.20). Once Metro's floor
+ * moves to 2.4.20+, delete this method, the two `Metro*DiagnosticsHandler` files, and the version
+ * gate above; `super.configure(builder)` then suffices.
+ */
+private fun TestConfigurationBuilder.configureWithMetroDiagnosticHandlers() {
+  defaultDirectives {
+    LATEST_PHASE_IN_PIPELINE with TestPhase.BACKEND
+    LANGUAGE + "+EnableDfaWarningsInK2"
   }
 
-  /**
-   * Inlined copy of `AbstractFirPhasedDiagnosticTest.configure` (Kotlin 2.3.21) with the FIR and IR
-   * diagnostics handlers swapped for Metro variants that point the assertion at the post-KT-85292
-   * file naming (`<name>.diag.txt`, `<name>.ir.diag.txt`). Other handlers from
-   * `setupHandlersForDiagnosticTest` are inlined verbatim.
-   *
-   * Active only while [NEEDS_LEGACY_GOLDEN_NAMING] is true (Kotlin < 2.4.20). Once Metro's floor
-   * moves to 2.4.20+, delete this method, the two `Metro*DiagnosticsHandler` files, and the version
-   * gate above; `super.configure(builder)` then suffices.
-   */
-  private fun configureWithMetroDiagnosticHandlers(builder: TestConfigurationBuilder) =
-    with(builder) {
-      defaultDirectives {
-        LATEST_PHASE_IN_PIPELINE with TestPhase.BACKEND
-        LANGUAGE + "+EnableDfaWarningsInK2"
-      }
+  setupJvmPipelineSteps(FirParser.LightTree)
+  configureFirParser(FirParser.LightTree)
 
-      setupJvmPipelineSteps(FirParser.LightTree)
-      configureFirParser(FirParser.LightTree)
+  configureFirHandlersStep {
+    useHandlers(
+      ::MetroFirDiagnosticsHandler,
+      ::FirDumpHandler,
+      ::FirCfgDumpHandler,
+      ::FirVFirDumpHandler,
+      ::FirInferenceLogsHandler,
+      ::FirCfgConsistencyHandler,
+      ::FirResolvedTypesVerifier,
+      ::FirScopeDumpHandler,
+      ::NoFirCompilationErrorsHandler,
+    )
+    useHandlers(::TagsGeneratorChecker)
+  }
 
-      configureFirHandlersStep {
-        useHandlers(
-          ::MetroFirDiagnosticsHandler,
-          ::FirDumpHandler,
-          ::FirCfgDumpHandler,
-          ::FirVFirDumpHandler,
-          ::FirInferenceLogsHandler,
-          ::FirCfgConsistencyHandler,
-          ::FirResolvedTypesVerifier,
-          ::FirScopeDumpHandler,
-          ::NoFirCompilationErrorsHandler,
-        )
-        tagsGeneratorCheckerHandler?.let { useHandlers(it) }
-      }
+  configureIrHandlersStep {
+    useHandlers(::MetroIrDiagnosticsHandler, ::NoIrCompilationErrorsHandler)
+  }
 
-      configureIrHandlersStep {
-        useHandlers(::MetroIrDiagnosticsHandler, noIrCompilationErrorsHandlerCtor)
-      }
+  configureJvmArtifactsHandlersStep {
+    commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
+  }
 
-      configureJvmArtifactsHandlersStep {
-        commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler = false)
-      }
-
-      useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
-      val tagsAfter = tagsGeneratorCheckerAfterAnalysis
-      if (tagsAfter != null) {
-        useAfterAnalysisCheckers(::NonSourceErrorMessagesHandler, tagsAfter)
-      } else {
-        useAfterAnalysisCheckers(::NonSourceErrorMessagesHandler)
-      }
-      usePhasedPipelineFailureSuppressorCompat()
-      enableMetaInfoHandler()
-      useAdditionalService<SuppressionChecker>(suppressionCheckerCtor)
-    }
+  useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
+  useAfterAnalysisCheckers(::NonSourceErrorMessagesHandler)
+  useFailureSuppressorsCompat(::PhasedPipelineChecker)
+  enableMetaInfoHandler()
+  useAdditionalService<SuppressionChecker>(::SuppressionChecker.bind(null, null))
 }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitTest
 import org.jetbrains.kotlin.config.JvmTarget
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
@@ -30,11 +30,9 @@ import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTes
  * test data.
  */
 open class AbstractReportsTest :
-  DelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
-
-  override fun configure(builder: TestConfigurationBuilder) {
-    super.configure(builder)
-    with(builder) {
+  DevKitTest(
+    AbstractPhasedJvmDiagnosticLightTreeTest(),
+    {
       configurePlugin()
 
       useMetaTestConfigurators(::MetroTestConfigurator)
@@ -46,6 +44,5 @@ open class AbstractReportsTest :
         +IGNORE_DEXING
         +DISABLE_GENERATED_FIR_TAGS
       }
-    }
-  }
-}
+    },
+  )

@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.irTextDumpHandlerCtor
 import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.setupJvmPipelineSteps
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.useIrDumpFailureSuppressorsCompat
 import dev.zacsweers.metro.compiler.compat.CompatContext
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitTest
+import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
 import org.jetbrains.kotlin.test.backend.handlers.IrSourceRangesDumpHandler
+import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler
 import org.jetbrains.kotlin.test.backend.handlers.IrTreeVerifierHandler
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
 import org.jetbrains.kotlin.test.configuration.additionalK2ConfigurationForIrTextTest
 import org.jetbrains.kotlin.test.configuration.commonHandlersForCodegenTest
@@ -25,7 +26,9 @@ import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirective
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.JVM_TARGET
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.model.SimpleDirective
+import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.TestPhase
+import org.jetbrains.kotlin.utils.bind
 
 /**
  * IR dump test that uses [MetroIrPrettyKotlinDumpHandler] (with `betterDumpKotlinLike`) instead of
@@ -34,9 +37,10 @@ import org.jetbrains.kotlin.test.services.TestPhase
  * We don't extend `AbstractFirLightTreeJvmIrTextTest` because its parent registers the built-in
  * handler which can't be removed and would delete our golden files.
  */
-open class AbstractIrDumpTest : TestBaseWithTargetBackend(TargetBackend.JVM_IR) {
-  override fun configure(builder: TestConfigurationBuilder) =
-    with(builder) {
+open class AbstractIrDumpTest :
+  DevKitTest(
+    TargetBackend.JVM_IR,
+    {
       setupJvmPipelineSteps(FirParser.LightTree)
       commonHandlersForCodegenTest()
       additionalK2ConfigurationForIrTextTest(FirParser.LightTree)
@@ -45,7 +49,7 @@ open class AbstractIrDumpTest : TestBaseWithTargetBackend(TargetBackend.JVM_IR) 
       val compatContext = CompatContext.create()
       configureIrHandlersStep {
         useHandlers(
-          ::irTextDumpHandlerCtor,
+          ::IrTextDumpHandler,
           ::IrTreeVerifierHandler,
           { testServices, artifactKind ->
             MetroIrPrettyKotlinDumpHandler(testServices, artifactKind, compatContext)
@@ -54,7 +58,10 @@ open class AbstractIrDumpTest : TestBaseWithTargetBackend(TargetBackend.JVM_IR) 
         )
       }
 
-      useIrDumpFailureSuppressorsCompat()
+      useFailureSuppressorsCompat(
+        ::BlackBoxCodegenSuppressor,
+        ::PhasedPipelineChecker.bind(TestPhase.BACKEND),
+      )
       enableMetaInfoHandler()
 
       configurePlugin(compatContext)
@@ -79,8 +86,8 @@ open class AbstractIrDumpTest : TestBaseWithTargetBackend(TargetBackend.JVM_IR) 
       }
 
       useMetaTestConfigurators(::MetroTestConfigurator)
-    }
-}
+    },
+  )
 
 private val SKIP_NEW_KOTLIN_REFLECT_COMPATIBILITY_CHECK_DIRECTIVE: SimpleDirective? by lazy {
   CodegenTestDirectives::class

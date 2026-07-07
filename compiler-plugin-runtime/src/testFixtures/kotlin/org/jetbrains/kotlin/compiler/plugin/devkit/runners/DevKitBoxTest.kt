@@ -50,11 +50,11 @@ open class DevKitJvmBoxTest(
         *config,
     )
 
-open class DevKitJsBoxTest(
+open class DevKitJsBoxTestDumpless(
     vararg config: TestConfigurationBuilder.() -> Unit,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     val parser: FirParser = FirParser.LightTree,
-) : DevKitTest(targetBackend = targetBackend) {
+) : DevKitTest(targetBackend) {
     init {
         configure {
             // From AbstractJsBlackBoxCodegenTestBase
@@ -80,10 +80,6 @@ open class DevKitJsBoxTest(
 
             configureJsArtifactsHandlersStep {
                 useHandlers(::JsIrRecompiledArtifactsIdentityHandler)
-            }
-            defaultDirectives {
-                versionDumpClassifier()
-                boxTestDefaults()
             }
         }
         configure(*config)
@@ -113,6 +109,23 @@ open class DevKitJsBoxTest(
         }
     }
 }
+
+open class DevKitJsBoxTest(
+    vararg config: TestConfigurationBuilder.() -> Unit,
+    targetBackend: TargetBackend = TargetBackend.JS_IR,
+    parser: FirParser = FirParser.LightTree,
+) :
+    DevKitJsBoxTestDumpless(
+        {
+            defaultDirectives {
+                versionDumpClassifier()
+                boxTestDefaults()
+            }
+        },
+        *config,
+        targetBackend = targetBackend,
+        parser = parser,
+    )
 
 private fun RegisteredDirectivesBuilder.boxTestDefaults() {
     +CodegenTestDirectives.DUMP_IR

@@ -25,6 +25,11 @@ abstract class DevKitTest(
             },
     )
 
+    constructor(
+        targetBackend: TargetBackend,
+        vararg config: TestConfigurationBuilder.() -> Unit,
+    ) : this(*config, targetBackend = targetBackend)
+
     private val config: MutableList<TestConfigurationBuilder.() -> Unit> = config.toMutableList()
 
     protected fun configure(configuration: TestConfigurationBuilder.() -> Unit) {

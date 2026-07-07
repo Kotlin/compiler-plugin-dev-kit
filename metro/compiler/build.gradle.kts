@@ -240,7 +240,6 @@ pluginDevKit {
     )
 
   listOf(
-      "2.3.0",
       "2.3.20",
       "2.4.0-dev-2124",
       "2.4.0",
@@ -249,7 +248,7 @@ pluginDevKit {
       "2.4.20-Beta1",
     )
     .map(::KotlinToolingVersion)
-    .forEach { developFor(it) }
+    .forEach { testAgainst(it) }
 
   // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
   // metro.testCompilerVersion always has a matching task to select.

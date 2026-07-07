@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.afterAnalysisChecker
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestCompat.Companion.afterAnalysisChecker
 import java.io.File
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue

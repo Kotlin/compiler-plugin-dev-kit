@@ -44,14 +44,7 @@ pluginDevKit {
       )
     }
   }
-  listOf(
-      "2.3.0",
-      "2.4.0",
-    )
-    .map(::KotlinToolingVersion)
-    .forEach {
-      developForWithFixtures(it) { setupFixtures() }
-    }
+  developForWithFixtures(KotlinToolingVersion("2.4.0")) { setupFixtures() }
   val k2320Target = developForWithFixtures(KotlinToolingVersion("2.3.20")) { setupFixtures() }
 
   // 2.4.0-dev-2124 predates the TestConfigurationBuilder rename (like 2.3.0/2.3.20/2.4.0), so
@@ -167,12 +160,6 @@ val wasmKlibClasspath =
   }
 
 dependencies {
-  configurations.testFixturesApi.configure {
-    exclude(
-      group = "org.jetbrains.kotlin.compiler.plugin.devkit",
-      module = "compiler-plugin-runtime",
-    )
-  }
   testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin")
 
   testFixturesApi(project(":compiler"))

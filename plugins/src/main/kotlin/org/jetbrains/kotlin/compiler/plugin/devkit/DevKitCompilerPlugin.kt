@@ -10,6 +10,7 @@ import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.attributes.LibraryElements
@@ -28,6 +29,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
@@ -498,6 +500,32 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 action()
             }
 
+        fun SourceSet.withCompilerVersionAttribute(version: KotlinToolingVersion) {
+            configurations.named(compileClasspathConfigurationName) {
+                // Force resolution of the packed testFixtures jar (not the raw classes
+                // directory Gradle otherwise substitutes on compile classpaths), since
+                // MultiReleasePluginTransform only understands jar inputs: it looks for
+                // the per-version overlay under a jar's META-INF, which a plain classes
+                // directory doesn't have.
+                attributes.attribute(
+                    LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                    objects.named(LibraryElements.JAR),
+                )
+                // force it to use version-specific jars when compiling tests
+                attributes.attribute(
+                    KotlinCompilerVersion.attribute,
+                    KotlinCompilerVersion(version),
+                )
+            }
+            configurations.named(runtimeClasspathConfigurationName) {
+                // force it to use version-specific jars when running tests
+                attributes.attribute(
+                    KotlinCompilerVersion.attribute,
+                    KotlinCompilerVersion(version),
+                )
+            }
+        }
+
         fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) {
             // TODO which of these are actually needed?
             configurations.named(implementationConfigurationName) {
@@ -512,6 +540,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             configurations.named(runtimeClasspathConfigurationName) {
                 resolutionStrategy.forceKotlinVersion(version)
             }
+            withCompilerVersionAttribute(version)
         }
 
         fun SourceSet.extendsFrom(
@@ -526,6 +555,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 )
             }
         }
+
+        sourceSets.named("main") { withCompilerVersionAttribute(kotlinToolingVersion) }
+        sourceSets.named("test") { withCompilerVersionAttribute(kotlinToolingVersion) }
+        sourceSets.named("testFixtures") { withCompilerVersionAttribute(kotlinToolingVersion) }
 
         val versionMarker =
             // Registers task to generate empty version marker file
@@ -592,7 +625,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 kotlin.srcDir(sourceSets.named("testFixtures").map { it.kotlin.sourceDirectories })
                 java.srcDir(sourceSets.named("testFixtures").map { it.java.sourceDirectories })
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
-                resources.srcDir(sourceSets.named("testFixtures").map { it.resources.sourceDirectories })
+                resources.srcDir(
+                    sourceSets.named("testFixtures").map { it.resources.sourceDirectories }
+                )
                 forceKotlinVersion(version)
                 dependencies {
                     implementationConfigurationName(project())
@@ -616,7 +651,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     // KGP automatically associates "test" with "testFixtures" (in addition to
                     // "test" with "main"), granting access to its internal API.
                     kotlinExtension.target.compilations.named(name) {
-                        associateWith(kotlinExtension.target.compilations.getByName(testFixtures.get().name))
+                        associateWith(
+                            kotlinExtension.target.compilations.getByName(testFixtures.get().name)
+                        )
                     }
                 }
             }
@@ -671,7 +708,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     kotlin.srcDir(sourceSets.named("test").map { it.kotlin.sourceDirectories })
                     java.srcDir(sourceSets.named("test").map { it.java.sourceDirectories })
                     resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
-                    resources.srcDir(sourceSets.named("test").map { it.resources.sourceDirectories })
+                    resources.srcDir(
+                        sourceSets.named("test").map { it.resources.sourceDirectories }
+                    )
                     addTestGenDir()
                     forceKotlinVersion(version)
                     // KGP automatically associates the sourceSet literally named "test" with
@@ -685,29 +724,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     extendsFrom(sourceSets.named("test")) { it.implementationConfigurationName }
                     extendsFrom(sourceSets.named("test")) { it.compileOnlyConfigurationName }
 
-                    configurations.named(compileClasspathConfigurationName) {
-                        // Force resolution of the packed testFixtures jar (not the raw classes
-                        // directory Gradle otherwise substitutes on compile classpaths), since
-                        // MultiReleasePluginTransform only understands jar inputs: it looks for
-                        // the per-version overlay under a jar's META-INF, which a plain classes
-                        // directory doesn't have.
-                        attributes.attribute(
-                            LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
-                            objects.named(LibraryElements.JAR),
-                        )
-                        // force it to use version-specific jars when compiling tests
-                        attributes.attribute(
-                            KotlinCompilerVersion.attribute,
-                            KotlinCompilerVersion(version),
-                        )
-                    }
-                    configurations.named(runtimeClasspathConfigurationName) {
-                        // force it to use version-specific jars when running tests
-                        attributes.attribute(
-                            KotlinCompilerVersion.attribute,
-                            KotlinCompilerVersion(version),
-                        )
-                    }
+                    withCompilerVersionAttribute(version)
                 }
 
                 targets.all {
@@ -760,8 +777,20 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         afterEvaluate {
             if (pluginDevKit.addRuntimeDependency.get()) {
                 dependencies {
-                    "implementation"("$DEV_KIT_GROUP:compiler-plugin-runtime")
-                    "testFixturesApi"(testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime"))
+                    "implementation"("$DEV_KIT_GROUP:compiler-plugin-runtime") {
+                        exclude(
+                            group = "org.jetbrains.kotlin",
+                            module = "kotlin-compiler",
+                        )
+                    }
+                    "testFixturesApi"(
+                        testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime") as ModuleDependency
+                    ) {
+                        exclude(
+                            group = "org.jetbrains.kotlin",
+                            module = "kotlin-compiler-internal-test-framework",
+                        )
+                    }
                 }
             }
         }

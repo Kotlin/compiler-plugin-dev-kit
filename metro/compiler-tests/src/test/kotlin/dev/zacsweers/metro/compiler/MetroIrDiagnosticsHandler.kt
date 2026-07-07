@@ -3,9 +3,7 @@
 package dev.zacsweers.metro.compiler
 
 import com.intellij.openapi.util.TextRange
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.getContentOfSourceFileCompat
 import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.irDiagnosticsForFileCompat
-import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.severityToStringCompat
 import org.jetbrains.kotlin.cli.common.fir.SequentialPositionFinder
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticWithSource
@@ -24,6 +22,7 @@ import org.jetbrains.kotlin.test.services.assertions
 import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.test.services.sourceFileProvider
 import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
+import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 
 /**
  * Drop-in replacement for [IrDiagnosticsHandler] that asserts the full-text IR diagnostics dump
@@ -107,7 +106,7 @@ class MetroIrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(
                 is KtDiagnosticWithSource -> it.textRanges
                 is KtDiagnosticWithoutSource -> listOf(it.firstRange)
               },
-            severity = severityToStringCompat(it.severity),
+            severity = it.severity.toCompilerMessageSeverity().toString().toLowerCaseAsciiOnly(),
             message = it.renderMessage().let { m -> if (isRichMode) AnsiMarkup.escape(m) else m },
           )
         }
@@ -116,7 +115,7 @@ class MetroIrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(
         )
 
     return testServices.sourceFileProvider
-      .getContentOfSourceFileCompat(file)
+      .getContentOfSourceFile(file)
       .byteInputStream()
       .reader()
       .use { reader ->
