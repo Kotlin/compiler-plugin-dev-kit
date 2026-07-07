@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 
 open class AbstractJsBoxTest :
-  MetroDelegatingTestBase(MetroDiagnosticsCompat.createKotlinJsBoxTestBase()) {
+  DelegatingTestBase(MetroDiagnosticsCompat.createKotlinJsBoxTestBase()) {
   override fun configure(builder: TestConfigurationBuilder) {
     super.configure(builder)
 

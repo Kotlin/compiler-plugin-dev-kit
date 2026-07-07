@@ -5,20 +5,14 @@ import org.jetbrains.kotlin.test.TestInfrastructureInternals
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
-import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider as KTStandardLibrariesPathProvider
+import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
+import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 
 abstract class TestBase : AbstractKotlinCompilerTest() {
+  override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider =
+    EnvironmentBasedStandardLibrariesPathProvider
+
   open val targetBackend: TargetBackend? = null
-
-  final override fun createKotlinStandardLibrariesPathProvider(): KTStandardLibrariesPathProvider =
-    MetroDiagnosticsCompat.createKotlinStandardLibrariesPathProvider(
-      createStandardLibrariesPathProvider()
-    )
-
-  open fun createStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider =
-    MetroDiagnosticsCompat.createStandardLibrariesPathProvider(
-      super.createKotlinStandardLibrariesPathProvider()
-    )
 
   @TestInfrastructureInternals
   override fun configureInternal(builder: TestConfigurationBuilder) {
@@ -37,9 +31,6 @@ abstract class TestBase : AbstractKotlinCompilerTest() {
       }
     }
   }
-
-  // Default empty implementation
-  override fun configure(builder: TestConfigurationBuilder) {}
 }
 
 abstract class DelegatingTestBase(private val original: AbstractKotlinCompilerTest) : TestBase() {
@@ -49,9 +40,4 @@ abstract class DelegatingTestBase(private val original: AbstractKotlinCompilerTe
   override fun configure(builder: TestConfigurationBuilder) = original.configure(builder)
 }
 
-abstract class TestBaseWithTargetBackend(targetBackend: TargetBackend) :
-  DelegatingTestBase(
-    object : AbstractKotlinCompilerWithTargetBackendTest(targetBackend) {
-      override fun configure(builder: TestConfigurationBuilder) {}
-    }
-  )
+abstract class TestBaseWithTargetBackend(override val targetBackend: TargetBackend) : TestBase()

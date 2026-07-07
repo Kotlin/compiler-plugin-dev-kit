@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTes
  * test data.
  */
 open class AbstractReportsTest :
-  MetroDelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
+  DelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
 
   override fun configure(builder: TestConfigurationBuilder) {
     super.configure(builder)

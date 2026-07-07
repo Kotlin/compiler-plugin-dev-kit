@@ -29,7 +29,7 @@ private val NoIrCompilationErrorsHandler =
     .kotlin as KClass<BackendInputHandler<IrBackendInput>>?
     ?: error("Could not find NoIrCompilationErrorsHandler for the current kotlin version")
 
-open class AbstractBoxTest : MetroDelegatingTestBase(AbstractFirLightTreeBlackBoxCodegenTest()) {
+open class AbstractBoxTest : DelegatingTestBase(AbstractFirLightTreeBlackBoxCodegenTest()) {
   override fun configure(builder: TestConfigurationBuilder) {
     super.configure(builder)
 

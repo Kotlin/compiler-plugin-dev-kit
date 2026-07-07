@@ -130,16 +130,6 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
         parser = FirParser.LightTree,
       ) {}
 
-  override fun createStandardLibrariesPathProvider(
-    from: KTStandardLibrariesPathProvider
-  ): KotlinStandardLibrariesPathProvider =
-    object : KTStandardLibrariesPathProvider by from, KotlinStandardLibrariesPathProvider {}
-
-  override fun createKotlinStandardLibrariesPathProvider(
-    from: KotlinStandardLibrariesPathProvider
-  ): KTStandardLibrariesPathProvider =
-    object : KTStandardLibrariesPathProvider, KotlinStandardLibrariesPathProvider by from {}
-
   override fun TestConfigurationBuilder.commonConfigurationForJsTest() =
     realCommonConfigurationForJsTest()
 

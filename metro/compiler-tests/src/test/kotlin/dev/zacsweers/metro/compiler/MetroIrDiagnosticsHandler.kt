@@ -3,6 +3,9 @@
 package dev.zacsweers.metro.compiler
 
 import com.intellij.openapi.util.TextRange
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.getContentOfSourceFileCompat
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.irDiagnosticsForFileCompat
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.severityToStringCompat
 import org.jetbrains.kotlin.cli.common.fir.SequentialPositionFinder
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticWithSource
@@ -32,8 +35,7 @@ import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
  *
  * Wired in by [AbstractDiagnosticTest] only when [NEEDS_LEGACY_GOLDEN_NAMING] is true.
  */
-class MetroIrDiagnosticsHandler(testServices: TestServices) :
-  AbstractIrHandler(testServices), MetroDiagnosticsCompat by MetroDiagnosticsCompat {
+class MetroIrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(testServices) {
   private val delegate = IrDiagnosticsHandler(testServices)
   private val dumper = MultiModuleInfoDumper(moduleHeaderTemplate = "// -- Module: <%s> --")
 

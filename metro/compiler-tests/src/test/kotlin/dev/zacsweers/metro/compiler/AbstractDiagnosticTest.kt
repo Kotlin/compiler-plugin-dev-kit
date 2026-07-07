@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.noIrCompilationErrorsHandlerCtor
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.setupJvmPipelineSteps
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.suppressionCheckerCtor
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.tagsGeneratorCheckerAfterAnalysis
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.tagsGeneratorCheckerHandler
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.usePhasedPipelineFailureSuppressorCompat
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
@@ -32,7 +38,7 @@ import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTes
 import org.jetbrains.kotlin.test.services.TestPhase
 
 open class AbstractDiagnosticTest :
-  MetroDelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
+  DelegatingTestBase(AbstractPhasedJvmDiagnosticLightTreeTest()) {
   override fun configure(builder: TestConfigurationBuilder) {
     if (NEEDS_LEGACY_GOLDEN_NAMING) {
       configureWithMetroDiagnosticHandlers(builder)

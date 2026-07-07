@@ -133,21 +133,6 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
         parser = FirParser.LightTree,
       ) {}
 
-  override fun createStandardLibrariesPathProvider(
-    from: KTStandardLibrariesPathProvider
-  ): KotlinStandardLibrariesPathProvider =
-    object : KTStandardLibrariesPathProvider by from, KotlinStandardLibrariesPathProvider {
-      override fun fullWasmStdlib(target: WasmTarget): File = error("Not available in this version")
-
-      override fun kotlinTestWasmKLib(target: WasmTarget): File =
-        error("Not available in this version")
-    }
-
-  override fun createKotlinStandardLibrariesPathProvider(
-    from: KotlinStandardLibrariesPathProvider
-  ): KTStandardLibrariesPathProvider =
-    object : KTStandardLibrariesPathProvider, KotlinStandardLibrariesPathProvider by from {}
-
   override fun TestConfigurationBuilder.commonConfigurationForJsTest() =
     realCommonConfigurationForJsTest()
 

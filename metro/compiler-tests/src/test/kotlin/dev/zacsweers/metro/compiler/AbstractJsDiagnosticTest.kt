@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.firIdenticalCompat
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.suppressionCheckerCtor
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.usePhasedPipelineFailureSuppressorCompat
+import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
@@ -22,7 +26,7 @@ import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.TestPhase
 
-open class AbstractJsDiagnosticTest : MetroTestBaseWithTargetBackend(TargetBackend.JS_IR) {
+open class AbstractJsDiagnosticTest : TestBaseWithTargetBackend(TargetBackend.JS_IR) {
   override fun configure(builder: TestConfigurationBuilder) =
     with(builder) {
       commonConfigurationForJsTest()

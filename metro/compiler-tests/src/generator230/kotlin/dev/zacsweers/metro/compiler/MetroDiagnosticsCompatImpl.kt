@@ -103,50 +103,6 @@ class MetroDiagnosticsCompatImpl : MetroDiagnosticsCompat {
       parser = FirParser.LightTree,
     )
 
-  override fun createStandardLibrariesPathProvider(
-    from: KTStandardLibrariesPathProvider
-  ): KotlinStandardLibrariesPathProvider =
-    object : KotlinStandardLibrariesPathProvider {
-      override fun runtimeJarForTests(): File = from.runtimeJarForTests()
-
-      override fun runtimeJarForTestsWithJdk8(): File = from.runtimeJarForTestsWithJdk8()
-
-      override fun minimalRuntimeJarForTests(): File = from.minimalRuntimeJarForTests()
-
-      override fun reflectJarForTests(): File = from.reflectJarForTests()
-
-      override fun kotlinTestJarForTests(): File = from.kotlinTestJarForTests()
-
-      override fun scriptRuntimeJarForTests(): File = from.scriptRuntimeJarForTests()
-
-      override fun jvmAnnotationsForTests(): File = from.jvmAnnotationsForTests()
-
-      override fun getAnnotationsJar(): File = from.getAnnotationsJar()
-
-      override fun fullJsStdlib(): File = from.fullJsStdlib()
-
-      override fun defaultJsStdlib(): File = from.defaultJsStdlib()
-
-      override fun kotlinTestJsKLib(): File = from.kotlinTestJsKLib()
-
-      override fun commonStdlibForTests(): File = from.commonStdlibForTests()
-
-      override fun scriptingPluginFilesForTests(): Collection<File> =
-        from.scriptingPluginFilesForTests()
-
-      override fun webStdlibForTests(): File = error("Unavailable in this version")
-
-      override fun fullWasmStdlib(target: WasmTarget): File = error("Unavailable in this version")
-
-      override fun kotlinTestWasmKLib(target: WasmTarget): File =
-        error("Unavailable in this version")
-    }
-
-  override fun createKotlinStandardLibrariesPathProvider(
-    from: KotlinStandardLibrariesPathProvider
-  ): KTStandardLibrariesPathProvider =
-    object : KTStandardLibrariesPathProvider(), KotlinStandardLibrariesPathProvider by from {}
-
   override fun TestConfigurationBuilder.commonConfigurationForJsTest() =
     commonConfigurationForJsTest(
       targetFrontend = FrontendKinds.FIR,

@@ -351,55 +351,28 @@ tasks.withType<Test> {
   }
 
   val testRuntimeClasspath = configurations.testRuntimeClasspath
-  setLibraryProperty("kotlin.minimal.stdlib.path", "kotlin-stdlib", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin.full.stdlib.path", "kotlin-stdlib-jdk8", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin.reflect.jar.path", "kotlin-reflect", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin.test.jar.path", "kotlin-test", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-stdlib", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-stdlib-jdk8", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-stdlib-jdk8", "jar", testRuntimeClasspath, "kotlin.full.stdlib.path")
+  setLibraryProperty("kotlin-reflect", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-reflect", "jar", testRuntimeClasspath, "kotlin.reflect.jar.path")
+  setLibraryProperty("kotlin-test", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-script-runtime", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-annotations-jvm", "jar", testRuntimeClasspath)
   setLibraryProperty(
-    "kotlin.script.runtime.path",
-    "kotlin-script-runtime",
-    "jar",
-    testRuntimeClasspath,
-  )
-  setLibraryProperty(
-    "kotlin.annotations.path",
     "kotlin-annotations-jvm",
     "jar",
     testRuntimeClasspath,
+    "kotlin.mockJDK.annotations.path",
   )
-  setLibraryProperty("kotlin.js.stdlib.path", "kotlin-stdlib-js", "klib", jsKlibClasspath)
-  setLibraryProperty("kotlin.js.test.path", "kotlin-test-js", "klib", jsKlibClasspath)
-  setLibraryProperty(
-    "kotlin.wasm.stdlib.wasm-js.path",
-    "kotlin-stdlib-wasm-js",
-    "klib",
-    wasmKlibClasspath,
-  )
-  setLibraryProperty(
-    "kotlin.wasm.stdlib.wasm-wasi.path",
-    "kotlin-stdlib-wasm-wasi",
-    "klib",
-    wasmKlibClasspath,
-  )
-  setLibraryProperty(
-    "kotlin.wasm.test.wasm-js.path",
-    "kotlin-test-wasm-js",
-    "klib",
-    wasmKlibClasspath,
-  )
-  setLibraryProperty(
-    "kotlin.wasm.test.wasm-wasi.path",
-    "kotlin-test-wasm-wasi",
-    "klib",
-    wasmKlibClasspath,
-  )
-  setLibraryProperty(
-    "kotlin.common.stdlib.path",
-    "kotlin-common-stdlib",
-    "jar",
-    testRuntimeClasspath,
-  )
-  setLibraryProperty("kotlin.web.stdlib.path", "kotlin-stdlib-web", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-stdlib-js", "klib", jsKlibClasspath)
+  setLibraryProperty("kotlin-test-js", "klib", jsKlibClasspath)
+  setLibraryProperty("kotlin-stdlib-wasm-js", "klib", wasmKlibClasspath)
+  setLibraryProperty("kotlin-stdlib-wasm-wasi", "klib", wasmKlibClasspath)
+  setLibraryProperty("kotlin-test-wasm-js", "klib", wasmKlibClasspath)
+  setLibraryProperty("kotlin-test-wasm-wasi", "klib", wasmKlibClasspath)
+  setLibraryProperty("kotlin-common-stdlib", "jar", testRuntimeClasspath)
+  setLibraryProperty("kotlin-stdlib-web", "jar", testRuntimeClasspath)
 
   val d8EnvSpec = project.the<D8EnvSpec>()
   dependsOn(d8EnvSpec.run { project.d8SetupTaskProvider })
@@ -440,10 +413,10 @@ tasks.withType<Test> {
 }
 
 fun Test.setLibraryProperty(
-  propName: String,
   jarName: String,
   extension: String,
   configuration: Configuration,
+  propName: String = "org.jetbrains.kotlin.test.$jarName",
 ) {
   val regex = "$jarName-\\d.*$extension".toRegex()
   val path = configuration.files.find { regex.matches(it.name) }?.absolutePath ?: return
@@ -453,10 +426,10 @@ fun Test.setLibraryProperty(
 // Lazy overload: resolves `configuration` only when this task forks its test JVM, via
 // jvmArgumentProviders.
 fun Test.setLibraryProperty(
-  propName: String,
   jarName: String,
   extension: String,
   configuration: Provider<out FileCollection>,
+  propName: String = "org.jetbrains.kotlin.test.$jarName",
 ) {
   jvmArgumentProviders.add(LibraryPathArgumentProvider(propName, jarName, extension, configuration))
 }

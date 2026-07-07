@@ -3,6 +3,9 @@
 package dev.zacsweers.metro.compiler
 
 import com.intellij.openapi.util.TextRange
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.getContentOfSourceFileCompat
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.mainFirFilesCompat
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.severityToStringCompat
 import org.jetbrains.kotlin.cli.common.fir.SequentialPositionFinder
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticWithSource
@@ -38,8 +41,7 @@ import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
  * Wired in by [AbstractDiagnosticTest] only when [NEEDS_LEGACY_GOLDEN_NAMING] is true. Once Metro's
  * floor is 2.4.20+, this class can be deleted.
  */
-class MetroFirDiagnosticsHandler(testServices: TestServices) :
-  FirAnalysisHandler(testServices), MetroDiagnosticsCompat by MetroDiagnosticsCompat {
+class MetroFirDiagnosticsHandler(testServices: TestServices) : FirAnalysisHandler(testServices) {
   private val delegate = FirDiagnosticsHandler(testServices)
   private val dumper = MultiModuleInfoDumper(moduleHeaderTemplate = "// -- Module: <%s> --")
 

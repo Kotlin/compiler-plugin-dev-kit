@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.irTextDumpHandlerCtor
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.setupJvmPipelineSteps
+import dev.zacsweers.metro.compiler.MetroDiagnosticsCompat.Companion.useIrDumpFailureSuppressorsCompat
 import dev.zacsweers.metro.compiler.compat.CompatContext
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.test.FirParser
@@ -31,7 +34,7 @@ import org.jetbrains.kotlin.test.services.TestPhase
  * We don't extend `AbstractFirLightTreeJvmIrTextTest` because its parent registers the built-in
  * handler which can't be removed and would delete our golden files.
  */
-open class AbstractIrDumpTest : MetroTestBaseWithTargetBackend(TargetBackend.JVM_IR) {
+open class AbstractIrDumpTest : TestBaseWithTargetBackend(TargetBackend.JVM_IR) {
   override fun configure(builder: TestConfigurationBuilder) =
     with(builder) {
       setupJvmPipelineSteps(FirParser.LightTree)

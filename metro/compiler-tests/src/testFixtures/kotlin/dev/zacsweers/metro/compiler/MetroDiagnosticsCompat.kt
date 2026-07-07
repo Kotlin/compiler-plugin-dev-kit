@@ -58,14 +58,6 @@ interface MetroDiagnosticsCompat {
 
   fun createKotlinJsBoxTestBase(): AbstractKotlinCompilerTest
 
-  fun createStandardLibrariesPathProvider(
-    from: KTStandardLibrariesPathProvider
-  ): KotlinStandardLibrariesPathProvider
-
-  fun createKotlinStandardLibrariesPathProvider(
-    from: KotlinStandardLibrariesPathProvider
-  ): KTStandardLibrariesPathProvider
-
   fun TestConfigurationBuilder.commonConfigurationForJsTest()
 
   fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser)
