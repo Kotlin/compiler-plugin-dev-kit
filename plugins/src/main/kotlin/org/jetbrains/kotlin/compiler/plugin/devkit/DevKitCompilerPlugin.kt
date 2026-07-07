@@ -665,7 +665,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         // output.
                         from(versionMarker)
                         from(testFixtures.map { it.output }) {
-                            exclude("META-INF/*kotlin_module")
                             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                         }
                     }
