@@ -20,8 +20,8 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    developForWithFixtures(kotlinToolingVersion)
-    testAgainst(KotlinToolingVersion("2.4.20-dev-7680"))
+    testAgainst(kotlinToolingVersion)
+    developForWithFixtures(KotlinToolingVersion("2.4.20-dev-7680"))
 
     developForWithFixtures(KotlinToolingVersion("2.4.0"))
     val k2320Target = developForWithFixtures(KotlinToolingVersion("2.3.20"))
