@@ -335,6 +335,12 @@ abstract class MetroProject(
         // compile/IC cycles, MaxMetaspaceSize caps growth in tests that exercise many classloaders.
         "org.gradle.jvmargs=-Xmx4g -Xms1g -Dfile.encoding=UTF-8 -XX:+HeapDumpOnOutOfMemoryError -XX:MaxMetaspaceSize=1024m",
         "org.gradle.parallel=true",
+        // These fixture projects are single-use and short-lived, so there's no benefit to
+        // filesystem watching between builds. Under heavy host-level parallelism (many concurrent
+        // Kotlin-version functional test suites), dropped FS-event notifications can leave a
+        // build's VFS snapshot stale, making incremental-compilation tests flakily see UP_TO_DATE
+        // for a file that was actually just modified.
+        "org.gradle.vfs.watch=false",
         "systemProp.org.gradle.configuration-cache.read-only=true",
         // Allow producing klibs for non-host Kotlin/Native targets without that host present.
         "kotlin.native.enableKlibsCrossCompilation=true",
