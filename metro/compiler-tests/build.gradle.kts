@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.setClasspathProperty
 import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitKotlinCompilerTestFixturesTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -146,19 +147,6 @@ val guiceClasspath = configurations.create("guiceClasspath") {}
 val javaxInteropClasspath = configurations.create("javaxInteropClasspath") { isTransitive = false }
 val jakartaInteropClasspath =
   configurations.create("jakartaInteropClasspath") { isTransitive = false }
-val jsKlibClasspath =
-  configurations.create("jsKlibClasspath") {
-    isTransitive = false
-    attributes { attribute(KotlinPlatformType.attribute, KotlinPlatformType.js) }
-  }
-val wasmKlibClasspath =
-  configurations.create("wasmKlibClasspath") {
-    isTransitive = false
-    attributes {
-      attribute(Attribute.of("org.jetbrains.kotlin.platform.type", String::class.java), "wasm")
-    }
-  }
-
 dependencies {
   testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin")
 
@@ -206,13 +194,6 @@ dependencies {
   circuitRuntimeKlibClasspath(libs.kotlinInject.anvil.runtime.optional)
   circuitRuntimeKlibClasspath(libs.kotlinInject.runtime)
   circuitRuntimeKlibClasspath(libs.kotlinx.browser)
-
-  jsKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-js")
-  jsKlibClasspath("org.jetbrains.kotlin:kotlin-test-js")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-js")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-stdlib-wasm-wasi")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-js")
-  wasmKlibClasspath("org.jetbrains.kotlin:kotlin-test-wasm-wasi")
 
   // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
   // ServiceLoader
@@ -280,8 +261,6 @@ tasks.withType<Test> {
   dependsOn(jakartaInteropClasspath)
   dependsOn(circuitRuntimeClasspath)
   dependsOn(circuitRuntimeKlibClasspath)
-  dependsOn(jsKlibClasspath)
-  dependsOn(wasmKlibClasspath)
   inputs
     .dir(layout.projectDirectory.dir("src/test/data"))
     .withPropertyName("testData")
@@ -338,28 +317,6 @@ tasks.withType<Test> {
   }
 
   val testRuntimeClasspath = configurations.testRuntimeClasspath
-  setLibraryProperty("kotlin-stdlib", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-stdlib-jdk8", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-stdlib-jdk8", "jar", testRuntimeClasspath, "kotlin.full.stdlib.path")
-  setLibraryProperty("kotlin-reflect", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-reflect", "jar", testRuntimeClasspath, "kotlin.reflect.jar.path")
-  setLibraryProperty("kotlin-test", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-script-runtime", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-annotations-jvm", "jar", testRuntimeClasspath)
-  setLibraryProperty(
-    "kotlin-annotations-jvm",
-    "jar",
-    testRuntimeClasspath,
-    "kotlin.mockJDK.annotations.path",
-  )
-  setLibraryProperty("kotlin-stdlib-js", "klib", jsKlibClasspath)
-  setLibraryProperty("kotlin-test-js", "klib", jsKlibClasspath)
-  setLibraryProperty("kotlin-stdlib-wasm-js", "klib", wasmKlibClasspath)
-  setLibraryProperty("kotlin-stdlib-wasm-wasi", "klib", wasmKlibClasspath)
-  setLibraryProperty("kotlin-test-wasm-js", "klib", wasmKlibClasspath)
-  setLibraryProperty("kotlin-test-wasm-wasi", "klib", wasmKlibClasspath)
-  setLibraryProperty("kotlin-common-stdlib", "jar", testRuntimeClasspath)
-  setLibraryProperty("kotlin-stdlib-web", "jar", testRuntimeClasspath)
 
   val d8EnvSpec = project.the<D8EnvSpec>()
   dependsOn(d8EnvSpec.run { project.d8SetupTaskProvider })
@@ -390,53 +347,9 @@ tasks.withType<Test> {
   systemProperty("jakartaInterop.classpath", jakartaInteropClasspath.asPath)
   systemProperty("circuit.classpath", circuitRuntimeClasspath.asPath)
   systemProperty("circuit.klibClasspath", circuitRuntimeKlibClasspath.asPath)
-  jvmArgumentProviders.add(
-    ClasspathSystemPropertyArgumentProvider("ksp.testRuntimeClasspath", testRuntimeClasspath)
-  )
+  setClasspathProperty("ksp.testRuntimeClasspath", testRuntimeClasspath)
 
   // Properties required to run the internal test framework.
   systemProperty("idea.ignore.disabled.plugins", "true")
   systemProperty("idea.home.path", rootDir)
-}
-
-fun Test.setLibraryProperty(
-  jarName: String,
-  extension: String,
-  configuration: Configuration,
-  propName: String = "org.jetbrains.kotlin.test.$jarName",
-) {
-  val regex = "$jarName-\\d.*$extension".toRegex()
-  val path = configuration.files.find { regex.matches(it.name) }?.absolutePath ?: return
-  systemProperty(propName, path)
-}
-
-// Lazy overload: resolves `configuration` only when this task forks its test JVM, via
-// jvmArgumentProviders.
-fun Test.setLibraryProperty(
-  jarName: String,
-  extension: String,
-  configuration: Provider<out FileCollection>,
-  propName: String = "org.jetbrains.kotlin.test.$jarName",
-) {
-  jvmArgumentProviders.add(LibraryPathArgumentProvider(propName, jarName, extension, configuration))
-}
-
-private class LibraryPathArgumentProvider(
-  @get:Internal val propName: String,
-  @get:Internal val jarName: String,
-  @get:Internal val extension: String,
-  @get:Internal val configuration: Provider<out FileCollection>,
-) : CommandLineArgumentProvider {
-  override fun asArguments(): Iterable<String> {
-    val regex = "$jarName-\\d.*$extension".toRegex()
-    val path = configuration.get().files.find { regex.matches(it.name) }?.absolutePath
-    return if (path != null) listOf("-D$propName=$path") else emptyList()
-  }
-}
-
-private class ClasspathSystemPropertyArgumentProvider(
-  @get:Internal val propName: String,
-  @get:Internal val configuration: Provider<out FileCollection>,
-) : CommandLineArgumentProvider {
-  override fun asArguments(): Iterable<String> = listOf("-D$propName=${configuration.get().asPath}")
 }

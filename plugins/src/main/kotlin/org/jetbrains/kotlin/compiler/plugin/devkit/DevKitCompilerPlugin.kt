@@ -17,11 +17,16 @@ import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
@@ -40,6 +45,7 @@ import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.api.GeneratorTask
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.internal.generator.generator.Generator
+import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.testing.base.TestingExtension
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
@@ -56,12 +62,9 @@ import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
-// The Kotlin plugin adds a "kotlin" extension SourceDirectorySet to every SourceSet, defaulting
-// to src/<name>/kotlin plus a mirror of .java.srcDirs (never the other direction - see the
-// recompile-shared-sources comments below). Going through this instead of .allSource keeps
-// resources dirs out of what gets fed into another SourceDirectorySet's srcDir(...): passing a
-// SourceDirectorySet itself (rather than its .sourceDirectories) elsewhere would make Gradle
-// iterate it as a FileTree of matched leaf files, not root directories.
+// The Kotlin plugin mirrors each SourceSet's java.srcDirs into a "kotlin" SourceDirectorySet,
+// but never the reverse. Used instead of .allSource to get root source dirs (not resources, and
+// not matched leaf files).
 private val SourceSet.kotlin: SourceDirectorySet
     get() = extensions.getByName("kotlin") as SourceDirectorySet
 
@@ -257,6 +260,41 @@ public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     }
 }
 
+// Lazy. Takes a Provider<FileCollection> rather than Provider<Configuration> cuz configuration
+// cache
+private class LibraryPathArgumentProvider(
+    @get:Input val propNames: List<String>,
+    @get:Input val jarName: String,
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.ABSOLUTE)
+    val configuration: Provider<out FileCollection>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> {
+        val regex = """$jarName-\d.*""".toRegex()
+        val path = configuration.get().files.find { regex.matches(it.name) }?.absolutePath
+        return if (path != null) propNames.map { "-D$it=$path" } else emptyList()
+    }
+}
+
+private class ClasspathSystemPropertyArgumentProvider(
+    @get:Input val propName: String,
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.ABSOLUTE)
+    val configuration: Provider<out FileCollection>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> =
+        listOf("-D$propName=${configuration.get().asPath}")
+}
+
+// Public so consumers of this plugin (e.g. :compiler-tests) can reuse it for their own
+// classpath-derived system properties
+public fun Test.setClasspathProperty(
+    propName: String,
+    configuration: Provider<out FileCollection>,
+) {
+    jvmArgumentProviders.add(ClasspathSystemPropertyArgumentProvider(propName, configuration))
+}
+
 @OptIn(ExperimentalWasmDsl::class)
 public class DevKitCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project): Unit = project.run {
@@ -308,7 +346,12 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         // force configuration
         afterEvaluate { pluginDevKit.testAgainst.toList() }
 
-        val testArtifacts: Configuration = configurations.create("testArtifacts")
+        val testArtifacts = configurations.register("testArtifacts")
+        val testArtifactsWasm =
+            configurations.register("testArtifactsWasm") {
+                isTransitive = false
+                attributes { attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm) }
+            }
 
         fun SourceSet.addTestGenDir() =
             testGenDirectory.dir(name).let {
@@ -327,21 +370,24 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             }
 
         fun Test.setLibraryProperty(
-            testArtifacts: Configuration,
-            propName: String,
             jarName: String,
+            testArtifacts: Provider<out FileCollection>,
+            vararg extraPropNames: String,
         ) {
-            val path =
-                testArtifacts.files
-                    .find { """$jarName-\d.*""".toRegex().matches(it.name) }
-                    ?.absolutePath ?: return
-            systemProperty(propName, path)
+            jvmArgumentProviders.add(
+                LibraryPathArgumentProvider(
+                    listOf("org.jetbrains.kotlin.test.$jarName") + extraPropNames,
+                    jarName,
+                    testArtifacts,
+                )
+            )
         }
 
         fun Test.configure(
-            testArtifacts: Configuration,
-            annotationsJvmRuntimeClasspath: Configuration,
-            annotationsJsRuntimeClasspath: Configuration,
+            testArtifacts: Provider<out Configuration>,
+            testArtifactsWasm: Provider<out Configuration>,
+            annotationsJvmRuntimeClasspath: Provider<out Configuration>,
+            annotationsJsRuntimeClasspath: Provider<out Configuration>,
         ) {
             dependsOn(annotationsJvmRuntimeClasspath)
             dependsOn(annotationsJsRuntimeClasspath)
@@ -350,45 +396,25 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             useJUnitPlatform()
             workingDir = rootDir
 
-            systemProperty(
-                "annotationsRuntime.jvm.classpath",
-                annotationsJvmRuntimeClasspath.asPath,
-            )
-            systemProperty(
-                "annotationsRuntime.js.classpath",
-                annotationsJsRuntimeClasspath.asPath,
-            )
+            setClasspathProperty("annotationsRuntime.jvm.classpath", annotationsJvmRuntimeClasspath)
+            setClasspathProperty("annotationsRuntime.js.classpath", annotationsJsRuntimeClasspath)
 
-            // Properties required to run the internal test framework.
+            // Properties required to run the internal test framework. Some framework code bypasses
+            // provider abstraction entirely and reads the TestCompilePaths properties directly
+            // So we need both org.jetbrains.kotlin.test and these TestCompilePaths names.
+            setLibraryProperty("kotlin-stdlib-jdk8", testArtifacts, "kotlin.full.stdlib.path")
+            setLibraryProperty("kotlin-reflect", testArtifacts, "kotlin.reflect.jar.path")
+            setLibraryProperty("kotlin-test", testArtifacts)
+            setLibraryProperty("kotlin-script-runtime", testArtifacts)
             setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-stdlib",
-                "kotlin-stdlib",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-stdlib-jdk8",
-                "kotlin-stdlib-jdk8",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-reflect",
-                "kotlin-reflect",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-test",
-                "kotlin-test",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-script-runtime",
-                "kotlin-script-runtime",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-annotations-jvm",
                 "kotlin-annotations-jvm",
+                testArtifacts,
+                "kotlin.mockJDK.annotations.path",
+            )
+            setLibraryProperty(
+                "kotlin-stdlib",
+                testArtifacts,
+                "org.jetbrains.kotlin.test.kotlin-common-stdlib",
             )
 
             systemProperty("idea.ignore.disabled.plugins", "true")
@@ -398,16 +424,12 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             val d8EnvSpec = project.the<D8EnvSpec>()
             with(d8EnvSpec) { dependsOn(project.d8SetupTaskProvider) }
 
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-stdlib-js",
-                "kotlin-stdlib-js",
-            )
-            setLibraryProperty(
-                testArtifacts,
-                "org.jetbrains.kotlin.test.kotlin-test-js",
-                "kotlin-test-js",
-            )
+            setLibraryProperty("kotlin-stdlib-js", testArtifacts)
+            setLibraryProperty("kotlin-test-js", testArtifacts)
+            setLibraryProperty("kotlin-stdlib-wasm-js", testArtifactsWasm)
+            setLibraryProperty("kotlin-stdlib-wasm-wasi", testArtifactsWasm)
+            setLibraryProperty("kotlin-test-wasm-js", testArtifactsWasm)
+            setLibraryProperty("kotlin-test-wasm-wasi", testArtifactsWasm)
 
             systemProperty("javascript.engine.path.V8", d8EnvSpec.executable.get())
             systemProperty("javascript.engine.path.repl", "${jsReplOutputFile.get().asFile}")
@@ -427,6 +449,11 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testArtifacts(kotlin("annotations-jvm"))
             testArtifacts(kotlin("stdlib-js"))
             testArtifacts(kotlin("test-js"))
+
+            testArtifactsWasm(kotlin("stdlib-wasm-js"))
+            testArtifactsWasm(kotlin("stdlib-wasm-wasi"))
+            testArtifactsWasm(kotlin("test-wasm-js"))
+            testArtifactsWasm(kotlin("test-wasm-wasi"))
         }
 
         // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
@@ -474,7 +501,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
         }
 
-        fun Configuration.withKotlinVersion(
+        fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
             version: KotlinToolingVersion,
             action: ResolvableConfiguration.() -> Unit = {},
         ) =
@@ -486,11 +513,8 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         fun SourceSet.withCompilerVersionAttribute(version: KotlinToolingVersion) {
             configurations.named(compileClasspathConfigurationName) {
-                // Force resolution of the packed testFixtures jar (not the raw classes
-                // directory Gradle otherwise substitutes on compile classpaths), since
-                // MultiReleasePluginTransform only understands jar inputs: it looks for
-                // the per-version overlay under a jar's META-INF, which a plain classes
-                // directory doesn't have.
+                // Force the packed jar (not Gradle's raw classes dir) on the compile classpath:
+                // MultiReleasePluginTransform reads the per-version overlay from a jar's META-INF.
                 attributes.attribute(
                     LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
                     objects.named(LibraryElements.JAR),
@@ -600,12 +624,8 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     )
                 )
                 // Recompile the shared testFixtures sources, feeding each kind into the matching
-                // SourceDirectorySet on this suite - .kotlin dirs into .kotlin (so they only hit
-                // the Kotlin compile task), .java into .java, .resources into .resources - rather
-                // than lumping everything through one. Read via .kotlin (not .java) on the source
-                // side: the Kotlin plugin only mirrors java.srcDirs into kotlin.srcDirs, never the
-                // other direction, so "testFixtures"'s own .java set never contains
-                // src/testFixtures/kotlin.
+                // SourceDirectorySet (.kotlin→.kotlin, .java→.java, .resources→.resources). Read
+                // via .kotlin, not .java, per the java→kotlin mirroring noted on SourceSet.kotlin.
                 kotlin.srcDir(sourceSets.named("testFixtures").map { it.kotlin.sourceDirectories })
                 java.srcDir(sourceSets.named("testFixtures").map { it.java.sourceDirectories })
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
@@ -657,12 +677,16 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         }
         pluginDevKit.testAgainst.configureEach {
             val testArtifacts = testArtifacts.withKotlinVersion(version)
+            val testArtifactsWasm =
+                testArtifactsWasm.withKotlinVersion(version) {
+                    isTransitive = false
+                    attributes { attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm) }
+                }
 
-            val annotationsJvmRuntimeClasspath = annotationsJvmRuntimeClasspath.flatMap {
-                it.withKotlinVersion(version)
-            }
-            val annotationsJsRuntimeClasspath = annotationsJsRuntimeClasspath.flatMap {
-                it.withKotlinVersion(version) {
+            val annotationsJvmRuntimeClasspath =
+                annotationsJvmRuntimeClasspath.withKotlinVersion(version)
+            val annotationsJsRuntimeClasspath =
+                annotationsJsRuntimeClasspath.withKotlinVersion(version) {
                     attributes {
                         attribute(
                             Usage.USAGE_ATTRIBUTE,
@@ -671,7 +695,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
                     }
                 }
-            }
 
             testSuite {
                 dependencies {
@@ -682,12 +705,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                         listOf("$versionName/src/test/java", "$versionName/src/test/kotlin")
                     )
                     // Recompile the shared test sources, feeding each kind into the matching
-                    // SourceDirectorySet on this suite - .kotlin dirs into .kotlin (so they only
-                    // hit the Kotlin compile task), .java into .java, .resources into .resources -
-                    // rather than lumping everything through one. Read via .kotlin (not .java) on
-                    // the source side: the Kotlin plugin only mirrors java.srcDirs into
-                    // kotlin.srcDirs, never the other direction, so "test"'s own .java set never
-                    // contains src/test/kotlin.
+                    // SourceDirectorySet (.kotlin→.kotlin, .java→.java, .resources→.resources).
+                    // Read via .kotlin, not .java, per the java→kotlin mirroring noted on
+                    // SourceSet.kotlin.
                     kotlin.srcDir(sourceSets.named("test").map { it.kotlin.sourceDirectories })
                     java.srcDir(sourceSets.named("test").map { it.java.sourceDirectories })
                     resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
@@ -717,9 +737,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                             files(sourceSets.named("test").map { it.output.classesDirs })
                         classpath += files(sourceSets.named("test").map { it.output })
                         configure(
-                            testArtifacts.get(),
-                            annotationsJvmRuntimeClasspath.get(),
-                            annotationsJsRuntimeClasspath.get(),
+                            testArtifacts,
+                            testArtifactsWasm,
+                            annotationsJvmRuntimeClasspath,
+                            annotationsJsRuntimeClasspath,
                         )
                     }
                 }
