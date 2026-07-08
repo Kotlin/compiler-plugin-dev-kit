@@ -10,6 +10,7 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
@@ -227,8 +228,8 @@ public class DevKitGradlePlugin : Plugin<Project> {
 }
 
 private class FileSystemPropertyArgumentProvider(
-    val propName: String,
-    val value: Provider<Directory>,
+    @Internal val propName: String,
+    @Internal val value: Provider<Directory>,
 ) : CommandLineArgumentProvider {
     override fun asArguments(): Iterable<String> =
         listOf("-D$propName=${value.get().asFile.invariantSeparatorsPath}")
