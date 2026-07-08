@@ -6,16 +6,21 @@ import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -46,12 +51,6 @@ public fun Project.DevKitGradlePluginTestTarget(
         tasks.register<Test>("functionalTest${version.versionName}") {
             val functionalTestSourceSet =
                 project.extensions.getByType<SourceSetContainer>().named("functionalTest")
-            val functionalTestRepo =
-                rootProject.layout.buildDirectory
-                    .dir("functionalTestRepo")
-                    .get()
-                    .asFile
-                    .invariantSeparatorsPath
             group = "verification"
             description = "Runs the functional tests against Kotlin ${version.versionString}."
             testClassesDirs = files(functionalTestSourceSet.map { it.output.classesDirs })
@@ -59,7 +58,6 @@ public fun Project.DevKitGradlePluginTestTarget(
             dependsOn("deleteOldFuncTests", "installForFunctionalTest")
             mustRunAfter("test")
             jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
-            systemProperty("com.autonomousapps.plugin-under-test.repo", functionalTestRepo)
             systemProperty("$DEV_KIT_GROUP.gradle.test.kotlin-version", version.versionString)
         },
     )
@@ -92,6 +90,8 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
     public abstract val testAgainst: NamedDomainObjectSet<DevKitGradlePluginTestTarget>
 
+    public abstract val functionalTestRepo: DirectoryProperty
+
     public fun testAgainst(
         version: KotlinToolingVersion,
         action: Action<DevKitGradlePluginTestTarget> = Action {},
@@ -118,6 +118,18 @@ public class DevKitGradlePlugin : Plugin<Project> {
         pluginDevKit.generatePluginInfo.convention(true)
         pluginDevKit.addRuntimeDependency.convention(true)
         pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
+        pluginDevKit.functionalTestRepo.convention(layout.buildDirectory.dir("functionalTestRepo"))
+
+        pluginDevKit.testAgainst.configureEach {
+            testTask {
+                jvmArgumentProviders.add(
+                    FileSystemPropertyArgumentProvider(
+                        "com.autonomousapps.plugin-under-test.repo",
+                        pluginDevKit.functionalTestRepo,
+                    )
+                )
+            }
+        }
 
         // Deferred so consuming build scripts get a chance to call
         // `pluginDevKit.addRuntimeDependency.set(false)` before we decide whether to add it.
@@ -127,33 +139,13 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
 
-        rootProject.childProjects.values.forEach {
-            var noMultiplatformProjects = true
-            it.plugins.withId("org.jetbrains.kotlin.multiplatform") {
-                if (noMultiplatformProjects) {
-                    pluginAnnotations.convention(it)
-                    noMultiplatformProjects = false
-                } else {
-                    pluginAnnotations.convention(null)
-                }
+        val allFunctionalTests =
+            tasks.register<Test>("allFunctionalTests") {
+                description = "Run all functional tests."
+                group = "verification"
+                enabled = false
+                pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
             }
-            var noCompilerPluginProjects = true
-            it.plugins.withId("$DEV_KIT_GROUP.compiler-plugin") {
-                if (noCompilerPluginProjects) {
-                    compilerPlugin.convention(it)
-                    noCompilerPluginProjects = false
-                } else {
-                    compilerPlugin.convention(null)
-                }
-            }
-        }
-
-        val allFunctionalTests = tasks.register<Test>("allFunctionalTests") {
-            description = "Run all functional tests."
-            group = "verification"
-            enabled = false
-            pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
-        }
 
         tasks.named("check") { dependsOn(allFunctionalTests) }
 
@@ -180,35 +172,41 @@ public class DevKitGradlePlugin : Plugin<Project> {
             if (!pluginDevKit.generatePluginInfo.get()) return@afterEvaluate
 
             extensions.getByType<BuildConfigExtension>().forClass(
-                "${project.group}",
+                "$group",
                 "PluginInfo",
             ) {
-                buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
+                buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"$group\"")
 
-                buildConfigField("KOTLIN_PLUGIN_ARTIFACT") {
-                    type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
-                    expression(
-                        compilerPlugin.map {
-                            """
+                if (compilerPlugin.isPresent)
+                    buildConfigField("KOTLIN_PLUGIN_ARTIFACT") {
+                        type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
+                        expression(
+                            compilerPlugin.map {
+                                """
                             |org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact(
-                            |  groupId = "${it.group}",
+                            |  groupId = "$group",
                             |  artifactId = "${it.name}",
-                            |  version = "${it.version}",
+                            |  version = "$version",
                             |)
                             """
-                                .trimMargin()
-                        }
-                    )
-                }
+                                    .trimMargin()
+                            }
+                        )
+                    }
 
-                buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
-                    type("String")
-                    expression(pluginAnnotations.map { "\"${it.group}:${it.name}:${it.version}\"" })
-                }
+                if (pluginAnnotations.isPresent)
+                    buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
+                        type("String")
+                        expression(pluginAnnotations.map { "\"$group:${it.name}:$version\"" })
+                    }
 
                 // PLUGIN_INFO's type comes from gradle-plugin-runtime; only generate it if that's
                 // actually on the classpath.
-                if (pluginDevKit.addRuntimeDependency.get()) {
+                if (
+                    pluginDevKit.addRuntimeDependency.get() &&
+                        compilerPlugin.isPresent &&
+                        pluginAnnotations.isPresent
+                ) {
                     buildConfigField("PLUGIN_INFO") {
                         type("$DEV_KIT_GROUP.DevKitPluginInfo")
                         expression(
@@ -226,4 +224,12 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
     }
+}
+
+private class FileSystemPropertyArgumentProvider(
+    val propName: String,
+    val value: Provider<Directory>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> =
+        listOf("-D$propName=${value.get().asFile.invariantSeparatorsPath}")
 }

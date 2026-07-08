@@ -208,10 +208,6 @@ public abstract class DevKitCompilerPluginConfigExtension(override val project: 
     public val withFixtures: NamedDomainObjectCollection<DevKitKotlinCompilerTestFixturesTarget> =
         testAgainst.withType<DevKitKotlinCompilerTestFixturesTarget>()
 
-    public fun kotlinVersionsToTestAgainst(
-        block: Action<NamedDomainObjectSet<DevKitKotlinCompilerTestTarget>>
-    ): Unit = block.execute(testAgainst)
-
     public fun testAgainst(
         version: KotlinToolingVersion,
         action: Action<DevKitKotlinCompilerTestTarget> = Action {},
@@ -311,18 +307,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         // force configuration
         afterEvaluate { pluginDevKit.testAgainst.toList() }
-
-        rootProject.childProjects.values.forEach {
-            var noMultiplatformProjects = true
-            it.plugins.withId("org.jetbrains.kotlin.multiplatform") {
-                if (noMultiplatformProjects) {
-                    pluginAnnotations.convention(it)
-                    noMultiplatformProjects = false
-                } else {
-                    pluginAnnotations.convention(null)
-                }
-            }
-        }
 
         val testArtifacts: Configuration = configurations.create("testArtifacts")
 
@@ -812,7 +796,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         buildConfig.useKotlinOutput { internalVisibility = true }
         buildConfig.packageName(group.toString())
-        buildConfig.buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
+        buildConfig.buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"$group\"")
 
         kotlinExtension.compilerOptions {
             optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")

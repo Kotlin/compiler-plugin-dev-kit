@@ -2,6 +2,11 @@ plugins {
     kotlin("compiler.plugin.devkit.gradle-plugin")
 }
 
+pluginDevKit {
+    pluginAnnotations = project(":plugin-annotations")
+    compilerPlugin = project(":compiler-plugin")
+}
+
 sourceSets {
     main {
         java.setSrcDirs(listOf("src"))
@@ -16,7 +21,7 @@ sourceSets {
 gradlePlugin {
     plugins {
         create("SimplePlugin") {
-            id = rootProject.group.toString()
+            id = group.toString()
             displayName = "SimplePlugin"
             description = "SimplePlugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.template.SimpleGradlePlugin"

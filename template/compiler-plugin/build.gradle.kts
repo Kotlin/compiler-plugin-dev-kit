@@ -8,6 +8,7 @@ plugins {
 pluginDevKit {
     developForWithFixtures(kotlinToolingVersion)
     developForWithFixtures(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
+    pluginAnnotations = project(":plugin-annotations")
     developFor.configureEach {
         main {
             java.setSrcDirs(listOf("$versionName/src"))

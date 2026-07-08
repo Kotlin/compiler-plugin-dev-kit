@@ -81,6 +81,7 @@ pluginDevKit {
       providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
     )
   supportedVersions.forEach { testAgainst(it) }
+  functionalTestRepo = rootProject.layout.buildDirectory.dir("functionalTestRepo")
 }
 
 gradlePlugin {
