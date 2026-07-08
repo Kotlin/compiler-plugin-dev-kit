@@ -757,6 +757,17 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             dependencies.registerMultiReleasePluginTransform(project.provider { version })
         }
 
+        val allTests =
+            tasks.register<Test>("allTests") {
+                description = "Run all tests."
+                group = "verification"
+                enabled = false
+                pluginDevKit.testAgainst.configureEach {
+                    testSuite { targets.all { this@register.dependsOn(testTask) } }
+                }
+            }
+        tasks.named("check") { dependsOn(allTests) }
+
         sourceSets.named("test") { addTestGenDir() }
 
         dependencies {

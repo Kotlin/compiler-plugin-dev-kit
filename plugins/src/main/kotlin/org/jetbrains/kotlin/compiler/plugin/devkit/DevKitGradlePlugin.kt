@@ -69,9 +69,9 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
     public abstract val pluginAnnotations: Property<Project>
 
     /**
-     * Whether to generate the `PluginInfo` buildConfig class (id/artifact/annotations
-     * coordinates) for a thin plugin that just wires [compilerPlugin] into consumer builds.
-     * Plugins with their own, more involved wiring can turn this off.
+     * Whether to generate the `PluginInfo` buildConfig class (id/artifact/annotations coordinates)
+     * for a thin plugin that just wires [compilerPlugin] into consumer builds. Plugins with their
+     * own, more involved wiring can turn this off.
      */
     public abstract val generatePluginInfo: Property<Boolean>
 
@@ -148,12 +148,24 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
 
+        val allFunctionalTests = tasks.register<Test>("allFunctionalTests") {
+            description = "Run all functional tests."
+            group = "verification"
+            enabled = false
+            pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
+        }
+
+        tasks.named("check") { dependsOn(allFunctionalTests) }
+
         // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
         // `defaultTestVersion` first. If a matching version is registered, `functionalTest`
         // delegates to its task instead of running anything itself; every other per-version task
         // stays independently runnable by name.
         afterEvaluate {
-            val target = pluginDevKit.testAgainst.find { it.version == pluginDevKit.defaultTestVersion.get() }
+            val target =
+                pluginDevKit.testAgainst.find {
+                    it.version == pluginDevKit.defaultTestVersion.get()
+                }
             if (target != null) {
                 tasks.named<Test>("functionalTest") {
                     enabled = false
@@ -167,7 +179,10 @@ public class DevKitGradlePlugin : Plugin<Project> {
         afterEvaluate {
             if (!pluginDevKit.generatePluginInfo.get()) return@afterEvaluate
 
-            extensions.getByType<BuildConfigExtension>().forClass("${project.group}", "PluginInfo") {
+            extensions.getByType<BuildConfigExtension>().forClass(
+                "${project.group}",
+                "PluginInfo",
+            ) {
                 buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"${rootProject.group}\"")
 
                 buildConfigField("KOTLIN_PLUGIN_ARTIFACT") {
