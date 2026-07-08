@@ -139,15 +139,15 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
 
-        val allFunctionalTests =
-            tasks.register<Test>("allFunctionalTests") {
+        val allVersionedFunctionalTests =
+            tasks.register<Test>("allVersionedFunctionalTests") {
                 description = "Run all functional tests."
                 group = "verification"
                 enabled = false
                 pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
             }
 
-        tasks.named("check") { dependsOn(allFunctionalTests) }
+        tasks.named("check") { dependsOn(allVersionedFunctionalTests) }
 
         // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
         // `defaultTestVersion` first. If a matching version is registered, `functionalTest`
