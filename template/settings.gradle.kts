@@ -5,6 +5,9 @@ pluginManagement {
         gradlePluginPortal()
         maven("https://redirector.kotlinlang.org/maven/bootstrap")
         maven("https://redirector.kotlinlang.org/maven/dev/")
+        // Publications used by IJ
+        // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
+        maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
     }
 }
 
@@ -14,6 +17,9 @@ dependencyResolutionManagement {
         mavenCentral()
         maven("https://redirector.kotlinlang.org/maven/bootstrap")
         maven("https://redirector.kotlinlang.org/maven/dev/")
+        // Publications used by IJ
+        // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
+        maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
     }
 }
 

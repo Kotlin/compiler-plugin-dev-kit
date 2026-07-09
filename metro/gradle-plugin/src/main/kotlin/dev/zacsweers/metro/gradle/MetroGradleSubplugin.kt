@@ -213,11 +213,6 @@ public class MetroGradleSubplugin @Inject constructor(problems: Problems) :
 
     val kotlinVersion = project.kotlinToolingVersion
 
-    val version = project.kotlinExtension.compilerVersion.map(::KotlinToolingVersion)
-    kotlinCompilation.requireCompilerVersionForPluginClasspath(version)
-    project.dependencies.setupCompilerVersionAttribute()
-    project.dependencies.registerMultiReleasePluginTransform(version)
-
     if (project.logVerbosely) {
       project.logger.lifecycle(
         "Supported platforms for ${kotlinCompilation.platformType} are: ${extension.supportedHintContributionPlatforms.get()}"

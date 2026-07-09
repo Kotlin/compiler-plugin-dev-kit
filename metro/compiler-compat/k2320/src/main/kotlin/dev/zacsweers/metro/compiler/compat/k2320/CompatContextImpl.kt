@@ -113,14 +113,12 @@ public class CompatContextImpl : CompatContext {
     at(element, file).report(factory, a)
   }
 
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerFirExtensionCompat(
     extension: FirExtensionRegistrar
   ) {
     FirExtensionRegistrarAdapter.registerExtension(extension)
   }
 
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerIrExtensionCompat(
     extension: IrGenerationExtension
   ) {

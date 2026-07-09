@@ -324,6 +324,7 @@ dependencies {
   add(embedded.name, libs.wire.runtime)
   add(embedded.name, libs.kotlinx.serialization.json)
   add(embedded.name, project(":compiler-compat"))
+  add(embedded.name, "org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-runtime")
 
   testCompileOnly(libs.poko.annotations)
 

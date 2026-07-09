@@ -15,7 +15,7 @@ This project has three modules:
 Extension point registration:
 
 - K2 Frontend (FIR) extensions can be registered in `SimplePluginRegistrar`.
-- All other extensions (including K1 frontend and backend) can be registered in `SimplePluginComponentRegistrar`.
+- All other extensions (including K1 frontend and backend) can be registered in `SimpleCompilerPluginRegistrar`.
 
 ## Tests
 

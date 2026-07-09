@@ -4,16 +4,19 @@ package dev.zacsweers.metro.compiler
 
 import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CliOptionProcessingException
-import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCLP
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-public class MetroCommandLineProcessor : CommandLineProcessor {
+public class MetroCommandLineProcessor : DevKitCommandLineProcessor(MetroCLP::class) {
 
   override val pluginId: String = "dev.zacsweers.metro.compiler"
 
   override val pluginOptions: Collection<AbstractCliOption> =
     MetroOption.entries.map { it.raw.cliOption }
+}
 
+public class MetroCLP : DevKitCLP {
   override fun processOption(
     option: AbstractCliOption,
     value: String,

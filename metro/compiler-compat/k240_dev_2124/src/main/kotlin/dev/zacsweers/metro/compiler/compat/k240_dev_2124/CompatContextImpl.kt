@@ -26,14 +26,12 @@ import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 
 public class CompatContextImpl : CompatContext by DelegateType() {
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerFirExtensionCompat(
     extension: FirExtensionRegistrar
   ) {
     FirExtensionRegistrarAdapter.registerExtension(extension)
   }
 
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerIrExtensionCompat(
     extension: IrGenerationExtension
   ) {

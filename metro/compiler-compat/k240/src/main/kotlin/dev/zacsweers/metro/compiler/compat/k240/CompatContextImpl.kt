@@ -52,14 +52,12 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 
 public class CompatContextImpl : CompatContext by DelegateType() {
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerFirExtensionCompat(
     extension: FirExtensionRegistrar
   ) {
     FirExtensionRegistrarAdapter.registerExtension(extension)
   }
 
-  context(_: CompilerPluginRegistrar)
   override fun CompilerPluginRegistrar.ExtensionStorage.registerIrExtensionCompat(
     extension: IrGenerationExtension
   ) {

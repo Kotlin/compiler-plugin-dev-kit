@@ -68,7 +68,7 @@ public interface CompatContext {
     }
 
     public fun create(): CompatContext =
-      loadFactories().singleOrNull()?.create() ?: error("No factories available")
+      loadFactories().firstOrNull()?.create() ?: error("No factories available")
   }
 
   public interface Factory {
@@ -323,7 +323,6 @@ public interface CompatContext {
     reason = CompatApi.Reason.ABI_CHANGE,
     message = "2.4 moved APIs around here",
   )
-  context(_: CompilerPluginRegistrar)
   public fun CompilerPluginRegistrar.ExtensionStorage.registerFirExtensionCompat(
     extension: FirExtensionRegistrar
   )
@@ -333,7 +332,6 @@ public interface CompatContext {
     reason = CompatApi.Reason.ABI_CHANGE,
     message = "2.4 moved APIs around here",
   )
-  context(_: CompilerPluginRegistrar)
   public fun CompilerPluginRegistrar.ExtensionStorage.registerIrExtensionCompat(
     extension: IrGenerationExtension
   )
