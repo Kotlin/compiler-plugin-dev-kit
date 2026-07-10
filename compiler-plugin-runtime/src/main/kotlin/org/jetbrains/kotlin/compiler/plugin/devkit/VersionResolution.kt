@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
-// Copied from artifact-transform's VersionResolution.kt, retyped against the runtime-safe
-// KotlinToolingVersion in this file's package instead of org.jetbrains.kotlin.tooling.core's.
+// Copied from artifact-transform's VersionResolution.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 internal object VersionResolution {

@@ -155,7 +155,6 @@ dependencies {
 
   add(embedded.name, libs.graphSupport)
   add(embedded.name, libs.guava)
-  add(embedded.name, "org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
 
   lintChecks(libs.androidx.lint.gradle)
 
