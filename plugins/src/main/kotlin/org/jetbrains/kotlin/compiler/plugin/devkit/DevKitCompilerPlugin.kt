@@ -15,6 +15,7 @@ import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
+import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
@@ -25,6 +26,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.SourceSet
@@ -339,7 +341,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         val pluginAnnotations = pluginDevKit.pluginAnnotations
         pluginDevKit.addRuntimeDependency.convention(true)
         pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
-        val generateTestsClass = pluginDevKit.generateTestsClass.convention("GenerateTestsKt")
+        val generateTestsClass =
+            pluginDevKit.generateTestsClass.convention(
+                project.provider { "$group.GenerateTestsKt" }
+            )
         val testGenDirectory =
             pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
 
@@ -455,42 +460,38 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testArtifactsWasm(kotlin("test-wasm-js"))
             testArtifactsWasm(kotlin("test-wasm-wasi"))
         }
+        tasks.named<Test>("test") {
+            enabled = false
+            classpath = files()
+            testClassesDirs = files()
+        }
 
-        // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
-        // `defaultTestVersion` first. If a matching version is registered, `test` delegates to
-        // its suite (see the `${versionName}Test` suites below) instead of running anything
-        // itself; every other suite stays independently runnable by name.
         afterEvaluate {
+            val testVersion = pluginDevKit.defaultTestVersion.orNull
+            if (pluginDevKit.testAgainst.isEmpty() && testVersion != null)
+                pluginDevKit.testAgainst(testVersion)
             val target =
-                pluginDevKit.testAgainst.find {
-                    it.version == pluginDevKit.defaultTestVersion.get()
-                }
-            if (target != null) {
-                tasks.named<Test>("test") {
-                    enabled = false
-                    dependsOn(target.testSuite.get())
-                }
-            }
+                pluginDevKit.testAgainst.find { it.version == testVersion }
+                    ?: pluginDevKit.testAgainst.first()
+            tasks.named<Test>("test") { dependsOn(target.testSuite) }
         }
 
         fun JavaExec.addTestSourceSet(set: SourceSet) {
-            inputs.files(set.resources.sourceDirectories)
-            args(
-                testGenDirectory.dir(set.name).get().asFile.absolutePath,
-                set.resources.sourceDirectories.joinToString(
-                    ",",
-                    transform = File::getAbsolutePath,
-                ),
+            inputs
+                .files(set.resources.sourceDirectories)
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+            argFiles(
+                set.resources.sourceDirectories,
+                testGenDirectory.dir(set.name),
             )
         }
 
         val generateTests =
             tasks.register("generateTests", JavaExec::class) {
                 description = "Generate compiler plugin tests"
-                addTestSourceSet(sourceSets.named("test").get())
                 outputs.dir(testGenDirectory).withPropertyName("generatedTests")
 
-                classpath = sourceSets.named("testFixtures").get().runtimeClasspath
+                classpath(sourceSets.named("testFixtures").map { it.runtimeClasspath })
                 mainClass.set(generateTestsClass)
                 workingDir = rootDir
             }
@@ -565,7 +566,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         }
 
         sourceSets.named("main") { withCompilerVersionAttribute(kotlinToolingVersion) }
-        sourceSets.named("test") { withCompilerVersionAttribute(kotlinToolingVersion) }
+        sourceSets.named("test") {
+            withCompilerVersionAttribute(kotlinToolingVersion)
+            resources.setSrcDirs(listOf("src/test/data"))
+        }
         sourceSets.named("testFixtures") { withCompilerVersionAttribute(kotlinToolingVersion) }
 
         val versionMarker =
@@ -710,7 +714,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     // SourceSet.kotlin.
                     kotlin.srcDir(sourceSets.named("test").map { it.kotlin.sourceDirectories })
                     java.srcDir(sourceSets.named("test").map { it.java.sourceDirectories })
-                    resources.setSrcDirs(listOf("${versionName}/src/test/resources"))
+                    resources.setSrcDirs(listOf("${versionName}/src/test/data"))
                     resources.srcDir(
                         sourceSets.named("test").map { it.resources.sourceDirectories }
                     )
@@ -830,4 +834,24 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         dependencies.setupCompilerVersionAttribute()
     }
+}
+
+private fun JavaExec.argFiles(
+    inputFiles: FileCollection,
+    outputDir: Provider<out Directory>,
+) =
+    argumentProviders.add(
+        FilesCommandLineArgumentProvider(project.rootDir.path, inputFiles, outputDir)
+    )
+
+private class FilesCommandLineArgumentProvider(
+    @Input val rootDir: String,
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE) val inputFiles: FileCollection,
+    @OutputDirectory val outputDir: Provider<out Directory>,
+) : CommandLineArgumentProvider {
+    override fun asArguments() =
+        listOf(
+            outputDir.get().asFile.toRelativeString(File(rootDir)),
+            inputFiles.joinToString(",") { it.toRelativeString(File(rootDir)) },
+        )
 }

@@ -150,21 +150,20 @@ public class DevKitGradlePlugin : Plugin<Project> {
 
         tasks.named("check") { dependsOn(allVersionedFunctionalTests) }
 
-        // Deferred so consuming build scripts get a chance to populate `testAgainst` and set
-        // `defaultTestVersion` first. If a matching version is registered, `functionalTest`
-        // delegates to its task instead of running anything itself; every other per-version task
-        // stays independently runnable by name.
+        tasks.named<Test>("functionalTest") {
+            enabled = false
+            classpath = files()
+            testClassesDirs = files()
+        }
+
         afterEvaluate {
+            val testVersion = pluginDevKit.defaultTestVersion.orNull
+            if (pluginDevKit.testAgainst.isEmpty() && testVersion != null)
+                pluginDevKit.testAgainst(testVersion)
             val target =
-                pluginDevKit.testAgainst.find {
-                    it.version == pluginDevKit.defaultTestVersion.get()
-                }
-            if (target != null) {
-                tasks.named<Test>("functionalTest") {
-                    enabled = false
-                    dependsOn(target.testTask)
-                }
-            }
+                pluginDevKit.testAgainst.find { it.version == testVersion }
+                    ?: pluginDevKit.testAgainst.first()
+            tasks.named<Test>("functionalTest") { dependsOn(target.testTask) }
         }
 
         // Deferred so consuming build scripts get a chance to call

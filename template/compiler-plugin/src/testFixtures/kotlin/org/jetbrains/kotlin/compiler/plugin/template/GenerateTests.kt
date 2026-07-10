@@ -1,3 +1,5 @@
+package org.jetbrains.kotlin.compiler.plugin.template
+
 import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestGenerator
 import org.jetbrains.kotlin.compiler.plugin.devkit.sourceSetTestClass
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJsBoxTest
