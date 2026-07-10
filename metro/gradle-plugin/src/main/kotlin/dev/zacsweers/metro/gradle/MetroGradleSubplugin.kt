@@ -15,9 +15,6 @@ import org.gradle.api.problems.Problems
 import org.gradle.api.provider.Provider
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
-import org.jetbrains.kotlin.compiler.plugin.devkit.registerMultiReleasePluginTransform
-import org.jetbrains.kotlin.compiler.plugin.devkit.requireCompilerVersionForPluginClasspath
-import org.jetbrains.kotlin.compiler.plugin.devkit.setupCompilerVersionAttribute
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
@@ -198,13 +195,7 @@ public class MetroGradleSubplugin @Inject constructor(problems: Problems) :
     return true
   }
 
-  @OptIn(
-    DangerousMetroGradleApi::class,
-    ExperimentalMetroGradleApi::class,
-    RequiresIdeSupport::class,
-    ExperimentalBuildToolsApi::class,
-    ExperimentalKotlinGradlePluginApi::class,
-  )
+  @OptIn(ExperimentalMetroGradleApi::class)
   override fun applyToCompilation(
     kotlinCompilation: KotlinCompilation<*>
   ): Provider<List<SubpluginOption>> {
