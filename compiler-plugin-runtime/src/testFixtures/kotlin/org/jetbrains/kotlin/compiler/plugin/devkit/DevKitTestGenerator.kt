@@ -14,14 +14,12 @@ data class SourceSetName(val name: String)
 object DevKitTestGenerator {
     fun generate(args: Array<String>, block: context(SourceSetName) TestGroup.() -> Unit) =
         generateTestGroupSuiteWithJUnit5 {
-            val testsRoots = mutableListOf<File>()
             args
                 .toList()
                 .chunked(2) { it.takeIf { it.size == 2 }?.toList().orEmpty() }
                 .forEach { (testsRoot, dataRoots) ->
                     val sourceSetName =
                         File(testsRoot)
-                            .also { testsRoots.add(it) }
                             .name
                             .capitalizeAsciiOnly()
                             .removeSuffix("test")
@@ -34,11 +32,6 @@ object DevKitTestGenerator {
                         }
                     }
                 }
-            val parentFile =
-                testsRoots.firstOrNull()?.parentFile ?: return@generateTestGroupSuiteWithJUnit5
-            if (testsRoots.any { it.parentFile != parentFile })
-                return@generateTestGroupSuiteWithJUnit5
-            parentFile.listFiles { it !in testsRoots }?.forEach { it.deleteRecursively() }
         }
 }
 

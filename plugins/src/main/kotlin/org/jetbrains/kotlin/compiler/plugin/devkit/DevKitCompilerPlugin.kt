@@ -494,6 +494,11 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 classpath(sourceSets.named("testFixtures").map { it.runtimeClasspath })
                 mainClass.set(generateTestsClass)
                 workingDir = rootDir
+                doFirst {
+                    // We need to delete previously generated tests to handle
+                    // the case when the generated runner was removed from the generation
+                    testGenDirectory.asFile.get().deleteRecursively()
+                }
             }
 
         tasks.named("compileTestKotlin") { dependsOn(generateTests) }
