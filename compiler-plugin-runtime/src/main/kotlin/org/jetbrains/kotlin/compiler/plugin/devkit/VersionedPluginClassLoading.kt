@@ -1,11 +1,9 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.net.URI
-import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.FileSystems.newFileSystem
 import java.nio.file.Path
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.Manifest
 import kotlin.io.path.div
@@ -43,7 +41,7 @@ object VersionedPluginClassLoading {
             add(url)
         }
     }
-        .let { MyURLClassLoader(it.toTypedArray(), parent.parent) }
+        .let { URLClassLoader(it.toTypedArray(), parent.parent) }
 
     private inline fun Path.openDirectory(block: (Path) -> Unit) =
         when {
@@ -74,5 +72,3 @@ object VersionedPluginClassLoading {
         )
     }
 }
-
-internal class MyURLClassLoader(urls: Array<URL>, parent: ClassLoader?) : URLClassLoader(urls, parent)

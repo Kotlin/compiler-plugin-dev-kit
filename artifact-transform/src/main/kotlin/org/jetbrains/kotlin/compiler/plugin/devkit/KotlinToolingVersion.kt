@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.io.Serializable
 
-internal fun KotlinToolingVersion(kotlinVersionString: String): KotlinToolingVersion {
+public fun KotlinToolingVersion(kotlinVersionString: String): KotlinToolingVersion {
     val baseVersion = kotlinVersionString.split("-", limit = 2)[0]
     val classifier = kotlinVersionString.split("-", limit = 2).getOrNull(1)
 
@@ -30,14 +30,14 @@ internal fun KotlinToolingVersion(kotlinVersionString: String): KotlinToolingVer
     )
 }
 
-internal class KotlinToolingVersion(
-    val major: Int,
-    val minor: Int,
-    val patch: Int,
-    val classifier: String?,
+public class KotlinToolingVersion(
+    public val major: Int,
+    public val minor: Int,
+    public val patch: Int,
+    public val classifier: String?,
 ) : Comparable<KotlinToolingVersion>, Serializable {
 
-    enum class Maturity {
+    public enum class Maturity {
         SNAPSHOT,
         DEV,
         MILESTONE,
@@ -47,7 +47,7 @@ internal class KotlinToolingVersion(
         STABLE,
     }
 
-    val maturity: Maturity = run {
+    public val maturity: Maturity = run {
         val classifier = this.classifier?.lowercase()
         when {
             classifier == null || classifier.matches(Regex("""(release-)?\d+""")) -> Maturity.STABLE
@@ -159,17 +159,17 @@ internal class KotlinToolingVersion(
     }
 }
 
-internal val KotlinToolingVersion.isDev: Boolean
+public val KotlinToolingVersion.isDev: Boolean
     get() = this.maturity == KotlinToolingVersion.Maturity.DEV
 
-internal val KotlinToolingVersion.isIdeBuild: Boolean
+public val KotlinToolingVersion.isIdeBuild: Boolean
     get() = classifier?.startsWith("ij", ignoreCase = true) == true
 
-internal fun KotlinToolingVersion.hasSameBaseVersionAs(other: KotlinToolingVersion): Boolean {
+public fun KotlinToolingVersion.hasSameBaseVersionAs(other: KotlinToolingVersion): Boolean {
     return major == other.major && minor == other.minor && patch == other.patch
 }
 
-internal val KotlinToolingVersion.buildNumber: Int?
+private val KotlinToolingVersion.buildNumber: Int?
     get() {
         if (classifier == null) return null
 
@@ -190,7 +190,7 @@ internal val KotlinToolingVersion.buildNumber: Int?
         return classifierMatch.groupValues.getOrNull(4)?.toIntOrNull()
     }
 
-internal val KotlinToolingVersion.classifierNumber: Int?
+private val KotlinToolingVersion.classifierNumber: Int?
     get() {
         if (classifier == null) return null
 

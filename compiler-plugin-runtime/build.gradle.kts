@@ -16,6 +16,10 @@ kotlin {
     compilerOptions.jvmTarget = JvmTarget.JVM_17
 }
 
+dependencies {
+    api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
+}
+
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false

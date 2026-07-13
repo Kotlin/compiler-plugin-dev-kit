@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-
-internal object CompilerVersionAliases {
+public object CompilerVersionAliases {
     /**
      * Sentinel value in alias mappings indicating a version that only works in CLI (Gradle) builds,
      * not in IDE (IntelliJ/Android Studio) FIR integration. When [map] encounters this value, it
      * returns `null` to signal that the caller should skip enabling FIR extensions.
      */
-    const val CLI_ONLY: String = "CLI_ONLY"
+    public const val CLI_ONLY: String = "CLI_ONLY"
 
     /**
      * Resolves a compiler version through alias mappings.
@@ -24,7 +22,7 @@ internal object CompilerVersionAliases {
      * This is primarily used to map fake IDE compiler versions (e.g., Android Studio canary builds
      * reporting `2.3.255-dev-255`) to their real compiler versions.
      */
-    fun map(
+    public fun map(
         version: KotlinToolingVersion,
         userAliases: Map<String, String> = emptyMap(),
     ): KotlinToolingVersion? {

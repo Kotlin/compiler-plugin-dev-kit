@@ -22,7 +22,6 @@ import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 private const val PLUGIN_VERSIONS_PATH = "META-INF/kotlin/plugin/versions"
 
@@ -46,13 +45,13 @@ public abstract class MultiReleasePluginTransform :
                     newFileSystem(input).use { inputFs ->
                         val inputRoot = inputFs.rootDirectories.single()
                         val version = findVersion(inputRoot) ?: return@default
-                        val versionDir = inputRoot / PLUGIN_VERSIONS_PATH / version.versionString
+                        val versionDir = inputRoot / PLUGIN_VERSIONS_PATH / version.toString()
 
                         val output =
                             outputs
                                 .file(
                                     input.name.removeSuffix(".jar") +
-                                        "-${version.versionString}.jar"
+                                        "-${version.toString()}.jar"
                                 )
                                 .toPath()
 
@@ -65,8 +64,8 @@ public abstract class MultiReleasePluginTransform :
                 // TODO this code path is unexercised and is likely pointless.
                 input.isDirectory() -> {
                     val version = findVersion(input) ?: return@default
-                    val versionDir = input / PLUGIN_VERSIONS_PATH / version.versionString
-                    val output = outputs.dir(input.name + "-${version.versionString}").toPath()
+                    val versionDir = input / PLUGIN_VERSIONS_PATH / version.toString()
+                    val output = outputs.dir(input.name + "-$version").toPath()
                     return copyToOutput(input, versionDir, output)
                 }
             }

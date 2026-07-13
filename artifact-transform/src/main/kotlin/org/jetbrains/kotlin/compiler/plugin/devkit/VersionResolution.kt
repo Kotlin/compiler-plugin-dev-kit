@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-
-internal object VersionResolution {
+public object VersionResolution {
     /**
      * Pick the highest compatible version.
      *
@@ -22,7 +20,7 @@ internal object VersionResolution {
      * This ensures that a dev build like 2.3.20-dev-7791 doesn't incorrectly match 2.3.20-Beta1
      * just because beta > dev in maturity ordering.
      */
-    fun resolveVersion(
+    public fun resolveVersion(
         currentVersion: KotlinToolingVersion,
         versions: List<KotlinToolingVersion>,
     ): KotlinToolingVersion? {
