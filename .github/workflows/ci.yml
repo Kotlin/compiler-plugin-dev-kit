@@ -135,7 +135,7 @@ jobs:
       - name: Run JS box tests
         if: github.ref == 'refs/heads/template-refactoring-poc'
         run: |
-          ./gradlew :compiler-tests:test --continue -Pmetro.jsBoxTestRetries=3 \
+          ./gradlew :compiler-tests:test --continue \
             --tests 'dev.zacsweers.metro.compiler.JsBoxTestGenerated*' \
             --tests 'dev.zacsweers.metro.compiler.JsFastInitBoxTestGenerated*' \
             --tests 'dev.zacsweers.metro.compiler.JsContributionProvidersBoxTestGenerated*'
