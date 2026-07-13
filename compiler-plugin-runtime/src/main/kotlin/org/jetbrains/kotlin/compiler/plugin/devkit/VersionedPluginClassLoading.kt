@@ -1,6 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.net.URI
+import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.FileSystems.newFileSystem
 import java.nio.file.Path
@@ -19,20 +20,26 @@ import org.jetbrains.kotlin.config.KotlinCompilerVersion
 internal const val PLUGIN_VERSIONS_PATH = "META-INF/kotlin/plugin/versions"
 
 object VersionedPluginClassLoading {
-    private val cache = ConcurrentHashMap<URLClassLoader, ClassLoader>()
+    private val cache = ConcurrentHashMap<ClassLoader, ClassLoader>()
 
     fun resolve(anchor: Class<*>): ClassLoader {
         val parent = anchor.classLoader
         val currentVersion = KotlinCompilerVersion.getVersion()?.let(::KotlinToolingVersion)
-        if (currentVersion == null || parent !is URLClassLoader) return parent
-        return cache.getOrPut(parent) { resolveUncached(parent, currentVersion) }
+        val urls = if (parent is URLClassLoader) parent.urLs.toList() else runCatching {
+            val method = parent.javaClass.getMethod("getUrls")
+            @Suppress("UNCHECKED_CAST")
+            method.invoke(parent) as? Iterable<URL>
+        }.getOrNull()
+        if (currentVersion == null || urls == null) return parent
+        return cache.getOrPut(parent) { resolveUncached(parent, urls, currentVersion) }
     }
 
     private fun resolveUncached(
-        parent: URLClassLoader,
+        parent: ClassLoader,
+        urls: Iterable<URL>,
         currentVersion: KotlinToolingVersion,
     ): ClassLoader = buildList {
-        parent.urLs.forEach { url ->
+        urls.forEach { url ->
             url.toURI().toPath().openDirectory { root ->
                 findVersion(root, currentVersion)?.let {
                     add(URI((root / PLUGIN_VERSIONS_PATH / it.toString()).toUri().toString() + "/").toURL())
