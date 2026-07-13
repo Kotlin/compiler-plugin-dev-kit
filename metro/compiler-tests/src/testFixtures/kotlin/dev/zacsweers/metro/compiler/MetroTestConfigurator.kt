@@ -33,8 +33,10 @@ class MetroTestConfigurator(testServices: TestServices) : MetaTestConfigurator(t
     }
 
     val jsDiagnosticSuite =
-      testServices.testInfo.className.substringAfterLast('.').substringBefore('$') ==
-        "JsDiagnosticTestGenerated"
+      testServices.testInfo.className
+        .substringAfterLast('.')
+        .substringBefore('$')
+        .endsWith("JsDiagnosticTestGenerated")
     if (testServices.isJsBackend() && jsDiagnosticSuite) {
       val rendersIrDiagnostics = DiagnosticsDirectives.RENDER_IR_DIAGNOSTICS_FULL_TEXT in directives
       val usesJvmInteropDependencies =

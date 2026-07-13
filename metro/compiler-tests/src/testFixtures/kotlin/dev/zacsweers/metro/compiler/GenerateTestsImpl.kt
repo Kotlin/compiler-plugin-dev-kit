@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestGenerator
+import org.jetbrains.kotlin.compiler.plugin.devkit.sourceSetTestClass
 import org.jetbrains.kotlin.generators.dsl.TestGroup
-import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 
 // API repackaged in kotlin 2.3.0
 inline fun <
@@ -19,34 +20,29 @@ inline fun <
   reified FirDump,
   reified IrDump,
   reified Reports,
-> generateTests(exclusionPattern: String?) {
-  generateTestGroupSuiteWithJUnit5 {
-    testGroup(
-      testDataRoot = "compiler-tests/src/test/data",
-      testsRoot = "compiler-tests/src/test/java",
-    ) {
-      val commonModel: TestGroup.TestClass.(name: String) -> Unit = { name ->
-        model(name, excludedPattern = exclusionPattern)
-      }
-      val nonJvmModel: TestGroup.TestClass.(name: String) -> Unit = { name ->
-        model(
-          name,
-          excludedPattern = exclusionPattern,
-          excludeDirsRecursively = listOf("interop", "circuit"),
-        )
-      }
-      testClass<Box> { commonModel("box") }
-      testClass<FastInitBox> { commonModel("box") }
-      testClass<ContributionProvidersBox> { commonModel("box") }
-      testClass<JsBox> { nonJvmModel("box") }
-      testClass<JsFastInitBox> { nonJvmModel("box") }
-      testClass<JsContributionProvidersBox> { nonJvmModel("box") }
-      testClass<IrOnlyClassesBox> { commonModel("box") }
-      testClass<Diagnostic> { commonModel("diagnostic") }
-      testClass<JsDiagnostic> { nonJvmModel("diagnostic") }
-      testClass<FirDump> { commonModel("dump/fir") }
-      testClass<IrDump> { commonModel("dump/ir") }
-      testClass<Reports> { commonModel("dump/reports") }
+> generateTests(args: Array<String>, exclusionPattern: String?) {
+  DevKitTestGenerator.generate(args) {
+    val commonModel: TestGroup.TestClass.(name: String) -> Unit = { name ->
+      model(name, excludedPattern = exclusionPattern)
     }
+    val nonJvmModel: TestGroup.TestClass.(name: String) -> Unit = { name ->
+      model(
+        name,
+        excludedPattern = exclusionPattern,
+        excludeDirsRecursively = listOf("interop", "circuit"),
+      )
+    }
+    sourceSetTestClass<Box> { commonModel("box") }
+    sourceSetTestClass<FastInitBox> { commonModel("box") }
+    sourceSetTestClass<ContributionProvidersBox> { commonModel("box") }
+    sourceSetTestClass<JsBox> { nonJvmModel("box") }
+    sourceSetTestClass<JsFastInitBox> { nonJvmModel("box") }
+    sourceSetTestClass<JsContributionProvidersBox> { nonJvmModel("box") }
+    sourceSetTestClass<IrOnlyClassesBox> { commonModel("box") }
+    sourceSetTestClass<Diagnostic> { commonModel("diagnostic") }
+    sourceSetTestClass<JsDiagnostic> { nonJvmModel("diagnostic") }
+    sourceSetTestClass<FirDump> { commonModel("dump/fir") }
+    sourceSetTestClass<IrDump> { commonModel("dump/ir") }
+    sourceSetTestClass<Reports> { commonModel("dump/reports") }
   }
 }

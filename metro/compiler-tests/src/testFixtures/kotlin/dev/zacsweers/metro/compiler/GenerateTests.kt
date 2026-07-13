@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-fun main() {
+fun main(args: Array<String>) {
   generateTests<
     AbstractBoxTest,
     AbstractFastInitBoxTest,
@@ -17,6 +17,7 @@ fun main() {
     AbstractIrDumpTest,
     AbstractReportsTest,
   >(
-    null
+    args,
+    null,
   )
 }

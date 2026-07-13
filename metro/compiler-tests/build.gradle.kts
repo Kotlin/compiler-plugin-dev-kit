@@ -79,6 +79,7 @@ pluginDevKit {
     KotlinToolingVersion(
       providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
     )
+  generateTestsClass = "$group.compiler.GenerateTestsKt"
 }
 
 // Configure the compiler-version-related test properties per registered devkit test suite, so
@@ -204,31 +205,6 @@ dependencies {
   testRuntimeOnly(libs.kotlin.scriptRuntime)
   testRuntimeOnly(libs.kotlin.annotationsJvm)
 }
-
-tasks.named("generateTests") {
-  enabled = false
-}
-
-val generateTests =
-  tasks.register<JavaExec>("generateTests2") {
-    inputs
-      .dir(layout.projectDirectory.dir("src/test/data"))
-      .withPropertyName("testData")
-      .withPathSensitivity(PathSensitivity.RELATIVE)
-
-    outputs.dir(layout.projectDirectory.dir("src/test/java"))
-
-    classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("dev.zacsweers.metro.compiler.GenerateTestsKt")
-    workingDir = rootDir
-
-    // Larger heap size
-    minHeapSize = "128m"
-    maxHeapSize = "1g"
-
-    // Larger stack size
-    jvmArgs("-Xss1m")
-  }
 
 val largeTestMode = providers.gradleProperty("metro.enableLargeTests").isPresent
 val excludeJsBoxTests = providers.gradleProperty("metro.excludeJsBoxTests").isPresent
