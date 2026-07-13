@@ -4,16 +4,16 @@ package dev.zacsweers.metro.gradle.incremental
 
 import com.autonomousapps.kit.gradle.Dependency.Companion.implementation
 import com.google.common.truth.Truth.assertThat
-import dev.zacsweers.metro.gradle.FileSnapshot
 import dev.zacsweers.metro.gradle.KmpTarget
 import dev.zacsweers.metro.gradle.MetroOptionOverrides
 import dev.zacsweers.metro.gradle.MetroProject
-import dev.zacsweers.metro.gradle.getTestCompilerVersion
-import dev.zacsweers.metro.gradle.invokeMain
-import dev.zacsweers.metro.gradle.snapshot
 import dev.zacsweers.metro.gradle.toKotlinVersion
 import java.io.File
 import org.gradle.testkit.runner.TaskOutcome
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.FileSnapshot
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.invokeMain
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.snapshot
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test

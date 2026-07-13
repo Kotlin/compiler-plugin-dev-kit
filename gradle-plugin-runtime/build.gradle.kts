@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     `embedded-kotlin`
     `java-gradle-plugin`
+    `java-test-fixtures`
 }
 
 java {
@@ -15,5 +16,10 @@ kotlin {
 
 dependencies {
     implementation(kotlin("gradle-plugin-api"))
-    testImplementation(kotlin("test-junit5"))
+
+    testFixturesApi(gradleTestKit())
+    testFixturesApi(kotlin("test-junit5"))
+    testFixturesApi(libs.testkit.support)
+    testFixturesApi(libs.testkit.truth)
+    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
 }

@@ -8,6 +8,7 @@ plugins {
   alias(libs.plugins.kotlin.plugin.serialization)
   alias(libs.plugins.poko)
   id("metro.publish")
+  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
 }
 
 metroArtifact {

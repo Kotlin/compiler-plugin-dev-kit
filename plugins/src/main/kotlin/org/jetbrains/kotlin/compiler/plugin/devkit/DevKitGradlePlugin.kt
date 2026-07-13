@@ -129,6 +129,12 @@ public class DevKitGradlePlugin : Plugin<Project> {
                         pluginDevKit.functionalTestRepo,
                     )
                 )
+                jvmArgumentProviders.add(
+                    StringSystemPropertyArgumentProvider(
+                        "com.autonomousapps.plugin-under-test.version",
+                        project.provider { project.version.toString() },
+                    )
+                )
             }
         }
 
@@ -232,4 +238,11 @@ private class FileSystemPropertyArgumentProvider(
 ) : CommandLineArgumentProvider {
     override fun asArguments(): Iterable<String> =
         listOf("-D$propName=${value.get().asFile.invariantSeparatorsPath}")
+}
+
+private class StringSystemPropertyArgumentProvider(
+    @Internal val propName: String,
+    @Internal val value: Provider<String>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf("-D$propName=${value.get()}")
 }

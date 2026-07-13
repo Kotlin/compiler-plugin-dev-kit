@@ -17,6 +17,7 @@ plugins {
   alias(libs.plugins.kotlin.compiler.plugin.devkit.gradle.plugin)
   id("metro.base")
   id("metro.publish")
+  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
 }
 
 metroArtifact {
@@ -169,6 +170,9 @@ dependencies {
   functionalTestImplementation(libs.kotlin.test)
   functionalTestImplementation(libs.testkit.support)
   functionalTestImplementation(libs.testkit.truth)
+  functionalTestImplementation(
+    testFixtures("org.jetbrains.kotlin.compiler.plugin.devkit:gradle-plugin-runtime")
+  )
   // TODO really only here for extensions tests
   functionalTestRuntimeOnly(project(":compiler"))
   functionalTestRuntimeOnly(project(":runtime"))
@@ -193,10 +197,6 @@ val functionalTestKmpTarget = providers.gradleProperty("metro.functionalTestKmpT
 
 tasks.withType<Test>().configureEach {
   maxParallelForks = Runtime.getRuntime().availableProcessors() * 2
-  systemProperty(
-    "com.autonomousapps.plugin-under-test.version",
-    providers.gradleProperty("VERSION_NAME").get(),
-  )
   systemProperty("metro.agpVersion", libs.versions.agp.get())
   systemProperty("metro.androidHome", androidHomeOrNull()?.absolutePath)
   functionalTestKmpTarget?.let { systemProperty("metro.functionalTestKmpTarget", it) }

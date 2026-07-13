@@ -29,6 +29,11 @@ gradlePlugin {
             id = "org.jetbrains.kotlin.compiler.plugin.devkit.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
         }
+        create("functionalTestPublishing") {
+            id = "org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing"
+            implementationClass =
+                "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitFunctionalTestPublishingPlugin"
+        }
     }
 }
 

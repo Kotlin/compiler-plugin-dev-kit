@@ -13,6 +13,9 @@ import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.isDev
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerToolingVersion
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 

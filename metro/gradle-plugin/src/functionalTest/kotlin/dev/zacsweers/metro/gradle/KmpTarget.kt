@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.gradle
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.detectHostNativeTarget
+
 /**
  * Targets a parameterized [MetroProject] is exercised against. Each entry maps to a single Kotlin
  * multiplatform target declared by [MetroProject.applyMetroDefault] when `multiplatform = true`.
@@ -50,17 +52,5 @@ enum class KmpTarget(val gradleTargetName: String) {
           )
       }
     }
-  }
-}
-
-private fun detectHostNativeTarget(): String {
-  val os = System.getProperty("os.name").orEmpty().lowercase()
-  val arch = System.getProperty("os.arch").orEmpty().lowercase()
-  val isArm64 = arch == "aarch64" || arch == "arm64"
-  return when {
-    os.contains("mac") || os.contains("darwin") -> if (isArm64) "macosArm64" else "macosX64"
-    os.contains("windows") -> "mingwX64"
-    os.contains("linux") -> if (isArm64) "linuxArm64" else "linuxX64"
-    else -> "linuxX64"
   }
 }

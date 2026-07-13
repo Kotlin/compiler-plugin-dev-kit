@@ -8,8 +8,6 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinBasePlugin
 
 apply(plugin = "com.vanniktech.maven.publish")
 
-apply(plugin = "com.autonomousapps.testkit")
-
 val extension = project.extensions.create<MetroArtifactExtension>("metroArtifact")
 
 extension.artifactId.convention(project.name)
@@ -46,27 +44,4 @@ afterEvaluate {
 // Compiler-compat artifacts get explicit API mode too; only the main :compiler module is exempt.
 if (project.path != ":compiler") {
   plugins.withType<KotlinBasePlugin> { configure<KotlinProjectExtension> { explicitApi() } }
-}
-
-// Every publish task must run after every sign task to avoid implicit-dependency validation
-// errors where the testkit publication and main publication share outputs from each other's
-// signing tasks.
-tasks
-  .named { it.startsWith("publish") && it.contains("PublicationTo") }
-  .configureEach { mustRunAfter(tasks.matching { it.name.startsWith("sign") }) }
-
-// `testKitSupportForJava` is only meant for the local FunctionalTest repo; don't let it publish
-// to Maven Central where it would race the real `maven` publication at the same coordinates.
-tasks
-  .matching { it.name == "publishTestKitSupportForJavaPublicationToMavenCentralRepository" }
-  .configureEach { enabled = false }
-
-// When TestKit adds its coordinate-correcting publication, it replaces the local `maven` publish.
-// Modules whose existing coordinates already match `(group, project.name, version)` keep the
-// original task. TestKit creates the extra publication in `afterEvaluate`, so check after it.
-afterEvaluate {
-  val publishing = extensions.findByType(PublishingExtension::class.java) ?: return@afterEvaluate
-  if (publishing.publications.findByName("testKitSupportForJava") != null) {
-    tasks.findByName("publishMavenPublicationToFunctionalTestRepository")?.enabled = false
-  }
 }

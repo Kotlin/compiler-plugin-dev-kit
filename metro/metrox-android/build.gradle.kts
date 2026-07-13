@@ -3,6 +3,7 @@
 plugins {
   alias(libs.plugins.android.library)
   id("metro.publish")
+  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
 }
 
 metroArtifact {

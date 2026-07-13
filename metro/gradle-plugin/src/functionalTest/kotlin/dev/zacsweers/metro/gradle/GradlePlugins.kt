@@ -4,6 +4,7 @@ package dev.zacsweers.metro.gradle
 
 import com.autonomousapps.kit.AbstractGradleProject.Companion.PLUGIN_UNDER_TEST_VERSION
 import com.autonomousapps.kit.gradle.Plugin
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerVersion
 
 object GradlePlugins {
   private val pluginVersion = PLUGIN_UNDER_TEST_VERSION

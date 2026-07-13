@@ -8,13 +8,13 @@ import com.autonomousapps.kit.GradleProject
 import com.autonomousapps.kit.Source
 import com.autonomousapps.kit.Subproject
 import dev.zacsweers.metro.gradle.KmpTarget
-import dev.zacsweers.metro.gradle.KotlinToolingVersion
 import dev.zacsweers.metro.gradle.copy
-import dev.zacsweers.metro.gradle.getTestCompilerToolingVersion
-import dev.zacsweers.metro.gradle.getTestCompilerVersion
-import dev.zacsweers.metro.gradle.resolveSafe
 import java.io.File
 import org.intellij.lang.annotations.Language
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerToolingVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.resolveSafe
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Before
