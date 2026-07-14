@@ -2,29 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.gradle.incremental
 
-import com.autonomousapps.kit.GradleBuilder.build
-import com.autonomousapps.kit.GradleBuilder.buildAndFail
 import com.autonomousapps.kit.GradleProject
-import com.autonomousapps.kit.Source
-import com.autonomousapps.kit.Subproject
-import dev.zacsweers.metro.gradle.KmpTarget
-import dev.zacsweers.metro.gradle.copy
 import java.io.File
-import org.intellij.lang.annotations.Language
-import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
-import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerToolingVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.AbstractIncrementalCompilationTest
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.KmpTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerVersion
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.resolveSafe
 import org.junit.Assume.assumeFalse
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 
-private const val GRADLE_DEBUG_ARGS = "-Dorg.gradle.debug=true"
-private const val KOTLIN_DEBUG_ARGS =
-  """-Dkotlin.daemon.jvm.options="-agentlib:jdwp=transport=dt_socket\,server=n\,suspend=y\,address=5005""""
-
-/** Minimum Kotlin version that supports incremental compilation for KMP projects. */
-private val MULTIPLATFORM_IC_MIN_VERSION = KotlinToolingVersion("2.3.21")
 
 /**
  * Kotlin/JS and Kotlin/Wasm IC trip on top-level declaration generation in these specific Kotlin
@@ -36,15 +22,10 @@ private val MULTIPLATFORM_IC_MIN_VERSION = KotlinToolingVersion("2.3.21")
  */
 private val JS_WASM_IC_TOP_LEVEL_BROKEN_VERSIONS = setOf("2.4.0-Beta1", "2.4.0-dev-2124")
 
-abstract class BaseIncrementalCompilationTest(protected val target: KmpTarget) {
+abstract class BaseIncrementalCompilationTest(target: KmpTarget) :
+  AbstractIncrementalCompilationTest(target) {
 
-  @Before
-  fun assumeMultiplatformIcSupported() {
-    assumeTrue(
-      "KMP incremental compilation requires Kotlin $MULTIPLATFORM_IC_MIN_VERSION+",
-      getTestCompilerToolingVersion() >= MULTIPLATFORM_IC_MIN_VERSION,
-    )
-  }
+  override val defaultImports = listOf("dev.zacsweers.metro.*")
 
   @Before
   fun assumeJsAndWasmTopLevelDeclarationsSupported() {
@@ -54,28 +35,6 @@ abstract class BaseIncrementalCompilationTest(protected val target: KmpTarget) {
         "${getTestCompilerVersion()} (KT-82395, KT-82989)",
       getTestCompilerVersion() in JS_WASM_IC_TOP_LEVEL_BROKEN_VERSIONS,
     )
-  }
-
-  /** Compile task name for the [target]'s main compilation, e.g. `compileKotlinJvm`. */
-  protected val targetCompileTaskName: String
-    get() = target.compileTaskName
-
-  /**
-   * Returns the fully-qualified Gradle task path for the current [target]'s compile task. Pass an
-   * empty [projectPath] for the root project, or a name like `"lib"` / `":lib"` for a subproject.
-   */
-  protected fun compileTaskFor(projectPath: String = ""): String {
-    val normalized = projectPath.trim(':')
-    return if (normalized.isEmpty()) {
-      ":$targetCompileTaskName"
-    } else {
-      ":$normalized:$targetCompileTaskName"
-    }
-  }
-
-  /** Runs [block] only when the current parameter [target] is [KmpTarget.JVM]. */
-  protected inline fun ifJvmTarget(block: () -> Unit) {
-    if (target == KmpTarget.JVM) block()
   }
 
   protected val GradleProject.asMetroProject: MetroGradleProject
@@ -209,94 +168,5 @@ abstract class BaseIncrementalCompilationTest(protected val target: KmpTarget) {
         .resolveSafe("merging-unmatched-rank-replacements-fir/$graphFqName.txt")
         .readText()
     }
-  }
-
-  protected fun GradleProject.delete(source: Source) {
-    val filePath = "src/commonMain/kotlin/${source.path}/${source.name}.kt"
-    rootDir.resolve(filePath).delete()
-  }
-
-  protected fun GradleProject.modify(source: Source, @Language("kotlin") content: String) {
-    val newSource = source.copy(content)
-    val filePath = "src/commonMain/kotlin/${newSource.path}/${newSource.name}.kt"
-    rootDir.resolve(filePath).writeText(newSource.source)
-  }
-
-  protected fun Subproject.modify(
-    rootDir: File,
-    source: Source,
-    @Language("kotlin") content: String,
-    includeDefaultImports: Boolean = true,
-  ) {
-    val newSource = source.copy(content, includeDefaultImports)
-    val filePath = "src/commonMain/kotlin/${newSource.path}/${newSource.name}.kt"
-    val projectPath = rootDir.resolve(this.name.removePrefix(":").replace(":", "/"))
-    projectPath.resolve(filePath).writeText(newSource.source)
-  }
-
-  protected fun Subproject.delete(rootDir: File, source: Source) {
-    val filePath = "src/commonMain/kotlin/${source.path}/${source.name}.kt"
-    val projectPath = rootDir.resolve(this.name.removePrefix(":").replace(":", "/"))
-    projectPath.resolve(filePath).delete()
-  }
-
-  protected fun modifyKotlinFile(
-    rootDir: File,
-    packageName: String,
-    fileName: String,
-    @Language("kotlin") content: String,
-  ) {
-    val packageDir = packageName.replace('.', '/')
-    val filePath = "src/commonMain/kotlin/$packageDir/$fileName"
-    rootDir.resolve(filePath).writeText(content)
-  }
-
-  protected fun GradleProject.compileKotlin(
-    task: String = compileTaskFor(),
-    debug: Boolean = false,
-    vararg args: String,
-  ) = compileKotlin(rootDir, task, debug, *args)
-
-  protected fun GradleProject.compileKotlinAndFail(
-    task: String = compileTaskFor(),
-    debug: Boolean = false,
-    vararg args: String,
-  ) = compileKotlinAndFail(rootDir, task, debug, *args)
-
-  protected fun compileKotlin(
-    projectDir: File,
-    task: String = compileTaskFor(),
-    enableDebugger: Boolean = false,
-    vararg args: String,
-  ) = build(projectDir, *buildArgs(task, enableDebugger, quiet = true, *args))
-
-  protected fun compileKotlinAndFail(
-    projectDir: File,
-    task: String = compileTaskFor(),
-    enableDebugger: Boolean = false,
-    vararg args: String,
-  ) = buildAndFail(projectDir, *buildArgs(task, enableDebugger, quiet = true, *args))
-
-  private fun buildArgs(
-    task: String,
-    enableDebugger: Boolean,
-    quiet: Boolean,
-    vararg args: String,
-  ): Array<String> {
-    return buildList {
-      add(task)
-      // These tests assert raw diagnostic text; plain console keeps Metro's AUTO console mode
-      // from resolving to RICH (ANSI codes) on developer machines.
-      add("--console=plain")
-      if (enableDebugger) {
-        add(GRADLE_DEBUG_ARGS)
-        add(KOTLIN_DEBUG_ARGS)
-      }
-      if (quiet) {
-        add("--quiet")
-      }
-      addAll(args)
-    }
-      .toTypedArray()
   }
 }

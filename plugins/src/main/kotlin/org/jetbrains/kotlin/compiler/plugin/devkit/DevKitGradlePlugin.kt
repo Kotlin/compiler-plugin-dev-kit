@@ -61,6 +61,7 @@ public fun Project.DevKitGradlePluginTestTarget(
             classpath = files(functionalTestSourceSet.map { it.runtimeClasspath })
             dependsOn("deleteOldFuncTests", "installForFunctionalTest")
             mustRunAfter("test")
+            maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
             jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
             systemProperty("$DEV_KIT_GROUP.gradle.test.kotlin-version", version.versionString)
         },
@@ -131,6 +132,8 @@ public class DevKitGradlePlugin : Plugin<Project> {
         pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
         pluginDevKit.functionalTestRepo.convention(layout.buildDirectory.dir("functionalTestRepo"))
 
+        val kmpTargetProperty = "$DEV_KIT_GROUP.gradle.test.kmpTarget"
+        val kmpTarget = providers.gradleProperty(kmpTargetProperty)
         pluginDevKit.testAgainst.configureEach {
             testTask {
                 +FileSystemPropertyArgumentProvider(
@@ -141,6 +144,7 @@ public class DevKitGradlePlugin : Plugin<Project> {
                     "com.autonomousapps.plugin-under-test.version",
                     project.provider { project.version.toString() },
                 )
+                +OptionalStringSystemPropertyArgumentProvider(kmpTargetProperty, kmpTarget)
             }
         }
 
@@ -150,10 +154,8 @@ public class DevKitGradlePlugin : Plugin<Project> {
                 mainCompilation.implementationConfigurationName,
                 "$DEV_KIT_GROUP:gradle-plugin-runtime",
             )
-            addIf(
-                pluginDevKit.addRuntimeDependency,
-                functionalTestCompilation.implementationConfigurationName,
-                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime"),
+            functionalTestCompilation.implementationConfigurationName(
+                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime")
             )
         }
 

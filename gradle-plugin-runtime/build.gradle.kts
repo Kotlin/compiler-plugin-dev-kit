@@ -19,6 +19,7 @@ dependencies {
 
     testFixturesApi(gradleTestKit())
     testFixturesApi(kotlin("test-junit5"))
+    testFixturesApi("junit:junit:4.13.2") // TODO don't force junit version
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
     testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")

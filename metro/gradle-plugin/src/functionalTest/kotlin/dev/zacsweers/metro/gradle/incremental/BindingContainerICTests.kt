@@ -6,15 +6,15 @@ package dev.zacsweers.metro.gradle.incremental
 
 import com.autonomousapps.kit.gradle.Dependency
 import com.google.common.truth.Truth.assertThat
-import dev.zacsweers.metro.gradle.KmpTarget
 import dev.zacsweers.metro.gradle.MetroOptionOverrides
 import dev.zacsweers.metro.gradle.MetroProject
-import dev.zacsweers.metro.gradle.toKotlinVersion
 import org.gradle.testkit.runner.TaskOutcome
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.KmpTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.assertOutputContains
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.cleanOutputLine
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.getTestCompilerVersion
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.invokeMain
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.toKotlinVersion
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith

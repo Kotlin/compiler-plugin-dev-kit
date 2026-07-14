@@ -11,13 +11,13 @@ import com.autonomousapps.kit.gradle.Dependency
 import com.autonomousapps.kit.gradle.Dependency.Companion.implementation
 import com.google.common.truth.Truth.assertThat
 import dev.zacsweers.metro.gradle.GradlePlugins
-import dev.zacsweers.metro.gradle.KmpTarget
 import dev.zacsweers.metro.gradle.MetroProject
-import dev.zacsweers.metro.gradle.source
 import java.io.File
 import java.net.URLClassLoader
 import org.gradle.testkit.runner.TaskOutcome
 import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.KmpTarget
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.KotlinPlugins
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.buildAndAssertThat
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.classLoader
 import org.jetbrains.kotlin.compiler.plugin.devkit.test.cleanOutputLine
@@ -2241,7 +2241,7 @@ class ICTests(target: KmpTarget) : BaseIncrementalCompilationTest(target) {
               sources = projectSources
               withBuildScript {
                 plugins(
-                  GradlePlugins.Kotlin.multiplatform(),
+                  KotlinPlugins.multiplatform(),
                   GradlePlugins.agpKmp,
                   GradlePlugins.metro,
                 )

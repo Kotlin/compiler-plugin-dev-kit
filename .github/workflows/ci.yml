@@ -87,9 +87,9 @@ jobs:
       - name: Check root project
         run: |
           echo "Running checks..."
-          # metro.functionalTestKmpTarget=jvm scopes IC test parameterization to JVM only here. The
+          # kmpTarget=jvm scopes IC test parameterization to JVM only here. The
           # kmp-functional job (main only) fans the remaining targets out into parallel runners.
-          ./gradlew check --continue '-Pmetro.testCompilerVersion=${{ matrix.kotlin-compiler }}' -Pmetro.excludeJsBoxTests -Pmetro.functionalTestKmpTarget=jvm ${{ github.ref != 'refs/heads/template-refactoring-poc' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
+          ./gradlew check --continue '-Pmetro.testCompilerVersion=${{ matrix.kotlin-compiler }}' -Pmetro.excludeJsBoxTests -Porg.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget=jvm ${{ github.ref != 'refs/heads/template-refactoring-poc' && '-Dorg.gradle.configuration-cache.read-only=true' || '' }}
 
       - name: (Fail-only) Upload reports
         if: failure()
@@ -194,7 +194,7 @@ jobs:
 
       - name: ':gradle-plugin:functionalTest'
         if: github.ref == 'refs/heads/template-refactoring-poc'
-        run: ./gradlew :gradle-plugin:functionalTest --continue -Pmetro.functionalTestKmpTarget=${{ matrix.target }}
+        run: ./gradlew :gradle-plugin:functionalTest --continue -Porg.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget=${{ matrix.target }}
 
       - name: (Fail-only) Upload reports
         if: failure() && github.ref == 'refs/heads/template-refactoring-poc'
@@ -328,7 +328,7 @@ jobs:
         if: github.ref == 'refs/heads/template-refactoring-poc'
         # `all` exercises every KmpTarget entry on this OS — host native is OS-specific (macosArm64,
         # mingwX64, etc.), so each runner covers a different native target naturally.
-        run: ./gradlew :runtime:allTests :gradle-plugin:functionalTest --continue --quiet -Pmetro.functionalTestKmpTarget=all
+        run: ./gradlew :runtime:allTests :gradle-plugin:functionalTest --continue --quiet -Porg.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget=all
 
       - name: Check samples
         if: github.ref == 'refs/heads/template-refactoring-poc'

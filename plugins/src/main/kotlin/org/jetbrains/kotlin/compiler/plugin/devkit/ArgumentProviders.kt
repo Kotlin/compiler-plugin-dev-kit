@@ -10,6 +10,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
@@ -75,6 +76,14 @@ internal class StringSystemPropertyArgumentProvider(
     @Input val value: Provider<out String>,
 ) : CommandLineArgumentProviderFlatMap {
     override fun asArguments(): Iterable<String> = listOf("-D$propName=${value()}")
+}
+
+internal class OptionalStringSystemPropertyArgumentProvider(
+    @Input val propName: String,
+    @Optional @Input val value: Provider<String>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> =
+        value.orNull?.let { listOf("-D$propName=$it") } ?: emptyList()
 }
 
 context(exec: JavaForkOptions)
