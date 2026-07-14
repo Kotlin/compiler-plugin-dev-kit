@@ -35,6 +35,7 @@ pluginDevKit {
     // its KotlinStandardLibrariesPathProvider impl assumes wasm stdlib APIs this dev build lacks.)
     developForWithFixtures(KotlinToolingVersion("2.4.0-dev-2124")) {
         testFixtures {
+            kotlin.srcDirs(k2320Target.testFixtures.map { it.kotlin.sourceDirectories })
             java.srcDirs(k2320Target.testFixtures.map { it.java.sourceDirectories })
             resources.srcDirs(k2320Target.testFixtures.map { it.resources.srcDirs })
         }
@@ -60,6 +61,7 @@ pluginDevKit {
             if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
                 developForWithFixtures(it) {
                     testFixtures {
+                        kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
                         java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
                         resources.srcDirs(k2420Target.testFixtures.map { it.resources.srcDirs })
                     }

@@ -10,29 +10,26 @@ import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
-import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
+import org.gradle.api.plugins.JavaPlugin
+import org.gradle.api.plugins.internal.JavaPluginHelper
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.JavaExec
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
+import org.gradle.internal.component.external.model.TestFixturesSupport
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
@@ -44,14 +41,15 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
+import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.gradle.plugins.ide.api.GeneratorTask
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.internal.generator.generator.Generator
-import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.testing.base.TestingExtension
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
@@ -249,7 +247,8 @@ public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     init {
         generator =
             object : Generator<String> {
-                override fun read(inputFile: File?): String? = inputFile?.readText()
+                override fun read(inputFile: File?): String? =
+                    defaultRepl.orNull ?: inputFile?.readText()
 
                 override fun defaultInstance(): String? = defaultRepl.orNull
 
@@ -262,39 +261,13 @@ public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     }
 }
 
-// Lazy. Takes a Provider<FileCollection> rather than Provider<Configuration> cuz configuration
-// cache
-private class LibraryPathArgumentProvider(
-    @get:Input val propNames: List<String>,
-    @get:Input val jarName: String,
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.ABSOLUTE)
-    val configuration: Provider<out FileCollection>,
-) : CommandLineArgumentProvider {
-    override fun asArguments(): Iterable<String> {
-        val regex = """$jarName-\d.*""".toRegex()
-        val path = configuration.get().files.find { regex.matches(it.name) }?.absolutePath
-        return if (path != null) propNames.map { "-D$it=$path" } else emptyList()
-    }
-}
-
-private class ClasspathSystemPropertyArgumentProvider(
-    @get:Input val propName: String,
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.ABSOLUTE)
-    val configuration: Provider<out FileCollection>,
-) : CommandLineArgumentProvider {
-    override fun asArguments(): Iterable<String> =
-        listOf("-D$propName=${configuration.get().asPath}")
-}
-
 // Public so consumers of this plugin (e.g. :compiler-tests) can reuse it for their own
 // classpath-derived system properties
 public fun Test.setClasspathProperty(
     propName: String,
     configuration: Provider<out FileCollection>,
 ) {
-    jvmArgumentProviders.add(ClasspathSystemPropertyArgumentProvider(propName, configuration))
+    +ClasspathSystemPropertyArgumentProvider(propName, configuration)
 }
 
 @OptIn(ExperimentalWasmDsl::class)
@@ -314,7 +287,26 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         project.plugins.apply(D8Plugin::class.java)
 
         val kotlinExtension = extensions.getByType<KotlinJvmProjectExtension>()
-        val sourceSets = extensions.getByType<SourceSetContainer>()
+        val mainCompilation =
+            kotlinExtension.target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+        val testCompilation =
+            kotlinExtension.target.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
+        val testFixturesCompilation =
+            kotlinExtension.target.compilations.getByName(
+                TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME
+            )
+
+        val defaultTestSuite = JavaPluginHelper.getDefaultTestSuite(project)
+
+        val testFixturesFeature =
+            JavaPluginHelper.getJavaComponent(project)
+                .features
+                .getByName(TestFixturesSupport.TEST_FIXTURES_FEATURE_NAME)
+
+        val realMain = mainCompilation.javaSourceSet
+        val realTest = testCompilation.javaSourceSet
+        val realTestFixtures = testFixturesFeature.sourceSet
+
         val animalsniffer = extensions.getByType<AnimalSnifferExtension>()
         val buildConfig = extensions.getByType<BuildConfigExtension>()
         val idea = extensions.getByType<IdeaModel>()
@@ -379,12 +371,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testArtifacts: Provider<out FileCollection>,
             vararg extraPropNames: String,
         ) {
-            jvmArgumentProviders.add(
-                LibraryPathArgumentProvider(
-                    listOf("org.jetbrains.kotlin.test.$jarName") + extraPropNames,
-                    jarName,
-                    testArtifacts,
-                )
+            +LibraryPathArgumentProvider(
+                listOf("org.jetbrains.kotlin.test.$jarName") + extraPropNames,
+                jarName,
+                testArtifacts,
             )
         }
 
@@ -436,11 +426,11 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             setLibraryProperty("kotlin-test-wasm-js", testArtifactsWasm)
             setLibraryProperty("kotlin-test-wasm-wasi", testArtifactsWasm)
 
-            systemProperty("javascript.engine.path.V8", d8EnvSpec.executable.get())
-            systemProperty("javascript.engine.path.repl", "${jsReplOutputFile.get().asFile}")
-            systemProperty(
+            +StringSystemPropertyArgumentProvider("javascript.engine.path.V8", d8EnvSpec.executable)
+            +FileSystemPropertyArgumentProvider("javascript.engine.path.repl", jsReplOutputFile)
+            +FileSystemPropertyArgumentProvider(
                 "kotlin.js.test.root.out.dir",
-                "${layout.buildDirectory.get().asFile}/js-test-output",
+                layout.buildDirectory.dir("js-test-output"),
             )
         }
 
@@ -460,10 +450,12 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             testArtifactsWasm(kotlin("test-wasm-js"))
             testArtifactsWasm(kotlin("test-wasm-wasi"))
         }
-        tasks.named<Test>("test") {
-            enabled = false
-            classpath = files()
-            testClassesDirs = files()
+        defaultTestSuite.targets.all {
+            testTask {
+                enabled = false
+                classpath = files()
+                testClassesDirs = files()
+            }
         }
 
         afterEvaluate {
@@ -473,7 +465,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             val target =
                 pluginDevKit.testAgainst.find { it.version == testVersion }
                     ?: pluginDevKit.testAgainst.first()
-            tasks.named<Test>("test") { dependsOn(target.testSuite) }
+            defaultTestSuite.targets.all { testTask { dependsOn(target.testSuite) } }
         }
 
         fun JavaExec.addTestSourceSet(set: SourceSet) {
@@ -491,7 +483,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 description = "Generate compiler plugin tests"
                 outputs.dir(testGenDirectory).withPropertyName("generatedTests")
 
-                classpath(sourceSets.named("testFixtures").map { it.runtimeClasspath })
+                classpath(realTestFixtures.runtimeClasspath)
                 mainClass.set(generateTestsClass)
                 workingDir = rootDir
                 doFirst {
@@ -501,7 +493,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 }
             }
 
-        tasks.named("compileTestKotlin") { dependsOn(generateTests) }
+        tasks.named(testCompilation.compileKotlinTaskName) { dependsOn(generateTests) }
 
         fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachDependency {
             if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
@@ -558,24 +550,18 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         }
 
         fun SourceSet.extendsFrom(
-            otherSourceSet: Provider<SourceSet>,
+            otherSourceSet: SourceSet,
             extractName: (SourceSet) -> String,
         ) {
             configurations.named(extractName(this)) {
-                extendsFrom(
-                    otherSourceSet.flatMap {
-                        configurations.named(extractName(it))
-                    }
-                )
+                extendsFrom(configurations.named(extractName(otherSourceSet)))
             }
         }
 
-        sourceSets.named("main") { withCompilerVersionAttribute(kotlinToolingVersion) }
-        sourceSets.named("test") {
-            withCompilerVersionAttribute(kotlinToolingVersion)
-            resources.setSrcDirs(listOf("src/test/data"))
-        }
-        sourceSets.named("testFixtures") { withCompilerVersionAttribute(kotlinToolingVersion) }
+        realMain.withCompilerVersionAttribute(kotlinToolingVersion)
+        realTest.withCompilerVersionAttribute(kotlinToolingVersion)
+        realTestFixtures.withCompilerVersionAttribute(kotlinToolingVersion)
+        realTest.resources.setSrcDirs(listOf("src/test/data"))
 
         val versionMarker =
             // Registers task to generate empty version marker file
@@ -603,15 +589,12 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 dependencies {
                     compileOnlyConfigurationName(kotlin("compiler"))
                     // allow it to see shared main sources
-                    // TODO test this
-                    compileOnlyConfigurationName(
-                        sourceSets.named("main").map { it.output.classesDirs }
-                    )
+                    compileOnlyConfigurationName(realMain.output.classesDirs)
                 }
-                extendsFrom(sourceSets.named("main")) { it.implementationConfigurationName }
-                extendsFrom(sourceSets.named("main")) { it.compileOnlyConfigurationName }
+                extendsFrom(realMain) { it.implementationConfigurationName }
+                extendsFrom(realMain) { it.compileOnlyConfigurationName }
             }
-            tasks.named<Jar>("jar") {
+            tasks.named<Jar>(JavaPlugin.JAR_TASK_NAME) {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `main` has no output.
@@ -626,52 +609,30 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         }
         pluginDevKit.withFixtures.configureEach {
             testFixtures {
-                java.setSrcDirs(
-                    listOf(
-                        "$versionName/src/testFixtures/java",
-                        "$versionName/src/testFixtures/kotlin",
-                    )
-                )
-                // Recompile the shared testFixtures sources, feeding each kind into the matching
-                // SourceDirectorySet (.kotlin→.kotlin, .java→.java, .resources→.resources). Read
-                // via .kotlin, not .java, per the java→kotlin mirroring noted on SourceSet.kotlin.
-                kotlin.srcDir(sourceSets.named("testFixtures").map { it.kotlin.sourceDirectories })
-                java.srcDir(sourceSets.named("testFixtures").map { it.java.sourceDirectories })
+                java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
+                kotlin.setSrcDirs(listOf("$versionName/src/testFixtures/kotlin"))
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
-                resources.srcDir(
-                    sourceSets.named("testFixtures").map { it.resources.sourceDirectories }
-                )
+
+                kotlin.srcDir(realTestFixtures.kotlin.sourceDirectories)
+                java.srcDir(realTestFixtures.java.sourceDirectories)
+                resources.srcDir(realTestFixtures.resources.sourceDirectories)
                 forceKotlinVersion(version)
                 dependencies {
                     implementationConfigurationName(project())
                     compileOnlyConfigurationName(kotlin("compiler"))
                 }
-                extendsFrom(sourceSets.named("testFixtures")) {
-                    it.implementationConfigurationName
-                }
-                extendsFrom(sourceSets.named("testFixtures")) {
-                    it.compileOnlyConfigurationName
-                }
-                // KGP automatically associates the sourceSet literally named "testFixtures" with
-                // "main", granting access to its internal API.
-                kotlinExtension.target.compilations.named(name) {
-                    associateWith(kotlinExtension.target.compilations.getByName("main"))
-                }
+                extendsFrom(realTestFixtures) { it.implementationConfigurationName }
+                extendsFrom(realTestFixtures) { it.compileOnlyConfigurationName }
+                kotlinExtension.target.compilations.named(name) { associateWith(mainCompilation) }
             }
 
-            testSuite {
-                sources {
-                    // KGP automatically associates "test" with "testFixtures" (in addition to
-                    // "test" with "main"), granting access to its internal API.
-                    kotlinExtension.target.compilations.named(name) {
-                        associateWith(
-                            kotlinExtension.target.compilations.getByName(testFixtures.get().name)
-                        )
-                    }
-                }
+            // KGP automatically associates "test" with "testFixtures" (in addition to
+            // "test" with "main"), granting access to its internal API.
+            kotlinExtension.target.compilations.named(testSuite.name) {
+                associateWith(testFixturesCompilation)
             }
 
-            tasks.named<Jar>("testFixturesJar") {
+            testFixturesFeature.jarTask {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `testFixtures` has no
@@ -710,31 +671,25 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     implementation(testFixtures(project()))
                 }
                 sources {
-                    java.setSrcDirs(
-                        listOf("$versionName/src/test/java", "$versionName/src/test/kotlin")
-                    )
-                    // Recompile the shared test sources, feeding each kind into the matching
-                    // SourceDirectorySet (.kotlin→.kotlin, .java→.java, .resources→.resources).
-                    // Read via .kotlin, not .java, per the java→kotlin mirroring noted on
-                    // SourceSet.kotlin.
-                    kotlin.srcDir(sourceSets.named("test").map { it.kotlin.sourceDirectories })
-                    java.srcDir(sourceSets.named("test").map { it.java.sourceDirectories })
+                    kotlin.setSrcDirs(listOf("$versionName/src/test/kotlin"))
+                    java.setSrcDirs(listOf("$versionName/src/test/java"))
                     resources.setSrcDirs(listOf("${versionName}/src/test/data"))
-                    resources.srcDir(
-                        sourceSets.named("test").map { it.resources.sourceDirectories }
-                    )
+
+                    kotlin.srcDir(realTest.kotlin.sourceDirectories)
+                    java.srcDir(realTest.java.sourceDirectories)
+                    resources.srcDir(realTest.resources.sourceDirectories)
                     addTestGenDir()
                     forceKotlinVersion(version)
                     // KGP automatically associates the sourceSet literally named "test" with
                     // "main", granting access to its internal API.
                     kotlinExtension.target.compilations.named(name) {
-                        associateWith(kotlinExtension.target.compilations.getByName("main"))
+                        associateWith(mainCompilation)
                     }
                     generateTests { addTestSourceSet(this@sources) }
                     tasks.named(compileJavaTaskName) { dependsOn(generateTests) }
 
-                    extendsFrom(sourceSets.named("test")) { it.implementationConfigurationName }
-                    extendsFrom(sourceSets.named("test")) { it.compileOnlyConfigurationName }
+                    extendsFrom(realTest) { it.implementationConfigurationName }
+                    extendsFrom(realTest) { it.compileOnlyConfigurationName }
 
                     withCompilerVersionAttribute(version)
                 }
@@ -742,9 +697,8 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 targets.all {
                     testTask {
                         // Include common tests
-                        testClassesDirs +=
-                            files(sourceSets.named("test").map { it.output.classesDirs })
-                        classpath += files(sourceSets.named("test").map { it.output })
+                        testClassesDirs += files(realTest.output.classesDirs)
+                        classpath += files(realTest.output)
                         configure(
                             testArtifacts,
                             testArtifactsWasm,
@@ -780,47 +734,44 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                     testSuite { targets.all { this@register.dependsOn(testTask) } }
                 }
             }
-        tasks.named("check") { dependsOn(allVersionedTests) }
+        tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) { dependsOn(allVersionedTests) }
 
-        sourceSets.named("test") { addTestGenDir() }
+        realTest.addTestGenDir()
 
         dependencies {
-            "compileOnly"(kotlin("compiler"))
+            realMain.compileOnlyConfigurationName(kotlin("compiler"))
 
-            "testFixturesApi"(kotlin("stdlib"))
-            "testFixturesApi"(kotlin("test-junit5"))
-            "testFixturesApi"(kotlin("compiler-internal-test-framework"))
-            "testFixturesApi"(kotlin("compiler"))
-            "testFixturesRuntimeOnly"("junit:junit:4.13.2") // TODO don't force junit version
+            realTestFixtures.apiConfigurationName(kotlin("stdlib"))
+            realTestFixtures.apiConfigurationName(kotlin("test-junit5"))
+            realTestFixtures.apiConfigurationName(kotlin("compiler-internal-test-framework"))
+            realTestFixtures.apiConfigurationName(kotlin("compiler"))
+            realTestFixtures.runtimeOnlyConfigurationName("junit:junit:4.13.2")
 
             annotationsRuntimeClasspath(pluginAnnotations)
-        }
 
-        // Deferred so consuming build scripts get a chance to call
-        // `pluginDevKit.addRuntimeDependency.set(false)` before we decide whether to add it.
-        afterEvaluate {
-            if (pluginDevKit.addRuntimeDependency.get()) {
-                dependencies {
-                    "implementation"("$DEV_KIT_GROUP:compiler-plugin-runtime") {
-                        exclude(
-                            group = "org.jetbrains.kotlin",
-                            module = "kotlin-compiler",
-                        )
-                    }
-                    "testFixturesApi"(
-                        testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime") as ModuleDependency
-                    ) {
-                        exclude(
-                            group = "org.jetbrains.kotlin",
-                            module = "kotlin-compiler-internal-test-framework",
-                        )
-                    }
-                }
+            addIf(
+                pluginDevKit.addRuntimeDependency,
+                realMain.implementationConfigurationName,
+                "$DEV_KIT_GROUP:compiler-plugin-runtime",
+            ) {
+                exclude(
+                    group = "org.jetbrains.kotlin",
+                    module = "kotlin-compiler",
+                )
+            }
+            addIf(
+                pluginDevKit.addRuntimeDependency,
+                realTestFixtures.apiConfigurationName,
+                testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime"),
+            ) {
+                exclude(
+                    group = "org.jetbrains.kotlin",
+                    module = "kotlin-compiler-internal-test-framework",
+                )
             }
         }
 
-        animalsniffer.sourceSets =
-            listOf(sourceSets.named("main").get(), sourceSets.named("test").get())
+        animalsniffer.sourceSets = listOf(realMain, realTest)
         animalsniffer.excludeJars("kotlin-compiler*")
         animalsniffer.ignore("java.*", "javax.*", "org.omg.*", "org.w3c.dom.*")
 
@@ -839,24 +790,4 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
         dependencies.setupCompilerVersionAttribute()
     }
-}
-
-private fun JavaExec.argFiles(
-    inputFiles: FileCollection,
-    outputDir: Provider<out Directory>,
-) =
-    argumentProviders.add(
-        FilesCommandLineArgumentProvider(project.rootDir.path, inputFiles, outputDir)
-    )
-
-private class FilesCommandLineArgumentProvider(
-    @Input val rootDir: String,
-    @InputFiles @PathSensitive(PathSensitivity.RELATIVE) val inputFiles: FileCollection,
-    @OutputDirectory val outputDir: Provider<out Directory>,
-) : CommandLineArgumentProvider {
-    override fun asArguments() =
-        listOf(
-            outputDir.get().asFile.toRelativeString(File(rootDir)),
-            inputFiles.joinToString(",") { it.toRelativeString(File(rootDir)) },
-        )
 }

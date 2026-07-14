@@ -40,6 +40,6 @@ gradlePlugin {
 kotlin {
     explicitApi()
     compilerOptions {
-        freeCompilerArgs.add("-Xcontext-sensitive-resolution")
+        freeCompilerArgs.addAll("-Xcontext-sensitive-resolution", "-Xcontext-parameters")
     }
 }

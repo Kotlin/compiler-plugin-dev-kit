@@ -1,10 +1,12 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.gradle.api.Action
+import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-public val KotlinToolingVersion.versionString: String
+internal val KotlinToolingVersion.versionString: String
     get() = toString()
 
 // Uses same convention as Metro
@@ -14,7 +16,7 @@ public val KotlinToolingVersion.baseVersionName: String
 public val KotlinToolingVersion.versionName: String
     get() = "k$baseVersionName"
 
-public fun DependencyHandler.registerMultiReleasePluginTransform(
+internal fun DependencyHandler.registerMultiReleasePluginTransform(
     version: Provider<KotlinToolingVersion>
 ) {
     registerTransform(MultiReleasePluginTransform::class.java) {
@@ -24,10 +26,17 @@ public fun DependencyHandler.registerMultiReleasePluginTransform(
     }
 }
 
-public fun DependencyHandler.setupCompilerVersionAttribute() {
+internal fun DependencyHandler.setupCompilerVersionAttribute() {
     artifactTypes {
         all {
             attributes.attribute(KotlinCompilerVersion.attribute, noVersion)
         }
     }
 }
+
+internal fun DependencyHandler.addIf(
+    condition: Provider<out Boolean>,
+    configurationName: String,
+    dependencyNotation: Any,
+    action: Action<in ExternalModuleDependency> = {},
+) = addProvider(configurationName, condition.filter { it }.map { dependencyNotation }, action)

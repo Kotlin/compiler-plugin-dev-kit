@@ -48,12 +48,7 @@ public abstract class MultiReleasePluginTransform :
                         val versionDir = inputRoot / PLUGIN_VERSIONS_PATH / version.toString()
 
                         val output =
-                            outputs
-                                .file(
-                                    input.name.removeSuffix(".jar") +
-                                        "-${version.toString()}.jar"
-                                )
-                                .toPath()
+                            outputs.file(input.name.removeSuffix(".jar") + "-$version.jar").toPath()
 
                         return newFileSystem(output, mapOf("create" to true)).use { outputFs ->
                             val outputRoot = outputFs.rootDirectories.single()
@@ -85,8 +80,10 @@ public abstract class MultiReleasePluginTransform :
         val versionsDir = inputRoot / PLUGIN_VERSIONS_PATH
         if (!versionsDir.isDirectory()) return null
         val realVersion =
-            parameters.kotlinVersion.get().let(::KotlinToolingVersion).let(CompilerVersionAliases::map)
-                ?: return null
+            parameters.kotlinVersion
+                .get()
+                .let(::KotlinToolingVersion)
+                .let(CompilerVersionAliases::map) ?: return null
 
         return VersionResolution.resolveVersion(
             realVersion,

@@ -6,11 +6,8 @@ import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
@@ -21,8 +18,9 @@ import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
-import org.gradle.process.CommandLineArgumentProvider
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -44,14 +42,19 @@ private class DevKitGradlePluginTestTargetImpl(
     override fun hashCode(): Int = version.hashCode()
 }
 
+// GradleTestKitSupportExtension doesn't expose it publicly
+private const val FUNCTIONAL_TEST_SOURCE_SET_NAME = "functionalTest"
+
 public fun Project.DevKitGradlePluginTestTarget(
     version: KotlinToolingVersion
 ): DevKitGradlePluginTestTarget =
     DevKitGradlePluginTestTargetImpl(
         version,
-        tasks.register<Test>("functionalTest${version.versionName}") {
+        tasks.register<Test>("${version.versionName}FunctionalTest") {
             val functionalTestSourceSet =
-                project.extensions.getByType<SourceSetContainer>().named("functionalTest")
+                project.extensions
+                    .getByType<SourceSetContainer>()
+                    .named(FUNCTIONAL_TEST_SOURCE_SET_NAME)
             group = "verification"
             description = "Runs the functional tests against Kotlin ${version.versionString}."
             testClassesDirs = files(functionalTestSourceSet.map { it.output.classesDirs })
@@ -109,8 +112,15 @@ public class DevKitGradlePlugin : Plugin<Project> {
             apply("java-gradle-plugin")
             apply("com.autonomousapps.testkit")
         }
+        val kotlinExtension = extensions.getByType<KotlinJvmProjectExtension>()
+        val mainCompilation =
+            kotlinExtension.target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+        val functionalTestCompilation =
+            kotlinExtension.target.compilations.getByName(FUNCTIONAL_TEST_SOURCE_SET_NAME)
 
-        dependencies { "compileOnly"(kotlin("gradle-plugin-api")) }
+        dependencies {
+            mainCompilation.javaSourceSet.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
+        }
 
         val pluginDevKit =
             project.extensions.create<GradlePluginConfigExtension>("pluginDevKit", project)
@@ -123,27 +133,28 @@ public class DevKitGradlePlugin : Plugin<Project> {
 
         pluginDevKit.testAgainst.configureEach {
             testTask {
-                jvmArgumentProviders.add(
-                    FileSystemPropertyArgumentProvider(
-                        "com.autonomousapps.plugin-under-test.repo",
-                        pluginDevKit.functionalTestRepo,
-                    )
+                +FileSystemPropertyArgumentProvider(
+                    "com.autonomousapps.plugin-under-test.repo",
+                    pluginDevKit.functionalTestRepo,
                 )
-                jvmArgumentProviders.add(
-                    StringSystemPropertyArgumentProvider(
-                        "com.autonomousapps.plugin-under-test.version",
-                        project.provider { project.version.toString() },
-                    )
+                +StringSystemPropertyArgumentProvider(
+                    "com.autonomousapps.plugin-under-test.version",
+                    project.provider { project.version.toString() },
                 )
             }
         }
 
-        // Deferred so consuming build scripts get a chance to call
-        // `pluginDevKit.addRuntimeDependency.set(false)` before we decide whether to add it.
-        afterEvaluate {
-            if (pluginDevKit.addRuntimeDependency.get()) {
-                dependencies { "implementation"("$DEV_KIT_GROUP:gradle-plugin-runtime") }
-            }
+        dependencies {
+            addIf(
+                pluginDevKit.addRuntimeDependency,
+                mainCompilation.implementationConfigurationName,
+                "$DEV_KIT_GROUP:gradle-plugin-runtime",
+            )
+            addIf(
+                pluginDevKit.addRuntimeDependency,
+                functionalTestCompilation.implementationConfigurationName,
+                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime"),
+            )
         }
 
         val allVersionedFunctionalTests =
@@ -156,11 +167,12 @@ public class DevKitGradlePlugin : Plugin<Project> {
 
         tasks.named("check") { dependsOn(allVersionedFunctionalTests) }
 
-        tasks.named<Test>("functionalTest") {
-            enabled = false
-            classpath = files()
-            testClassesDirs = files()
-        }
+        val functionalTestTask =
+            tasks.named<Test>("functionalTest") {
+                enabled = false
+                classpath = files()
+                testClassesDirs = files()
+            }
 
         afterEvaluate {
             val testVersion = pluginDevKit.defaultTestVersion.orNull
@@ -169,18 +181,22 @@ public class DevKitGradlePlugin : Plugin<Project> {
             val target =
                 pluginDevKit.testAgainst.find { it.version == testVersion }
                     ?: pluginDevKit.testAgainst.first()
-            tasks.named<Test>("functionalTest") { dependsOn(target.testTask) }
+            functionalTestTask { dependsOn(target.testTask) }
         }
+        val pluginInfoClass =
+            extensions
+                .getByType<BuildConfigExtension>()
+                .forClass(
+                    "$group",
+                    "PluginInfo",
+                )
 
         // Deferred so consuming build scripts get a chance to call
         // `pluginDevKit.generatePluginInfo.set(false)` before we decide whether to generate.
         afterEvaluate {
             if (!pluginDevKit.generatePluginInfo.get()) return@afterEvaluate
 
-            extensions.getByType<BuildConfigExtension>().forClass(
-                "$group",
-                "PluginInfo",
-            ) {
+            pluginInfoClass.apply {
                 buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"$group\"")
 
                 if (compilerPlugin.isPresent)
@@ -230,19 +246,4 @@ public class DevKitGradlePlugin : Plugin<Project> {
             }
         }
     }
-}
-
-private class FileSystemPropertyArgumentProvider(
-    @Internal val propName: String,
-    @Internal val value: Provider<Directory>,
-) : CommandLineArgumentProvider {
-    override fun asArguments(): Iterable<String> =
-        listOf("-D$propName=${value.get().asFile.invariantSeparatorsPath}")
-}
-
-private class StringSystemPropertyArgumentProvider(
-    @Internal val propName: String,
-    @Internal val value: Provider<String>,
-) : CommandLineArgumentProvider {
-    override fun asArguments(): Iterable<String> = listOf("-D$propName=${value.get()}")
 }
