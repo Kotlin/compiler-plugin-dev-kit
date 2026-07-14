@@ -85,7 +85,7 @@ public abstract class MultiReleasePluginTransform :
         val versionsDir = inputRoot / PLUGIN_VERSIONS_PATH
         if (!versionsDir.isDirectory()) return null
         val realVersion =
-            CompilerVersionAliases.map(KotlinToolingVersion(parameters.kotlinVersion.get()))
+            parameters.kotlinVersion.get().let(::KotlinToolingVersion).let(CompilerVersionAliases::map)
                 ?: return null
 
         return VersionResolution.resolveVersion(

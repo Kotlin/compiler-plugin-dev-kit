@@ -24,7 +24,7 @@ object VersionedPluginClassLoading {
 
     fun resolve(anchor: Class<*>): ClassLoader {
         val parent = anchor.classLoader
-        val currentVersion = KotlinCompilerVersion.getVersion()?.let(::KotlinToolingVersion)
+        val currentVersion = KotlinCompilerVersion.getVersion()?.let(::KotlinToolingVersion)?.let(CompilerVersionAliases::map)
         val urls = if (parent is URLClassLoader) parent.urLs.toList() else runCatching {
             val method = parent.javaClass.getMethod("getUrls")
             @Suppress("UNCHECKED_CAST")
