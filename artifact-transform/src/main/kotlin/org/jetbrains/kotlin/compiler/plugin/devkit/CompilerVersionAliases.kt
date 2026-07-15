@@ -29,7 +29,13 @@ public object CompilerVersionAliases {
         val versionString = version.toString()
         // User aliases take priority
         // Then check built-in aliases
-        val alias = userAliases[versionString] ?: BUILT_IN_COMPILER_VERSION_ALIASES[versionString]
+        val alias = userAliases[versionString] ?: runCatching {
+            val appInfo = Class.forName("com.intellij.openapi.application.ApplicationInfo")
+            val build =
+                appInfo.getMethod("getBuild").invoke(appInfo.getMethod("getInstance").invoke(null))
+            val buildString = build.javaClass.getMethod("asStringWithoutProductCode").invoke(build) as String
+            BUILT_IN_COMPILER_VERSION_ALIASES[buildString.split(".").first()]
+        }.getOrNull()
         return when (alias) {
             null -> version // No alias found, return original
             CLI_ONLY -> null // Explicitly marked as CLI-only
