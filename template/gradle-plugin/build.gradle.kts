@@ -7,17 +7,6 @@ pluginDevKit {
     compilerPlugin = project(":compiler-plugin")
 }
 
-sourceSets {
-    main {
-        java.setSrcDirs(listOf("src"))
-        resources.setSrcDirs(listOf("resources"))
-    }
-    test {
-        java.setSrcDirs(listOf("test"))
-        resources.setSrcDirs(listOf("testResources"))
-    }
-}
-
 gradlePlugin {
     plugins {
         create("SimplePlugin") {

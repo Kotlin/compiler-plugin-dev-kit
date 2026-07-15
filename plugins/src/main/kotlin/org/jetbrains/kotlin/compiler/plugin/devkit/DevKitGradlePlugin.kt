@@ -18,6 +18,7 @@ import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
+import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
@@ -167,10 +168,10 @@ public class DevKitGradlePlugin : Plugin<Project> {
                 pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
             }
 
-        tasks.named("check") { dependsOn(allVersionedFunctionalTests) }
+        tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) { dependsOn(allVersionedFunctionalTests) }
 
         val functionalTestTask =
-            tasks.named<Test>("functionalTest") {
+            tasks.named<Test>(FUNCTIONAL_TEST_SOURCE_SET_NAME) {
                 enabled = false
                 classpath = files()
                 testClassesDirs = files()
