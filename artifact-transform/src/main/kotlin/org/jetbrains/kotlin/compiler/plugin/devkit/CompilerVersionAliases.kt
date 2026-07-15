@@ -13,8 +13,7 @@ public object CompilerVersionAliases {
     /**
      * Resolves a compiler version through alias mappings.
      *
-     * User-provided aliases take priority over built-in aliases. If no alias matches, the original
-     * version is returned unchanged.
+     * If no alias matches, the original version is returned unchanged.
      *
      * Returns `null` if the version is mapped to [CLI_ONLY], indicating it should not be used for
      * IDE FIR integration.
@@ -22,19 +21,25 @@ public object CompilerVersionAliases {
      * This is primarily used to map fake IDE compiler versions (e.g., Android Studio canary builds
      * reporting `2.3.255-dev-255`) to their real compiler versions.
      */
+    @Suppress("UNCHECKED_CAST")
     public fun map(
         version: KotlinToolingVersion,
-        userAliases: Map<String, String> = emptyMap(),
     ): KotlinToolingVersion? {
         val versionString = version.toString()
         // User aliases take priority
         // Then check built-in aliases
-        val alias = userAliases[versionString] ?: runCatching {
+        val alias = runCatching {
             val appInfo = Class.forName("com.intellij.openapi.application.ApplicationInfo")
-            val build =
-                appInfo.getMethod("getBuild").invoke(appInfo.getMethod("getInstance").invoke(null))
-            val buildString = build.javaClass.getMethod("asStringWithoutProductCode").invoke(build) as String
-            BUILT_IN_COMPILER_VERSION_ALIASES[buildString.split(".").first()]
+            val build = appInfo.getMethod("getInstance").invoke(null).let(appInfo.getMethod("getBuild")::invoke)
+            val buildWithoutCode =
+                build.let(build.javaClass.getMethod("withoutProductCode")::invoke) as Comparable<Comparable<Nothing>>
+            val baselineVersion = build.let(build.javaClass.getMethod("getBaselineVersion")::invoke) as Int
+            val builtInVersions =
+                BUILT_IN_COMPILER_VERSION_ALIASES.filter { it.key.startsWith("$baselineVersion") }.mapKeys {
+                    build.javaClass.getMethod("fromString", String::class.java)
+                        .invoke(null, it.key) as Comparable<Comparable<Nothing>>
+                }
+            builtInVersions.findExactOrClosestVersion(buildWithoutCode)
         }.getOrNull()
         return when (alias) {
             null -> version // No alias found, return original
@@ -43,3 +48,6 @@ public object CompilerVersionAliases {
         }
     }
 }
+
+private fun <T : Comparable<T>, V> Map<T, V>.findExactOrClosestVersion(forVersion: T): V? =
+    get(forVersion) ?: filter { it.key <= forVersion }.maxByOrNull { it.key }?.value

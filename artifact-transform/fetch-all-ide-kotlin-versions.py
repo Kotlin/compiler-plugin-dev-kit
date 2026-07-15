@@ -639,7 +639,7 @@ def main():
         }
 
     # Build alias mappings — one entry per release
-    # Each entry: (ide_name, fake_version, alias_target)
+    # Each entry: (ide_name, build, alias_target)
     alias_entries = []
 
     for build, entries in unique_builds.items():
@@ -652,36 +652,19 @@ def main():
         is_exact_match = info["is_exact_match"]
 
         for release in entries:
-            if release["is_android_studio"]:
-                # Android Studio: generate fake version from kotlin major.minor
-                # This works even with fallback tags since all AS builds for a
-                # platform major use the same fake version pattern (X.Y.255-dev-255)
-                km = re.match(r"^(\d+\.\d+)", kotlin_version)
-                if km:
-                    fake_version = f"{km.group(1)}.255-dev-255"
-                    alias_entries.append((release["ide_name"], fake_version, dev_version))
-            else:
-                # IntelliJ IDEA: use the ij version as alias source
-                # Only generate alias if we found the exact tag - fallback tags have
-                # different ij build numbers so the alias wouldn't match at runtime
-                if "-ij" in kotlin_version and is_exact_match:
-                    alias_entries.append((release["ide_name"], kotlin_version, dev_version))
-                elif "-ij" in kotlin_version:
-                    print(f"  WARNING: Skipping IntelliJ alias for {release['ide_name']} - "
-                          f"used fallback tag, actual ij version unknown")
+            if kotlin_version != dev_version:
+                alias_entries.append((release["ide_name"], build, dev_version))
 
-    # Deduplicate new results: group by (fake_version, alias_target)
-    new_map = OrderedDict()  # fake_version -> alias_target
-    new_comments = OrderedDict()  # fake_version -> list of IDE names
+    # Deduplicate new results: group by (build, alias_target)
+    new_map = OrderedDict()  # build -> alias_target
+    new_comments = OrderedDict()  # build -> list of IDE names
 
-    for ide_name, fake_version, alias_target in alias_entries:
-        if fake_version == alias_target:
-            continue
-        new_map[fake_version] = alias_target
-        if fake_version not in new_comments:
-            new_comments[fake_version] = []
-        if ide_name not in new_comments[fake_version]:
-            new_comments[fake_version].append(ide_name)
+    for ide_name, build, alias_target in alias_entries:
+        new_map[build] = alias_target
+        if build not in new_comments:
+            new_comments[build] = []
+        if ide_name not in new_comments[build]:
+            new_comments[build].append(ide_name)
 
     # Additive merge: start with existing entries, add/update from new results
     final_map = OrderedDict(existing_entries)
@@ -691,36 +674,36 @@ def main():
 
     additions = 0
     updates = 0
-    for fake_version, alias_target in new_map.items():
-        comments_for_version = new_comments.get(fake_version, [])
+    for build, alias_target in new_map.items():
+        comments_for_version = new_comments.get(build, [])
 
-        if fake_version in final_map:
-            existing_target = final_map[fake_version]
+        if build in final_map:
+            existing_target = final_map[build]
             if existing_target == "CLI_ONLY":
                 # Never override CLI_ONLY entries, but merge comments
                 for c in comments_for_version:
-                    if c not in final_comments.get(fake_version, []):
-                        final_comments.setdefault(fake_version, []).append(c)
+                    if c not in final_comments.get(build, []):
+                        final_comments.setdefault(build, []).append(c)
                 continue
             if existing_target != alias_target:
                 # Update: same version key, different target
-                print(f"  Updating {fake_version}: {existing_target} -> {alias_target}")
-                final_map[fake_version] = alias_target
-                merged = list(final_comments.get(fake_version, []))
+                print(f"  Updating {build}: {existing_target} -> {alias_target}")
+                final_map[build] = alias_target
+                merged = list(final_comments.get(build, []))
                 for c in comments_for_version:
                     if c not in merged:
                         merged.append(c)
-                final_comments[fake_version] = merged
+                final_comments[build] = merged
                 updates += 1
             else:
                 # Same target, just merge any new comments
                 for c in comments_for_version:
-                    if c not in final_comments.get(fake_version, []):
-                        final_comments.setdefault(fake_version, []).append(c)
+                    if c not in final_comments.get(build, []):
+                        final_comments.setdefault(build, []).append(c)
         else:
             # New entry
-            final_map[fake_version] = alias_target
-            final_comments[fake_version] = comments_for_version
+            final_map[build] = alias_target
+            final_comments[build] = comments_for_version
             additions += 1
 
     print(f"\n  {additions} new entries, {updates} updated entries")
@@ -740,12 +723,12 @@ def main():
     # Table output — one row per unique mapping
     print(f"{'IDE (representative)':<45} {'Fake/IDE Version':<25} → Alias Target")
     print("─" * 95)
-    for fake_version in sorted(final_map.keys()):
-        alias_target = final_map[fake_version]
-        names = final_comments.get(fake_version, [])
+    for build in sorted(final_map.keys()):
+        alias_target = final_map[build]
+        names = final_comments.get(build, [])
         representative = names[0] if names else "?"
         extra = f" (+{len(names) - 1} more)" if len(names) > 1 else ""
-        print(f"{representative + extra:<45} {fake_version:<25} → {alias_target}")
+        print(f"{representative + extra:<45} {build:<25} → {alias_target}")
 
     print()
     print("═══════════════════════════════════════════════════════════════════════════")
@@ -759,12 +742,12 @@ def main():
         f.write("# Format: <ide-version>=<dev-version>\n")
         f.write("#\n")
 
-        for fake_version in sorted(final_map.keys()):
-            alias_target = final_map[fake_version]
-            comments = final_comments.get(fake_version, [])
+        for build in sorted(final_map.keys()):
+            alias_target = final_map[build]
+            comments = final_comments.get(build, [])
             for comment in comments:
                 f.write(f"# {comment}\n")
-            f.write(f"{fake_version}={alias_target}\n")
+            f.write(f"{build}={alias_target}\n")
 
     print(f"Written to: {output_file}")
     print()
