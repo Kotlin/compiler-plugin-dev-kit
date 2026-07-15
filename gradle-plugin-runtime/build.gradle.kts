@@ -4,6 +4,7 @@ plugins {
     `embedded-kotlin`
     `java-gradle-plugin`
     `java-test-fixtures`
+    kotlin("compiler.plugin.devkit.functional-test-publishing")
 }
 
 java {
@@ -22,5 +23,5 @@ dependencies {
     testFixturesApi("junit:junit:4.13.2") // TODO don't force junit version
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
-    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
+    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
 }

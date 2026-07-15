@@ -190,7 +190,7 @@ private val KotlinToolingVersion.buildNumber: Int?
         return classifierMatch.groupValues.getOrNull(4)?.toIntOrNull()
     }
 
-private val KotlinToolingVersion.classifierNumber: Int?
+internal val KotlinToolingVersion.classifierNumber: Int?
     get() {
         if (classifier == null) return null
 

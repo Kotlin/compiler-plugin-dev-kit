@@ -6,7 +6,6 @@ import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
@@ -46,6 +45,9 @@ private class DevKitGradlePluginTestTargetImpl(
 // GradleTestKitSupportExtension doesn't expose it publicly
 private const val FUNCTIONAL_TEST_SOURCE_SET_NAME = "functionalTest"
 
+private val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
+    setOf("RepoAndVersionArgumentProvider", "IncludeBuildReposArgumentProvider")
+
 public fun Project.DevKitGradlePluginTestTarget(
     version: KotlinToolingVersion
 ): DevKitGradlePluginTestTarget =
@@ -65,6 +67,12 @@ public fun Project.DevKitGradlePluginTestTarget(
             maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
             jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
             systemProperty("$DEV_KIT_GROUP.gradle.test.kotlin-version", version.versionString)
+            +NestedArgumentProvider(
+                (tasks.getByName(FUNCTIONAL_TEST_SOURCE_SET_NAME) as Test)
+                    .jvmArgumentProviders
+                    // Hacky: pick up repo and included-build repos from functionalTest
+                    .filter { it.javaClass.simpleName in FUNCTIONAL_TEST_ARGUMENT_PROVIDERS }
+            )
         },
     )
 
@@ -96,8 +104,6 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
     public abstract val testAgainst: NamedDomainObjectSet<DevKitGradlePluginTestTarget>
 
-    public abstract val functionalTestRepo: DirectoryProperty
-
     public fun testAgainst(
         version: KotlinToolingVersion,
         action: Action<DevKitGradlePluginTestTarget> = Action {},
@@ -112,7 +118,7 @@ public class DevKitGradlePlugin : Plugin<Project> {
             apply("org.jetbrains.kotlin.jvm")
             apply("com.github.gmazzo.buildconfig")
             apply("java-gradle-plugin")
-            apply("com.autonomousapps.testkit")
+            apply(DevKitFunctionalTestPublishingPlugin::class.java)
         }
         val kotlinExtension = extensions.getByType<KotlinJvmProjectExtension>()
         val mainCompilation =
@@ -131,20 +137,11 @@ public class DevKitGradlePlugin : Plugin<Project> {
         pluginDevKit.generatePluginInfo.convention(true)
         pluginDevKit.addRuntimeDependency.convention(true)
         pluginDevKit.defaultTestVersion.convention(kotlinToolingVersion)
-        pluginDevKit.functionalTestRepo.convention(layout.buildDirectory.dir("functionalTestRepo"))
 
         val kmpTargetProperty = "$DEV_KIT_GROUP.gradle.test.kmpTarget"
         val kmpTarget = providers.gradleProperty(kmpTargetProperty)
         pluginDevKit.testAgainst.configureEach {
             testTask {
-                +FileSystemPropertyArgumentProvider(
-                    "com.autonomousapps.plugin-under-test.repo",
-                    pluginDevKit.functionalTestRepo,
-                )
-                +StringSystemPropertyArgumentProvider(
-                    "com.autonomousapps.plugin-under-test.version",
-                    project.provider { project.version.toString() },
-                )
                 +OptionalStringSystemPropertyArgumentProvider(kmpTargetProperty, kmpTarget)
             }
         }
@@ -153,10 +150,10 @@ public class DevKitGradlePlugin : Plugin<Project> {
             addIf(
                 pluginDevKit.addRuntimeDependency,
                 mainCompilation.implementationConfigurationName,
-                "$DEV_KIT_GROUP:gradle-plugin-runtime",
+                "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION",
             )
             functionalTestCompilation.implementationConfigurationName(
-                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime")
+                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION")
             )
         }
 

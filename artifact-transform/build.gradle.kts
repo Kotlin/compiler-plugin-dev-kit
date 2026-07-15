@@ -3,9 +3,15 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     `embedded-kotlin`
     alias(libs.plugins.buildconfig)
+    alias(libs.plugins.testkit)
 }
 
 group = "org.jetbrains.kotlin.compiler.plugin.devkit"
+version = "0.0.1-SNAPSHOT"
+
+dependencies {
+    testImplementation(libs.truth)
+}
 
 java {
     targetCompatibility = JavaVersion.VERSION_17

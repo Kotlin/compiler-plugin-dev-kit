@@ -10,6 +10,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
@@ -84,6 +85,12 @@ internal class OptionalStringSystemPropertyArgumentProvider(
 ) : CommandLineArgumentProvider {
     override fun asArguments(): Iterable<String> =
         value.orNull?.let { listOf("-D$propName=$it") } ?: emptyList()
+}
+
+internal class NestedArgumentProvider(
+    @Nested val providers: Iterable<CommandLineArgumentProvider>,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = providers.flatMap { it.asArguments() }
 }
 
 context(exec: JavaForkOptions)

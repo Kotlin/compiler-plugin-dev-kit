@@ -13,6 +13,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     includeBuild("..")
+    includeBuild("../artifact-transform")
     repositories {
         mavenCentral()
         maven("https://redirector.kotlinlang.org/maven/bootstrap")

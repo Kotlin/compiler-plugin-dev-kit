@@ -11,12 +11,12 @@ assignment { annotation("org.gradle.api.SupportsKotlinAssignmentOverloading") }
 
 dependencies {
     implementation(gradleKotlinDsl())
-    implementation(embeddedKotlin("gradle-plugin"))
+    compileOnly(embeddedKotlin("gradle-plugin"))
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)
     implementation(libs.testkit)
-    api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform")
+    api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
 }
 
 gradlePlugin {

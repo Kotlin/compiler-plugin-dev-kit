@@ -282,6 +282,8 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             apply("java-test-fixtures")
             apply("com.github.node-gradle.node")
             apply("idea")
+            apply("maven-publish")
+            apply(DevKitFunctionalTestPublishingPlugin::class.java)
         }
 
         project.plugins.apply(D8Plugin::class.java)
@@ -748,7 +750,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             addIf(
                 pluginDevKit.addRuntimeDependency,
                 realMain.implementationConfigurationName,
-                "$DEV_KIT_GROUP:compiler-plugin-runtime",
+                "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION",
             ) {
                 exclude(
                     group = "org.jetbrains.kotlin",
@@ -758,7 +760,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             addIf(
                 pluginDevKit.addRuntimeDependency,
                 realTestFixtures.apiConfigurationName,
-                testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime"),
+                testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"),
             ) {
                 exclude(
                     group = "org.jetbrains.kotlin",

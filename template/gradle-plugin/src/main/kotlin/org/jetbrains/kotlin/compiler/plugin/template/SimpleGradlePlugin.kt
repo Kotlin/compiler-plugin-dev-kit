@@ -17,6 +17,6 @@ class SimpleGradlePlugin : DevKitCompilerGradlePlugin(PluginInfo.PLUGIN_INFO) {
             // Run this compiler plugin before Compose plugin.
             it.compilerOptions.freeCompilerArgs.add("-Xcompiler-plugin-order=${PluginInfo.KOTLIN_PLUGIN_ID}>androidx.compose.compiler.plugins.kotlin")
         }
-        return super.applyToCompilation(kotlinCompilation)
+        return providers.provider { emptyList() }
     }
 }

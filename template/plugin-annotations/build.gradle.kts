@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
+    `maven-publish`
+    kotlin("compiler.plugin.devkit.functional-test-publishing")
 }
 
 kotlin {

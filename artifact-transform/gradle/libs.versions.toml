@@ -1,5 +1,11 @@
 [versions]
 buildconfig = "6.0.10"
+truth = "1.4.5"
+testkit = "0.18"
 
 [plugins]
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
+testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit" }
+
+[libraries]
+truth = { module = "com.google.truth:truth", version.ref = "truth" }

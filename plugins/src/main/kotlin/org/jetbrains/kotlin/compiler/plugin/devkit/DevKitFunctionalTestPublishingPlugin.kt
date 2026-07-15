@@ -43,9 +43,5 @@ public class DevKitFunctionalTestPublishingPlugin : Plugin<Project> {
             tasks.matching { it.name == "publishMavenPublicationToFunctionalTestRepository" }
                 .configureEach { enabled = false }
         }
-
-        rootProject.tasks.matching { it.name == "installForFunctionalTest" }.configureEach {
-            dependsOn(tasks.named("installForFunctionalTest"))
-        }
     }
 }

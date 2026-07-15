@@ -12,6 +12,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+    includeBuild("artifact-transform")
     repositories {
         gradlePluginPortal()
         mavenCentral()

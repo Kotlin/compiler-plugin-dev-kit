@@ -17,3 +17,12 @@ gradlePlugin {
         }
     }
 }
+
+gradleTestKitSupport {
+    // These can go away once we're doing shadowing
+    withIncludedBuildProjects(
+        "compiler-plugin-dev-kit:compiler-plugin-runtime",
+        "compiler-plugin-dev-kit:gradle-plugin-runtime",
+        "artifact-transform:"
+    )
+}

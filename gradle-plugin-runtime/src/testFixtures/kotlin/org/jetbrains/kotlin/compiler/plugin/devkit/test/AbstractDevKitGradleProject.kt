@@ -176,9 +176,9 @@ abstract class AbstractDevKitGradleProject(
 
   protected fun RootProject.Builder.withDevKitSettings() {
     withSettingsScript {
-      pluginManagement = PluginManagement(repositories(Repository.DEFAULT_PLUGINS))
+      pluginManagement = PluginManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + Repository.DEFAULT_PLUGINS))
       dependencyResolutionManagement =
-        DependencyResolutionManagement(repositories(Repository.DEFAULT))
+        DependencyResolutionManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + Repository.DEFAULT))
     }
     gradleProperties = gradleProperties.plus(extraGradleProperties)
   }
