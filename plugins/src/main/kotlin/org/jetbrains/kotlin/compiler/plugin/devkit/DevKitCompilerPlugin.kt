@@ -522,6 +522,10 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 )
             }
             configurations.named(runtimeClasspathConfigurationName) {
+                attributes.attribute(
+                    LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                    objects.named(LibraryElements.JAR),
+                )
                 // force it to use version-specific jars when running tests
                 attributes.attribute(
                     KotlinCompilerVersion.attribute,
@@ -694,9 +698,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
                 targets.all {
                     testTask {
-                        // Include common tests
-                        testClassesDirs += files(realTest.output.classesDirs)
-                        classpath += files(realTest.output)
                         configure(
                             testArtifacts,
                             testArtifactsWasm,

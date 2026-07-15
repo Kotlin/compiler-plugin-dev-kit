@@ -50,7 +50,7 @@ pluginDevKit {
     testFixtures {
       kotlin.srcDirs(k2320Target.testFixtures.map { it.kotlin.sourceDirectories })
       java.srcDirs(k2320Target.testFixtures.map { it.java.sourceDirectories })
-      resources.srcDirs(k2320Target.testFixtures.map { it.resources.srcDirs })
+      resources.srcDirs(k2320Target.testFixtures.map { it.resources.sourceDirectories })
     }
   }
   val k2420Target =
@@ -66,7 +66,7 @@ pluginDevKit {
           testFixtures {
             kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
             java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
-            resources.srcDirs(k2420Target.testFixtures.map { it.resources.srcDirs })
+            resources.srcDirs(k2420Target.testFixtures.map { it.resources.sourceDirectories })
           }
         }
       else testAgainst(it)
