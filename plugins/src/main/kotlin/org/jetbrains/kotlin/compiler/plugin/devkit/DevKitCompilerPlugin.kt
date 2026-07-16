@@ -291,10 +291,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             kotlinExtension.target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
         val testCompilation =
             kotlinExtension.target.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
-        val testFixturesCompilation =
-            kotlinExtension.target.compilations.getByName(
-                TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME
-            )
 
         val defaultTestSuite = JavaPluginHelper.getDefaultTestSuite(project)
 
@@ -629,7 +625,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             // KGP automatically associates "test" with "testFixtures" (in addition to
             // "test" with "main"), granting access to its internal API.
             kotlinExtension.target.compilations.named(testSuite.name) {
-                associateWith(testFixturesCompilation)
+                associateWith(kotlinExtension.target.compilations.getByName(testFixtures.name))
             }
 
             testFixturesFeature.jarTask {
