@@ -431,12 +431,8 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         val testGenDirectory =
             pluginDevKit.testGenDirectory.convention(layout.buildDirectory.dir("test-gen"))
 
-        val testArtifacts = configurations.register("testArtifacts")
-        val testArtifactsWasm =
-            configurations.register("testArtifactsWasm") {
-                isTransitive = false
-                attributes { attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm) }
-            }
+        val testArtifacts = configurations.dependencyScope("testArtifacts")
+        val testArtifactsWasm = configurations.dependencyScope("testArtifactsWasm")
 
         fun SourceSet.addTestGenDir() =
             testGenDirectory.dir(name).let {
@@ -759,7 +755,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
                 configure(
                     testArtifacts.withKotlinVersion(version),
                     testArtifactsWasm.withKotlinVersion(version) {
-                        this.isTransitive = false
+                        isTransitive = false
                         attributes {
                             attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
                         }
