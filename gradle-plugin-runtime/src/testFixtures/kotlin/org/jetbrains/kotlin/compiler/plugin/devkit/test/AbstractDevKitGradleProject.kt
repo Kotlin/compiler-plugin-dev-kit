@@ -176,9 +176,9 @@ abstract class AbstractDevKitGradleProject(
 
   protected fun RootProject.Builder.withDevKitSettings() {
     withSettingsScript {
-      pluginManagement = PluginManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + Repository.DEFAULT_PLUGINS))
+      pluginManagement = PluginManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + KOTLIN_REPOS + Repository.DEFAULT_PLUGINS))
       dependencyResolutionManagement =
-        DependencyResolutionManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + Repository.DEFAULT))
+        DependencyResolutionManagement(repositories(Repository.FUNC_TEST_INCLUDED_BUILDS + KOTLIN_REPOS + Repository.DEFAULT))
     }
     gradleProperties = gradleProperties.plus(extraGradleProperties)
   }
@@ -227,5 +227,11 @@ abstract class AbstractDevKitGradleProject(
         "kotlin.native.enableKlibsCrossCompilation=true",
         "kotlin.native.ignoreDisabledTargets=true",
       )
+    private val KOTLIN_REPOS =
+      listOf(
+        "https://packages.jetbrains.team/maven/p/kt/bootstrap",
+        "https://packages.jetbrains.team/maven/p/kt/dev/",
+        "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/",
+      ).map(Repository::ofMaven)
   }
 }

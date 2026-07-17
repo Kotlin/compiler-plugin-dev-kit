@@ -71,17 +71,14 @@ buildConfig {
 }
 
 pluginDevKit {
-  // Metro's Gradle plugin isn't a thin "wire up my compiler plugin" wrapper, so it doesn't need
-  // the devkit's generated PluginInfo class or its gradle-plugin-runtime dependency.
-  generatePluginInfo = false
   addRuntimeDependency = false
-  // Picks which single registered Kotlin version the plain `functionalTest` task delegates to.
-  // Every per-version task (functionalTestk<version>) stays independently runnable regardless.
-  defaultTestVersion =
+
+  supportedVersions.forEach { testAgainst(it) }
+  defaultTestVersion(
     KotlinToolingVersion(
       providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
     )
-  supportedVersions.forEach { testAgainst(it) }
+  )
 }
 
 gradlePlugin {

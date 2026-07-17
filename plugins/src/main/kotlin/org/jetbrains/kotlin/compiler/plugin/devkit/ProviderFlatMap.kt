@@ -1,5 +1,6 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 
 /**
@@ -11,3 +12,8 @@ internal interface ProviderFlatMap {
 
     object Unsafe : ProviderFlatMap
 }
+
+internal fun <T : Any> Project.providerFlatMap(provider: ProviderFlatMap.() -> T): Provider<T> =
+    provider {
+        ProviderFlatMap.Unsafe.provider()
+    }

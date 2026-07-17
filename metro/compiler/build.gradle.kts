@@ -233,12 +233,6 @@ val versionAliases =
 
 pluginDevKit {
   addRuntimeDependency = false
-  // Picks which single registered Kotlin version the plain `test` task delegates to. Every
-  // per-version suite (k<version>Test) stays independently runnable regardless.
-  defaultTestVersion =
-    KotlinToolingVersion(
-      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
-    )
 
   listOf(
       "2.3.20",
@@ -251,9 +245,12 @@ pluginDevKit {
     .map(::KotlinToolingVersion)
     .forEach { testAgainst(it) }
 
-  // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
-  // metro.testCompilerVersion always has a matching task to select.
   versionAliases.filterNot { alias -> testAgainst.any { it.version == alias } }.forEach { testAgainst(it) }
+  defaultTestVersion(
+    KotlinToolingVersion(
+      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
+    )
+  )
 }
 
 for (c in arrayOf("apiElements", "runtimeElements")) {

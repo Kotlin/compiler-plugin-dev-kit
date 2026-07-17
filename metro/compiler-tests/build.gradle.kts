@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 @file:OptIn(ExperimentalWasmDsl::class)
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitKotlinCompilerTestFixturesTarget
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestFixturesTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.compiler.plugin.devkit.setClasspathProperty
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -31,7 +31,7 @@ val versionAliases =
     .map(::KotlinToolingVersion)
 
 pluginDevKit {
-  fun DevKitKotlinCompilerTestFixturesTarget.setupFixtures() {
+  fun DevKitTestFixturesTarget.setupFixtures() {
     testFixtures {
       kotlin.srcDirs(
         "src/generator${KotlinToolingVersion(version.toKotlinVersion()).baseVersionName}/kotlin"
@@ -56,8 +56,6 @@ pluginDevKit {
   val k2420Target =
     developForWithFixtures(KotlinToolingVersion("2.4.20-dev-6138")) { setupFixtures() }
 
-  // Extend bare test coverage to any version-aliases.txt entry not already registered above, so
-  // metro.testCompilerVersion always has a matching task to select.
   versionAliases
     .filterNot { alias -> testAgainst.any { it.version == alias } }
     .forEach {
@@ -72,11 +70,11 @@ pluginDevKit {
       else testAgainst(it)
     }
 
-  // Picks which single registered Kotlin version's test task actually runs when running test task
-  defaultTestVersion =
+  defaultTestVersion(
     KotlinToolingVersion(
       providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
     )
+  )
   generateTestsClass = "$group.compiler.GenerateTestsKt"
 }
 
