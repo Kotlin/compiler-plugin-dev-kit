@@ -6,9 +6,6 @@ import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestFixturesTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.compiler.plugin.devkit.setClasspathProperty
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
-import org.jetbrains.kotlin.gradle.targets.js.KotlinJsCompilerAttribute
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
@@ -97,110 +94,83 @@ pluginDevKit.testAgainst.configureEach {
   }
 }
 
-val metroRuntimeClasspath = configurations.create("metroRuntimeClasspath") { isTransitive = false }
-val metroRuntimeKlibClasspath =
-  configurations.create("metroRuntimeKlibClasspath") {
-    isTransitive = false
-    attributes {
-      attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-      attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-      attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-      attribute(KotlinJsCompilerAttribute.jsCompilerAttribute, KotlinJsCompilerAttribute.ir)
+buildConfig {
+  packageName("$group.compiler")
+}
+
+pluginDevKit {
+  val runtimeTracingClasspath = registerRuntimeLibrariesJvm("runtimeTracing", isTransitive = true)
+  val anvilRuntimeClasspath = registerRuntimeLibrariesJvm("anvil")
+  val kiAnvilRuntimeClasspath = registerRuntimeLibrariesJvm("kiAnvil")
+  // include transitive in this case to grab compose and circuit runtimes
+  val circuitRuntimeClasspath = registerRuntimeLibrariesJvm("circuit", isTransitive = true)
+  val circuitRuntimeKlibClasspath =
+    registerRuntimeLibrariesJs("circuitKlib", isTransitive = true) {
+      // exclude(group = "org.jetbrains.kotlin")
+      extendsFrom(circuitRuntimeClasspath)
     }
+
+  // include transitive in this case to grab jakarta and javax
+  val daggerRuntimeClasspath = registerRuntimeLibrariesJvm("dagger", isTransitive = true)
+  val daggerInteropClasspath = registerRuntimeLibrariesJvm("daggerInterop")
+  val hiltCoreClasspath = registerRuntimeLibrariesJvm("hiltCore")
+  // include transitive in this case to grab jakarta and javax
+  val guiceClasspath = registerRuntimeLibrariesJvm("guice", isTransitive = true)
+  val javaxInteropClasspath = registerRuntimeLibrariesJvm("javaxInterop")
+  val jakartaInteropClasspath = registerRuntimeLibrariesJvm("jakartaInterop")
+
+  dependencies {
+    testFixturesApi(kotlin("compose-compiler-plugin"))
+
+    testFixturesApi(project(":compiler"))
+    testFixturesApi(project(":compiler-compat"))
+    testFixturesCompileOnlyApi(project(":metro-common"))
+
+    testFixturesRuntimeOnly(libs.ksp.symbolProcessing)
+    testFixturesApi(libs.ksp.symbolProcessing.aaEmbeddable)
+    testFixturesApi(libs.ksp.symbolProcessing.commonDeps)
+    testFixturesApi(libs.ksp.symbolProcessing.api)
+    testFixturesApi(libs.dagger.compiler)
+    testFixturesApi(libs.hilt.compiler)
+    testFixturesApi(libs.hilt.core)
+
+    defaultRuntimeLibraries(project(":runtime"))
+
+    runtimeTracingClasspath(project(":metro-trace"))
+
+    daggerInteropClasspath(project(":interop-dagger"))
+
+    guiceClasspath(project(":interop-guice"))
+    guiceClasspath(libs.guice)
+
+    javaxInteropClasspath(project(":interop-javax"))
+    jakartaInteropClasspath(project(":interop-jakarta"))
+
+    anvilRuntimeClasspath(libs.anvil.annotations)
+    anvilRuntimeClasspath(libs.anvil.annotations.optional)
+
+    daggerRuntimeClasspath(libs.dagger.runtime)
+
+    hiltCoreClasspath(libs.hilt.core)
+
+    kiAnvilRuntimeClasspath(libs.kotlinInject.anvil.runtime)
+    kiAnvilRuntimeClasspath(libs.kotlinInject.runtime)
+
+    circuitRuntimeClasspath(libs.circuit.runtime.presenter)
+    circuitRuntimeClasspath(libs.circuit.runtime.ui)
+    circuitRuntimeClasspath(libs.circuit.codegenAnnotations)
+    circuitRuntimeKlibClasspath(libs.circuit.runtime.presenter)
+    circuitRuntimeKlibClasspath(libs.circuit.runtime.ui)
+    circuitRuntimeKlibClasspath(libs.circuit.codegenAnnotations)
+    circuitRuntimeKlibClasspath(libs.compose.ui)
+    circuitRuntimeKlibClasspath(libs.kotlinInject.anvil.runtime.optional)
+    circuitRuntimeKlibClasspath(libs.kotlinInject.runtime)
+    circuitRuntimeKlibClasspath(libs.kotlinx.browser)
+
+    // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
+    // ServiceLoader
+    testFixturesRuntimeOnly(libs.anvil.kspCompiler)
   }
-
-val runtimeTracingClasspath = configurations.create("runtimeTracingClasspath")
-val anvilRuntimeClasspath = configurations.create("anvilRuntimeClasspath") { isTransitive = false }
-val kiAnvilRuntimeClasspath =
-  configurations.create("kiAnvilRuntimeClasspath") { isTransitive = false }
-// include transitive in this case to grab compose and circuit runtimes
-val circuitRuntimeClasspath =
-  configurations.create("circuitRuntimeClasspath") {
-    attributes {
-      // Force JVM variants
-      // TODO in future non-jvm tests we need others
-      attribute(KotlinPlatformType.attribute, KotlinPlatformType.jvm)
-    }
-  }
-val circuitRuntimeKlibClasspath =
-  configurations.create("circuitRuntimeKlibClasspath") {
-    exclude(group = "org.jetbrains.kotlin")
-    attributes {
-      attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-      attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-      attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-      attribute(KotlinJsCompilerAttribute.jsCompilerAttribute, KotlinJsCompilerAttribute.ir)
-    }
-  }
-
-// include transitive in this case to grab jakarta and javax
-val daggerRuntimeClasspath = configurations.create("daggerRuntimeClasspath") {}
-val daggerInteropClasspath =
-  configurations.create("daggerInteropClasspath") { isTransitive = false }
-val hiltCoreClasspath = configurations.create("hiltCoreClasspath") { isTransitive = false }
-// include transitive in this case to grab jakarta and javax
-val guiceClasspath = configurations.create("guiceClasspath") {}
-val javaxInteropClasspath = configurations.create("javaxInteropClasspath") { isTransitive = false }
-val jakartaInteropClasspath =
-  configurations.create("jakartaInteropClasspath") { isTransitive = false }
-
-dependencies {
-  testFixturesApi("org.jetbrains.kotlin:kotlin-compose-compiler-plugin")
-
-  testFixturesApi(project(":compiler"))
-  testFixturesApi(project(":compiler-compat"))
-  testFixturesCompileOnlyApi(project(":metro-common"))
-
-  testFixturesRuntimeOnly(libs.ksp.symbolProcessing) // TODO might be unnecessary
-  testFixturesApi(libs.ksp.symbolProcessing.aaEmbeddable)
-  testFixturesApi(libs.ksp.symbolProcessing.commonDeps)
-  testFixturesApi(libs.ksp.symbolProcessing.api)
-  testFixturesApi(libs.dagger.compiler)
-  testFixturesApi(libs.hilt.compiler)
-  testFixturesApi(libs.hilt.core)
-
-  metroRuntimeClasspath(project(":runtime"))
-  metroRuntimeKlibClasspath(project(path = ":runtime", configuration = "jsRuntimeElements"))
-  runtimeTracingClasspath(project(":metro-trace"))
-
-  daggerInteropClasspath(project(":interop-dagger"))
-
-  guiceClasspath(project(":interop-guice"))
-  guiceClasspath(libs.guice)
-
-  javaxInteropClasspath(project(":interop-javax"))
-  jakartaInteropClasspath(project(":interop-jakarta"))
-
-  anvilRuntimeClasspath(libs.anvil.annotations)
-  anvilRuntimeClasspath(libs.anvil.annotations.optional)
-
-  daggerRuntimeClasspath(libs.dagger.runtime)
-
-  hiltCoreClasspath(libs.hilt.core)
-
-  kiAnvilRuntimeClasspath(libs.kotlinInject.anvil.runtime)
-  kiAnvilRuntimeClasspath(libs.kotlinInject.runtime)
-
-  circuitRuntimeClasspath(libs.circuit.runtime.presenter)
-  circuitRuntimeClasspath(libs.circuit.runtime.ui)
-  circuitRuntimeClasspath(libs.circuit.codegenAnnotations)
-  circuitRuntimeKlibClasspath(libs.circuit.runtime.presenter)
-  circuitRuntimeKlibClasspath(libs.circuit.runtime.ui)
-  circuitRuntimeKlibClasspath(libs.circuit.codegenAnnotations)
-  circuitRuntimeKlibClasspath(libs.compose.ui)
-  circuitRuntimeKlibClasspath(libs.kotlinInject.anvil.runtime.optional)
-  circuitRuntimeKlibClasspath(libs.kotlinInject.runtime)
-  circuitRuntimeKlibClasspath(libs.kotlinx.browser)
-
-  // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
-  // ServiceLoader
-  testFixturesRuntimeOnly(libs.anvil.kspCompiler)
-
-  // Dependencies required to run the internal test framework.
-  // Use the test compiler version because 2.3.20+ uses new APIs from here
-  testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect")
-  testRuntimeOnly(libs.kotlin.scriptRuntime)
-  testRuntimeOnly(libs.kotlin.annotationsJvm)
 }
 
 val largeTestMode = providers.gradleProperty("metro.enableLargeTests").isPresent
@@ -208,7 +178,6 @@ val excludeJsBoxTests = providers.gradleProperty("metro.excludeJsBoxTests").isPr
 
 tasks.withType<Test> {
   outputs.upToDateWhen { false }
-  dependsOn(runtimeTracingClasspath)
 
   // Inspo from https://youtrack.jetbrains.com/issue/KT-83440
   minHeapSize = "512m"
@@ -221,22 +190,6 @@ tasks.withType<Test> {
     "-XX:CICompilerCount=2",
     "-Djna.nosys=true",
   )
-
-  dependsOn(metroRuntimeClasspath)
-  dependsOn(metroRuntimeKlibClasspath)
-  dependsOn(daggerInteropClasspath)
-  dependsOn(hiltCoreClasspath)
-  dependsOn(guiceClasspath)
-  dependsOn(javaxInteropClasspath)
-  dependsOn(jakartaInteropClasspath)
-  dependsOn(circuitRuntimeClasspath)
-  dependsOn(circuitRuntimeKlibClasspath)
-  inputs
-    .dir(layout.projectDirectory.dir("src/test/data"))
-    .withPropertyName("testData")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-
-  workingDir = rootDir
 
   if (providers.gradleProperty("metro.debugCompilerTests").isPresent) {
     testLogging {
@@ -265,8 +218,6 @@ tasks.withType<Test> {
     )
   }
 
-  useJUnitPlatform()
-
   if (largeTestMode) {
     filter { includeTestsMatching("*StressTest*") }
   } else {
@@ -280,8 +231,6 @@ tasks.withType<Test> {
     }
   }
 
-  val testRuntimeClasspath = configurations.testRuntimeClasspath
-
   systemProperty("metro.shortLocations", "true")
 
   // Regenerate golden files in place: ./gradlew :compiler-tests:test -PupdateTestData=true
@@ -289,22 +238,5 @@ tasks.withType<Test> {
     systemProperty("kotlin.test.update.test.data", "true")
   }
 
-  systemProperty("metroRuntime.classpath", metroRuntimeClasspath.asPath)
-  systemProperty("metroRuntime.klibClasspath", metroRuntimeKlibClasspath.asPath)
-  systemProperty("runtimeTracing.classpath", runtimeTracingClasspath.asPath)
-  systemProperty("anvilRuntime.classpath", anvilRuntimeClasspath.asPath)
-  systemProperty("kiAnvilRuntime.classpath", kiAnvilRuntimeClasspath.asPath)
-  systemProperty("daggerRuntime.classpath", daggerRuntimeClasspath.asPath)
-  systemProperty("daggerInterop.classpath", daggerInteropClasspath.asPath)
-  systemProperty("hiltCore.classpath", hiltCoreClasspath.asPath)
-  systemProperty("guice.classpath", guiceClasspath.asPath)
-  systemProperty("javaxInterop.classpath", javaxInteropClasspath.asPath)
-  systemProperty("jakartaInterop.classpath", jakartaInteropClasspath.asPath)
-  systemProperty("circuit.classpath", circuitRuntimeClasspath.asPath)
-  systemProperty("circuit.klibClasspath", circuitRuntimeKlibClasspath.asPath)
-  setClasspathProperty("ksp.testRuntimeClasspath", testRuntimeClasspath)
-
-  // Properties required to run the internal test framework.
-  systemProperty("idea.ignore.disabled.plugins", "true")
-  systemProperty("idea.home.path", rootDir)
+  setClasspathProperty("ksp.testRuntimeClasspath", configurations.testRuntimeClasspath)
 }

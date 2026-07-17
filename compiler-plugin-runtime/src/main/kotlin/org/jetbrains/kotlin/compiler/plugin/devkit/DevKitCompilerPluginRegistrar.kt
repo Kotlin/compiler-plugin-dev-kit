@@ -5,8 +5,9 @@ import kotlin.reflect.jvm.jvmName
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-abstract class DevKitCompilerPluginRegistrar(registrarClass: KClass<out DevKitComponentRegistrar>) :
-    CompilerPluginRegistrar() {
+public abstract class DevKitCompilerPluginRegistrar(
+    registrarClass: KClass<out DevKitComponentRegistrar>
+) : CompilerPluginRegistrar() {
     private val versionedRegistrar by lazy {
         val loader = VersionedPluginClassLoading.resolve(registrarClass.java)
         val registrar =
@@ -27,8 +28,8 @@ abstract class DevKitCompilerPluginRegistrar(registrarClass: KClass<out DevKitCo
     }
 }
 
-interface DevKitComponentRegistrar {
-    fun CompilerPluginRegistrar.ExtensionStorage.registerExtensions(
+public interface DevKitComponentRegistrar {
+    public fun CompilerPluginRegistrar.ExtensionStorage.registerExtensions(
         configuration: CompilerConfiguration
     )
 }

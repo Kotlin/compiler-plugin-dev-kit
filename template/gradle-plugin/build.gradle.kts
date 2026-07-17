@@ -3,7 +3,7 @@ plugins {
 }
 
 pluginDevKit {
-    pluginAnnotations = project(":plugin-annotations")
+    extraLibrary(project(":plugin-annotations"))
     compilerPlugin = project(":compiler-plugin")
 }
 
@@ -13,7 +13,8 @@ gradlePlugin {
             id = group.toString()
             displayName = "SimplePlugin"
             description = "SimplePlugin"
-            implementationClass = "org.jetbrains.kotlin.compiler.plugin.template.SimpleGradlePlugin"
+            implementationClass =
+                "org.jetbrains.kotlin.compiler.plugin.template.SimpleSupportPlugin"
         }
     }
 }
@@ -23,6 +24,6 @@ gradleTestKitSupport {
     withIncludedBuildProjects(
         "compiler-plugin-dev-kit:compiler-plugin-runtime",
         "compiler-plugin-dev-kit:gradle-plugin-runtime",
-        "artifact-transform:"
+        "artifact-transform:",
     )
 }

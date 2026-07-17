@@ -8,30 +8,35 @@ import org.junit.Test
 class SimpleProjectTest {
     @Test
     fun testHasAnnotationsDependency() {
-        val project = object: SimpleProject() {
-            override fun sources() = listOf(
-                source(simpleFile)
-            )
-        }.gradleProject
+        val project =
+            object : SimpleProject() {
+                    override fun sources() = listOf(source(simpleFile))
+                }
+                .gradleProject
         val result = build(project.rootDir, "dependencies", "--configuration", "compileClasspath")
-        result.assertOutputContains("org.jetbrains.kotlin.compiler.plugin.template:plugin-annotations")
+        result.assertOutputContains(
+            "org.jetbrains.kotlin.compiler.plugin.template:plugin-annotations"
+        )
     }
+
     @Test
     fun testCompiles() {
-        val project = object: SimpleProject() {
-            override fun sources() = listOf(
-                source(simpleFile)
-            )
-        }.gradleProject
+        val project =
+            object : SimpleProject() {
+                    override fun sources() = listOf(source(simpleFile))
+                }
+                .gradleProject
         build(project.rootDir, "build")
     }
 }
 
 @Language("kotlin")
-private val simpleFile = """
-@SomeAnnotation
-fun main() {
-    val result = MyClass().foo()
-    require(result == "Hello world")
-}
-""".trimIndent()
+private val simpleFile =
+    """
+    @SomeAnnotation
+    fun main() {
+        val result = MyClass().foo()
+        require(result == "Hello world")
+    }
+    """
+        .trimIndent()

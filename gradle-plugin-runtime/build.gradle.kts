@@ -1,4 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `embedded-kotlin`
@@ -13,6 +15,12 @@ java {
 
 kotlin {
     compilerOptions.jvmTarget = JvmTarget.JVM_17
+    explicitApi()
+    target.compilations.named("testFixtures") {
+        tasks.named<KotlinCompile>(compileKotlinTaskName) {
+            explicitApiMode = ExplicitApiMode.Strict
+        }
+    }
 }
 
 dependencies {

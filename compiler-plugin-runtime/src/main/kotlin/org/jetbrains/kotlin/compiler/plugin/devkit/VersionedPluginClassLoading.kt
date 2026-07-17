@@ -19,17 +19,24 @@ import org.jetbrains.kotlin.config.KotlinCompilerVersion
 
 internal const val PLUGIN_VERSIONS_PATH = "META-INF/kotlin/plugin/versions"
 
-object VersionedPluginClassLoading {
+public object VersionedPluginClassLoading {
     private val cache = ConcurrentHashMap<ClassLoader, ClassLoader>()
 
-    fun resolve(anchor: Class<*>): ClassLoader {
+    public fun resolve(anchor: Class<*>): ClassLoader {
         val parent = anchor.classLoader
-        val currentVersion = KotlinCompilerVersion.getVersion()?.let(::KotlinToolingVersion)?.let(CompilerVersionAliases::map)
-        val urls = if (parent is URLClassLoader) parent.urLs.toList() else runCatching {
-            val method = parent.javaClass.getMethod("getUrls")
-            @Suppress("UNCHECKED_CAST")
-            method.invoke(parent) as? Iterable<URL>
-        }.getOrNull()
+        val currentVersion =
+            KotlinCompilerVersion.getVersion()
+                ?.let(::KotlinToolingVersion)
+                ?.let(CompilerVersionAliases::map)
+        val urls =
+            if (parent is URLClassLoader) parent.urLs.toList()
+            else
+                runCatching {
+                    val method = parent.javaClass.getMethod("getUrls")
+                    @Suppress("UNCHECKED_CAST")
+                    method.invoke(parent) as? Iterable<URL>
+                }
+                    .getOrNull()
         if (currentVersion == null || urls == null) return parent
         return cache.getOrPut(parent) { resolveUncached(parent, urls, currentVersion) }
     }
@@ -42,7 +49,10 @@ object VersionedPluginClassLoading {
         urls.forEach { url ->
             url.toURI().toPath().openDirectory { root ->
                 findVersion(root, currentVersion)?.let {
-                    add(URI((root / PLUGIN_VERSIONS_PATH / it.toString()).toUri().toString() + "/").toURL())
+                    add(
+                        URI((root / PLUGIN_VERSIONS_PATH / it.toString()).toUri().toString() + "/")
+                            .toURL()
+                    )
                 }
             }
             add(url)

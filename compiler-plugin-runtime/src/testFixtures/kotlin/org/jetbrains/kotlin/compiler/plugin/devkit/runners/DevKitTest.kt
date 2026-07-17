@@ -6,12 +6,13 @@ import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
 import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
+import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 
-abstract class DevKitTest(
+public abstract class DevKitTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
-    val targetBackend: TargetBackend? = null,
+    public val targetBackend: TargetBackend? = null,
 ) : AbstractKotlinCompilerTest() {
-    constructor(
+    public constructor(
         delegate: AbstractKotlinCompilerTest,
         vararg initialConfig: TestConfigurationBuilder.() -> Unit,
     ) : this(
@@ -25,7 +26,7 @@ abstract class DevKitTest(
             },
     )
 
-    constructor(
+    public constructor(
         targetBackend: TargetBackend,
         vararg config: TestConfigurationBuilder.() -> Unit,
     ) : this(*config, targetBackend = targetBackend)
@@ -40,10 +41,12 @@ abstract class DevKitTest(
         config.addAll(configuration)
     }
 
-    override fun createKotlinStandardLibrariesPathProvider() =
+    override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider =
         EnvironmentBasedStandardLibrariesPathProvider
 
-    final override fun configure(builder: TestConfigurationBuilder) = config.forEach { it(builder) }
+    final override fun configure(builder: TestConfigurationBuilder) {
+        config.forEach { it(builder) }
+    }
 
     @TestInfrastructureInternals
     final override fun configureInternal(builder: TestConfigurationBuilder) {

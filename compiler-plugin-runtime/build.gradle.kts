@@ -1,5 +1,7 @@
+import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
@@ -14,6 +16,12 @@ java {
 
 kotlin {
     compilerOptions.jvmTarget = JvmTarget.JVM_17
+    explicitApi()
+    target.compilations.named("testFixtures") {
+        tasks.named<KotlinCompile>(compileKotlinTaskName) {
+            explicitApiMode = ExplicitApiMode.Strict
+        }
+    }
 }
 
 dependencies {
@@ -63,7 +71,9 @@ pluginDevKit {
                     testFixtures {
                         kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
                         java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
-                        resources.srcDirs(k2420Target.testFixtures.map { it.resources.sourceDirectories })
+                        resources.srcDirs(
+                            k2420Target.testFixtures.map { it.resources.sourceDirectories }
+                        )
                     }
                 }
             else testAgainst(it)

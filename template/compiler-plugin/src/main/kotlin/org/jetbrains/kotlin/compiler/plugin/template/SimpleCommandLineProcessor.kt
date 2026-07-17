@@ -2,17 +2,20 @@ package org.jetbrains.kotlin.compiler.plugin.template
 
 import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CliOption
-import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCLP
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
 @Suppress("unused") // Used via reflection.
-class SimpleCommandLineProcessor : CommandLineProcessor {
+class SimpleCommandLineProcessor : DevKitCommandLineProcessor(SimpleCLP::class) {
     override val pluginId: String
-        get() = BuildConfig.KOTLIN_PLUGIN_ID
+        get() = PluginInfo.PLUGIN_ID
 
     override val pluginOptions: Collection<CliOption>
         get() = emptyList()
+}
 
+class SimpleCLP : DevKitCLP {
     override fun processOption(
         option: AbstractCliOption,
         value: String,

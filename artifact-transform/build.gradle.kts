@@ -7,6 +7,7 @@ plugins {
 }
 
 group = "org.jetbrains.kotlin.compiler.plugin.devkit"
+
 version = "0.0.1-SNAPSHOT"
 
 dependencies {
@@ -41,7 +42,8 @@ buildConfig {
             .asText
             // Known tags-to-real version mappings for IDE builds.
             // Android Studio canary builds report a fake version like "2.3.255-dev-255".
-            // The real version can be found by checking the IntelliJ tag for the studio build number:
+            // The real version can be found by checking the IntelliJ tag for the studio build
+            // number:
             // https://github.com/JetBrains/intellij-community/blob/idea/<intellij-version>/.idea/libraries/kotlinc_kotlin_compiler_common.xml
             .map { text ->
                 text

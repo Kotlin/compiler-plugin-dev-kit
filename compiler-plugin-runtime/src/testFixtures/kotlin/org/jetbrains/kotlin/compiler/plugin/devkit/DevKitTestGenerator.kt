@@ -9,10 +9,10 @@ import org.jetbrains.kotlin.generators.model.AnnotationModel
 import org.jetbrains.kotlin.generators.model.SimpleTestClassModel
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.capitalizeAsciiOnly
 
-data class SourceSetName(val name: String)
+public data class SourceSetName(val name: String)
 
-object DevKitTestGenerator {
-    fun generate(args: Array<String>, block: context(SourceSetName) TestGroup.() -> Unit) =
+public object DevKitTestGenerator {
+    public fun generate(args: Array<String>, block: context(SourceSetName) TestGroup.() -> Unit) {
         generateTestGroupSuiteWithJUnit5 {
             args
                 .toList()
@@ -33,10 +33,11 @@ object DevKitTestGenerator {
                     }
                 }
         }
+    }
 }
 
 context(name: SourceSetName)
-inline fun <reified T> TestGroup.sourceSetTestClass(
+public inline fun <reified T> TestGroup.sourceSetTestClass(
     suiteTestClassName: String = getDefaultSuiteTestClassName(T::class.java.simpleName),
     annotations: List<AnnotationModel> = emptyList(),
     noinline init: TestClass.() -> Unit,

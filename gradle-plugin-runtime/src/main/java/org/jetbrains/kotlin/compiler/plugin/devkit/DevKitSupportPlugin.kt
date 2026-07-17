@@ -2,19 +2,18 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
-import org.jetbrains.kotlin.gradle.dsl.KotlinBaseExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin
 import org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact
 import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
 
-data class DevKitPluginInfo(
-    val id: String,
-    val artifact: SubpluginArtifact,
-    val libraryCoordinates: String,
+public data class DevKitPluginInfo(
+    public val id: String,
+    public val artifact: SubpluginArtifact,
+    public val extraLibraryCoordinates: List<String>,
 )
 
-abstract class DevKitCompilerGradlePlugin(val info: DevKitPluginInfo) :
+public abstract class DevKitSupportPlugin(public val info: DevKitPluginInfo) :
     KotlinCompilerPluginSupportPlugin {
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean = true
 
@@ -25,18 +24,16 @@ abstract class DevKitCompilerGradlePlugin(val info: DevKitPluginInfo) :
     final override fun applyToCompilation(
         kotlinCompilation: KotlinCompilation<*>
     ): Provider<List<SubpluginOption>> {
-        val project = kotlinCompilation.target.project
-        val kotlin = project.extensions.findByType(KotlinBaseExtension::class.java)!!
+        val project = kotlinCompilation.project
 
         kotlinCompilation.defaultSourceSet.dependencies {
-            // Add annotations library to all compilations.
-            implementation(info.libraryCoordinates)
+            info.extraLibraryCoordinates.forEach(::implementation)
         }
 
         return project.applyToCompilation(kotlinCompilation)
     }
 
-    open fun Project.applyToCompilation(
+    public open fun Project.applyToCompilation(
         kotlinCompilation: KotlinCompilation<*>
     ): Provider<List<SubpluginOption>> = provider { emptyList() }
 }

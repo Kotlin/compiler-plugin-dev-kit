@@ -22,25 +22,29 @@ public object CompilerVersionAliases {
      * reporting `2.3.255-dev-255`) to their real compiler versions.
      */
     @Suppress("UNCHECKED_CAST")
-    public fun map(
-        version: KotlinToolingVersion,
-    ): KotlinToolingVersion? {
-        val versionString = version.toString()
-        // User aliases take priority
-        // Then check built-in aliases
+    public fun map(version: KotlinToolingVersion): KotlinToolingVersion? {
         val alias = runCatching {
             val appInfo = Class.forName("com.intellij.openapi.application.ApplicationInfo")
-            val build = appInfo.getMethod("getInstance").invoke(null).let(appInfo.getMethod("getBuild")::invoke)
+            val build =
+                appInfo
+                    .getMethod("getInstance")
+                    .invoke(null)
+                    .let(appInfo.getMethod("getBuild")::invoke)
             val buildWithoutCode =
-                build.let(build.javaClass.getMethod("withoutProductCode")::invoke) as Comparable<Comparable<Nothing>>
-            val baselineVersion = build.let(build.javaClass.getMethod("getBaselineVersion")::invoke) as Int
+                build.let(build.javaClass.getMethod("withoutProductCode")::invoke)
+                    as Comparable<Comparable<Nothing>>
+            val baselineVersion =
+                build.let(build.javaClass.getMethod("getBaselineVersion")::invoke) as Int
             val builtInVersions =
-                BUILT_IN_COMPILER_VERSION_ALIASES.filter { it.key.startsWith("$baselineVersion") }.mapKeys {
-                    build.javaClass.getMethod("fromString", String::class.java)
-                        .invoke(null, it.key) as Comparable<Comparable<Nothing>>
-                }
+                BUILT_IN_COMPILER_VERSION_ALIASES.filter { it.key.startsWith("$baselineVersion") }
+                    .mapKeys {
+                        build.javaClass
+                            .getMethod("fromString", String::class.java)
+                            .invoke(null, it.key) as Comparable<Comparable<Nothing>>
+                    }
             builtInVersions.findExactOrClosestVersion(buildWithoutCode)
-        }.getOrNull()
+        }
+            .getOrNull()
         return when (alias) {
             null -> version // No alias found, return original
             CLI_ONLY -> null // Explicitly marked as CLI-only

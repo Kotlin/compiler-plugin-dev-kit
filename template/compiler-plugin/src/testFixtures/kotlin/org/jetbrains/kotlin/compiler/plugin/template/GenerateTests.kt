@@ -6,16 +6,17 @@ import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJsBoxTest
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJvmBoxTest
 import org.jetbrains.kotlin.compiler.plugin.template.runners.AbstractJvmDiagnosticTest
 
-fun main(args: Array<String>) = DevKitTestGenerator.generate(args) {
-    sourceSetTestClass<AbstractJvmDiagnosticTest> {
-        model("diagnostics")
-    }
+fun main(args: Array<String>) =
+    DevKitTestGenerator.generate(args) {
+        sourceSetTestClass<AbstractJvmDiagnosticTest> {
+            model("diagnostics")
+        }
 
-    sourceSetTestClass<AbstractJvmBoxTest> {
-        model("box")
-    }
+        sourceSetTestClass<AbstractJvmBoxTest> {
+            model("box")
+        }
 
-    sourceSetTestClass<AbstractJsBoxTest> {
-        model("box")
+        sourceSetTestClass<AbstractJsBoxTest> {
+            model("box")
+        }
     }
-}

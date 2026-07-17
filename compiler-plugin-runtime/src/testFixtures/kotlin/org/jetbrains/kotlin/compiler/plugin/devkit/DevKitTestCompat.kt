@@ -8,16 +8,16 @@ import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.services.TestServices
 
-interface DevKitTestCompat {
-    fun afterAnalysisChecker(
+public interface DevKitTestCompat {
+    public fun afterAnalysisChecker(
         testServices: TestServices,
         directives: List<DirectivesContainer>?,
         check: context(TestServices) (thereWereFailures: Boolean) -> Unit,
     ): AfterAnalysisChecker
 
-    fun RegisteredDirectivesBuilder.versionDumpClassifier()
+    public fun RegisteredDirectivesBuilder.versionDumpClassifier()
 
-    companion object :
+    public companion object :
         DevKitTestCompat by ServiceLoader.load(DevKitTestCompat::class.java).firstOrNull()
             as DevKitTestCompat
 }

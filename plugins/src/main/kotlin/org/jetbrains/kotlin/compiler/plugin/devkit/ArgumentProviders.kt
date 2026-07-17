@@ -88,7 +88,7 @@ internal class OptionalStringSystemPropertyArgumentProvider(
 }
 
 internal class NestedArgumentProvider(
-    @Nested val providers: Iterable<CommandLineArgumentProvider>,
+    @Nested val providers: Iterable<CommandLineArgumentProvider>
 ) : CommandLineArgumentProvider {
     override fun asArguments() = providers.flatMap { it.asArguments() }
 }

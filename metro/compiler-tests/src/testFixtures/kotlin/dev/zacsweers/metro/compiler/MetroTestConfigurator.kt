@@ -7,12 +7,14 @@ import dev.zacsweers.metro.compiler.test.BUILD_COMPILER_VERSION
 import dev.zacsweers.metro.compiler.test.COMPILER_TOOLING_VERSION
 import dev.zacsweers.metro.compiler.test.COMPILER_VERSION
 import dev.zacsweers.metro.compiler.test.TEST_COMPILER_VERSION
+import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.OPT_IN
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.services.MetaTestConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
+import org.jetbrains.kotlin.test.services.defaultsProvider
 import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.test.services.testInfo
 
@@ -173,4 +175,9 @@ private fun toolingVersionDirective(versionString: String): Pair<KotlinToolingVe
   val parts = versionPart.split('.')
   val requiresFullMatch = parts.size == 3
   return KotlinToolingVersion(versionString) to requiresFullMatch
+}
+
+private fun TestServices.isJsBackend(): Boolean {
+  val targetBackend = defaultsProvider.targetBackend
+  return targetBackend == TargetBackend.JS_IR || targetBackend == TargetBackend.JS_IR_ES6
 }

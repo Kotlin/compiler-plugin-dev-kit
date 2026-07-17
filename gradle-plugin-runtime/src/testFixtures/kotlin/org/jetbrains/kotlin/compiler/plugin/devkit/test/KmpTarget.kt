@@ -5,41 +5,41 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.test
  * resolves to the host's native target (e.g. `macosArm64`, `linuxX64`) — the only native target
  * compilable without a cross-compilation toolchain.
  */
-enum class KmpTarget(val gradleTargetName: String) {
-  JVM("jvm"),
-  JS("js"),
-  WASM_JS("wasmJs"),
-  NATIVE_HOST(detectHostNativeTarget());
+public enum class KmpTarget(public val gradleTargetName: String) {
+    JVM("jvm"),
+    JS("js"),
+    WASM_JS("wasmJs"),
+    NATIVE_HOST(detectHostNativeTarget());
 
-  /** The Gradle compile task for this target's main compilation, e.g. `compileKotlinJvm`. */
-  val compileTaskName: String =
-    "compileKotlin" + gradleTargetName.replaceFirstChar { it.titlecase() }
+    /** The Gradle compile task for this target's main compilation, e.g. `compileKotlinJvm`. */
+    public val compileTaskName: String =
+        "compileKotlin" + gradleTargetName.replaceFirstChar { it.titlecase() }
 
-  override fun toString(): String = gradleTargetName
+    override fun toString(): String = gradleTargetName
 
-  companion object {
-    /** Gradle/system property scoping [selectedTargets], forwarded by `DevKitGradlePlugin`. */
-    const val KMP_TARGET_PROPERTY: String =
-      "org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget"
+    public companion object {
+        /** Gradle/system property scoping [selectedTargets], forwarded by `DevKitGradlePlugin`. */
+        public const val KMP_TARGET_PROPERTY: String =
+            "org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget"
 
-    /**
-     * Targets to iterate, from [KMP_TARGET_PROPERTY]: unset → `[JVM]`; `all` → every entry;
-     * `native_host` → [NATIVE_HOST]; else the entry whose [gradleTargetName] matches.
-     */
-    fun selectedTargets(): List<KmpTarget> {
-      val raw = System.getProperty(KMP_TARGET_PROPERTY).orEmpty()
-      return when {
-        raw.isEmpty() -> listOf(JVM)
-        raw.equals("all", ignoreCase = true) -> entries.toList()
-        raw.equals("native_host", ignoreCase = true) -> listOf(NATIVE_HOST)
-        else ->
-          listOf(
-            entries.firstOrNull { it.gradleTargetName == raw }
-              ?: error(
-                "Unknown $KMP_TARGET_PROPERTY=$raw. Expected one of ${entries.map { it.gradleTargetName }} or `all` or `native_host`."
-              )
-          )
-      }
+        /**
+         * Targets to iterate, from [KMP_TARGET_PROPERTY]: unset → `[JVM]`; `all` → every entry;
+         * `native_host` → [NATIVE_HOST]; else the entry whose [gradleTargetName] matches.
+         */
+        public fun selectedTargets(): List<KmpTarget> {
+            val raw = System.getProperty(KMP_TARGET_PROPERTY).orEmpty()
+            return when {
+                raw.isEmpty() -> listOf(JVM)
+                raw.equals("all", ignoreCase = true) -> entries.toList()
+                raw.equals("native_host", ignoreCase = true) -> listOf(NATIVE_HOST)
+                else ->
+                    listOf(
+                        entries.firstOrNull { it.gradleTargetName == raw }
+                            ?: error(
+                                "Unknown $KMP_TARGET_PROPERTY=$raw. Expected one of ${entries.map { it.gradleTargetName }} or `all` or `native_host`."
+                            )
+                    )
+            }
+        }
     }
-  }
 }

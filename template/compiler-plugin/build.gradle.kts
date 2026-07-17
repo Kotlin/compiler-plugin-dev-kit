@@ -8,5 +8,8 @@ plugins {
 pluginDevKit {
     developForWithFixtures(kotlinToolingVersion)
     developForWithFixtures(KotlinToolingVersion(KotlinVersion(2, 4, 20), "dev-7680"))
-    pluginAnnotations = project(":plugin-annotations")
+}
+
+dependencies {
+    defaultRuntimeLibraries(project(":plugin-annotations"))
 }

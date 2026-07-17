@@ -7,9 +7,9 @@ import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
-fun TestConfigurationBuilder.configurePlugin(registrar: CompilerPluginRegistrar) {
+public fun TestConfigurationBuilder.configurePlugin(registrar: CompilerPluginRegistrar) {
     useConfigurators(registrar::ExtensionRegistrarConfigurator)
-    configureAnnotations()
+    configureDefaultRuntimeLibraries()
 }
 
 private fun CompilerPluginRegistrar.ExtensionRegistrarConfigurator(testServices: TestServices) =

@@ -5,8 +5,8 @@ import org.gradle.api.Project
 import org.gradle.api.publish.PublishingExtension
 
 /**
- * Applies `com.autonomousapps.testkit` and fixes up the friction points that come from combining
- * it with a "real" Maven publication (e.g. via `com.vanniktech.maven.publish` + signing):
+ * Applies `com.autonomousapps.testkit` and fixes up the friction points that come from combining it
+ * with a "real" Maven publication (e.g. via `com.vanniktech.maven.publish` + signing):
  * - The plugin's auto-generated `testKitSupportFor*` publication is only meant for the local
  *   `functionalTestRepo`; it must not race the module's real publication at the same coordinates
  *   when publishing to Maven Central.
@@ -30,7 +30,9 @@ public class DevKitFunctionalTestPublishingPlugin : Plugin<Project> {
         // publish to Maven Central where it would race the real `maven` publication at the same
         // coordinates.
         tasks
-            .matching { it.name == "publishTestKitSupportForJavaPublicationToMavenCentralRepository" }
+            .matching {
+                it.name == "publishTestKitSupportForJavaPublicationToMavenCentralRepository"
+            }
             .configureEach { enabled = false }
 
         // When TestKit adds its coordinate-correcting publication, it replaces the local `maven`
@@ -38,9 +40,12 @@ public class DevKitFunctionalTestPublishingPlugin : Plugin<Project> {
         // version)` keep the original task. TestKit creates the extra publication in
         // `afterEvaluate`, so check after it.
         afterEvaluate {
-            val publishing = extensions.findByType(PublishingExtension::class.java) ?: return@afterEvaluate
-            if (publishing.publications.findByName("testKitSupportForJava") == null) return@afterEvaluate
-            tasks.matching { it.name == "publishMavenPublicationToFunctionalTestRepository" }
+            val publishing =
+                extensions.findByType(PublishingExtension::class.java) ?: return@afterEvaluate
+            if (publishing.publications.findByName("testKitSupportForJava") == null)
+                return@afterEvaluate
+            tasks
+                .matching { it.name == "publishMavenPublicationToFunctionalTestRepository" }
                 .configureEach { enabled = false }
         }
     }

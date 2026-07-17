@@ -14,6 +14,7 @@ import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.DependencyScopeConfiguration
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.attributes.LibraryElements
@@ -114,9 +115,102 @@ private class DevKitTestTargetImpl<
     override var _main: @UnsafeVariance Main = null as Main
 }
 
+private fun DevKitTestTarget.testTask(action: Test.() -> Unit) = testSuite {
+    targets.all { this.testTask(action) }
+}
+
 public abstract class DevKitCompilerPluginConfigExtension(override val project: Project) :
     HasProject {
-    public abstract val pluginAnnotations: Property<Project>
+    private val buildConfig = project.extensions.getByType<BuildConfigExtension>()
+
+    public fun registerRuntimeLibraries(
+        name: String,
+        isTransitive: Boolean = false,
+        forJvm: Boolean = true,
+        forJs: Boolean = true,
+        addToBuildConfig: Boolean = true,
+        configure: DependencyScopeConfiguration.() -> Unit = {},
+    ): NamedDomainObjectProvider<DependencyScopeConfiguration> {
+        val jvm: String = "$name.jvm.classpath"
+        val js: String = "$name.js.classpath"
+        val configuration =
+            project.configurations.dependencyScope(name) {
+                this.isTransitive = isTransitive
+            }
+        val jvmConfiguration =
+            project.configurations.resolvable("${name}Jvm") {
+                extendsFrom(configuration)
+                this.isTransitive = isTransitive
+            }
+        val jsConfiguration =
+            project.configurations.resolvable("${name}Js") {
+                extendsFrom(configuration)
+                this.isTransitive = isTransitive
+                attributes {
+                    attribute(
+                        Usage.USAGE_ATTRIBUTE,
+                        project.objects.named(KotlinUsages.KOTLIN_RUNTIME),
+                    )
+                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
+                }
+            }
+        testAgainst.configureEach {
+            testTask {
+                if (forJvm) setClasspathProperty(jvm, jvmConfiguration)
+                if (forJs) setClasspathProperty(js, jsConfiguration)
+            }
+        }
+        buildConfig.sourceSets.named(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME) {
+            if (!addToBuildConfig) return@named
+            forClass("RuntimeClasspaths") {
+                if (forJvm)
+                    buildConfigField(
+                        "List<java.io.File>",
+                        if (forJs) "${name}Jvm" else name,
+                        """org.jetbrains.kotlin.compiler.plugin.devkit.services.classpathFiles("$jvm")""",
+                    )
+                if (forJs)
+                    buildConfigField(
+                        "List<java.io.File>",
+                        if (forJvm) "${name}Js" else name,
+                        """org.jetbrains.kotlin.compiler.plugin.devkit.services.classpathFiles("$js")""",
+                    )
+            }
+        }
+
+        return configuration.also { it(configure) }
+    }
+
+    public fun registerRuntimeLibrariesJvm(
+        name: String,
+        isTransitive: Boolean = false,
+        addToBuildConfig: Boolean = true,
+        configure: DependencyScopeConfiguration.() -> Unit = {},
+    ): NamedDomainObjectProvider<DependencyScopeConfiguration> =
+        registerRuntimeLibraries(
+            name,
+            isTransitive = isTransitive,
+            forJs = false,
+            addToBuildConfig = addToBuildConfig,
+            configure = configure,
+        )
+
+    public fun registerRuntimeLibrariesJs(
+        name: String,
+        isTransitive: Boolean = false,
+        addToBuildConfig: Boolean = true,
+        configure: DependencyScopeConfiguration.() -> Unit = {},
+    ): NamedDomainObjectProvider<DependencyScopeConfiguration> =
+        registerRuntimeLibraries(
+            name,
+            isTransitive = isTransitive,
+            forJvm = false,
+            addToBuildConfig = addToBuildConfig,
+            configure = configure,
+        )
+
+    public val defaultRuntimeLibraries: NamedDomainObjectProvider<DependencyScopeConfiguration> =
+        registerRuntimeLibraries("defaultRuntimeLibraries", addToBuildConfig = false)
     public abstract val generateTestsClass: Property<String>
     public abstract val testGenDirectory: DirectoryProperty
 
@@ -325,26 +419,9 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         val buildConfig = extensions.getByType<BuildConfigExtension>()
         val idea = extensions.getByType<IdeaModel>()
 
-        val annotationsRuntimeClasspath =
-            configurations.dependencyScope("annotationsRuntimeClasspath") {
-                isTransitive = false
-            }
-        val annotationsJvmRuntimeClasspath =
-            configurations.resolvable("annotationsJvmRuntimeClasspath") {
-                extendsFrom(annotationsRuntimeClasspath)
-            }
-        val annotationsJsRuntimeClasspath =
-            configurations.resolvable("annotationsJsRuntimeClasspath") {
-                extendsFrom(annotationsRuntimeClasspath)
-                attributes {
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-                }
-            }
-
         val pluginDevKit =
             project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit", project)
-        val pluginAnnotations = pluginDevKit.pluginAnnotations
+
         pluginDevKit.addRuntimeDependency.convention(true)
         pluginDevKit.defaultTestTarget.convention(pluginDevKit.testAgainst(kotlinToolingVersion))
         val generateTestsClass =
@@ -392,18 +469,11 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         fun Test.configure(
             testArtifacts: Provider<out Configuration>,
             testArtifactsWasm: Provider<out Configuration>,
-            annotationsJvmRuntimeClasspath: Provider<out Configuration>,
-            annotationsJsRuntimeClasspath: Provider<out Configuration>,
         ) {
-            dependsOn(annotationsJvmRuntimeClasspath)
-            dependsOn(annotationsJsRuntimeClasspath)
             dependsOn(createJsRepl)
 
             useJUnitPlatform()
             workingDir = rootDir
-
-            setClasspathProperty("annotationsRuntime.jvm.classpath", annotationsJvmRuntimeClasspath)
-            setClasspathProperty("annotationsRuntime.js.classpath", annotationsJsRuntimeClasspath)
 
             // Properties required to run the internal test framework. Some framework code bypasses
             // provider abstraction entirely and reads the TestCompilePaths properties directly
@@ -656,26 +726,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             }
         }
         pluginDevKit.testAgainst.configureEach {
-            val testArtifacts = testArtifacts.withKotlinVersion(version)
-            val testArtifactsWasm =
-                testArtifactsWasm.withKotlinVersion(version) {
-                    isTransitive = false
-                    attributes { attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm) }
-                }
-
-            val annotationsJvmRuntimeClasspath =
-                annotationsJvmRuntimeClasspath.withKotlinVersion(version)
-            val annotationsJsRuntimeClasspath =
-                annotationsJsRuntimeClasspath.withKotlinVersion(version) {
-                    attributes {
-                        attribute(
-                            Usage.USAGE_ATTRIBUTE,
-                            objects.named(KotlinUsages.KOTLIN_RUNTIME),
-                        )
-                        attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-                    }
-                }
-
             testSuite {
                 dependencies {
                     implementation(testFixtures(project()))
@@ -703,17 +753,18 @@ public class DevKitCompilerPlugin : Plugin<Project> {
 
                     withCompilerVersionAttribute(version)
                 }
+            }
 
-                targets.all {
-                    testTask {
-                        configure(
-                            testArtifacts,
-                            testArtifactsWasm,
-                            annotationsJvmRuntimeClasspath,
-                            annotationsJsRuntimeClasspath,
-                        )
-                    }
-                }
+            testTask {
+                configure(
+                    testArtifacts.withKotlinVersion(version),
+                    testArtifactsWasm.withKotlinVersion(version) {
+                        this.isTransitive = false
+                        attributes {
+                            attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
+                        }
+                    },
+                )
             }
 
             val signature = configurations.create("${versionName}Signature")
@@ -754,8 +805,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             realTestFixtures.apiConfigurationName(kotlin("compiler"))
             realTestFixtures.runtimeOnlyConfigurationName("junit:junit:4.13.2")
 
-            annotationsRuntimeClasspath(pluginAnnotations)
-
             addIf(
                 pluginDevKit.addRuntimeDependency,
                 realMain.implementationConfigurationName,
@@ -782,9 +831,11 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         animalsniffer.excludeJars("kotlin-compiler*")
         animalsniffer.ignore("java.*", "javax.*", "org.omg.*", "org.w3c.dom.*")
 
-        buildConfig.useKotlinOutput { internalVisibility = true }
         buildConfig.packageName(group.toString())
-        buildConfig.buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"$group\"")
+        buildConfig.forClass("PluginInfo") {
+            useKotlinOutput { internalVisibility = true }
+            buildConfigField("String", "PLUGIN_ID", "\"$group\"")
+        }
 
         kotlinExtension.compilerOptions {
             optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")

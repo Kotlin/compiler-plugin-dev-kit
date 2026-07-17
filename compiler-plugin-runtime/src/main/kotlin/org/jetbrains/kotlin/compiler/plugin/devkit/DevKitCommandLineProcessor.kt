@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-abstract class DevKitCommandLineProcessor(processorClass: KClass<out DevKitCLP>) :
+public abstract class DevKitCommandLineProcessor(processorClass: KClass<out DevKitCLP>) :
     CommandLineProcessor {
     private val versionedProcessor by lazy {
         val loader = VersionedPluginClassLoading.resolve(processorClass.java)
@@ -32,8 +32,8 @@ abstract class DevKitCommandLineProcessor(processorClass: KClass<out DevKitCLP>)
     }
 }
 
-interface DevKitCLP {
-    fun processOption(
+public interface DevKitCLP {
+    public fun processOption(
         option: AbstractCliOption,
         value: String,
         configuration: CompilerConfiguration,

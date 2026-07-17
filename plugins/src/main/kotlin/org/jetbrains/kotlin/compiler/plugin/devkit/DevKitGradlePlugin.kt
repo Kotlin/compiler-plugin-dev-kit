@@ -7,6 +7,7 @@ import org.gradle.api.ExtensiblePolymorphicDomainObjectContainer
 import org.gradle.api.Named
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
@@ -59,7 +60,21 @@ public fun Project.DevKitGradlePluginTestTarget(
 
 public abstract class GradlePluginConfigExtension(override val project: Project) : HasProject {
     public abstract val compilerPlugin: Property<Project>
-    public abstract val pluginAnnotations: Property<Project>
+    public abstract val extraLibraries: ListProperty<String>
+
+    public fun extraLibrary(project: Project, group: Any? = null, version: Any? = null) {
+        val group = project.provider { group ?: project.group }
+        val version = project.provider { version ?: project.version }
+        extraLibraries.add(
+            project.providerFlatMap {
+                "${group()}:${project.name}:${version()}"
+            }
+        )
+    }
+
+    public fun extraLibrary(dependencyNotation: String) {
+        extraLibraries.add(dependencyNotation)
+    }
 
     /**
      * Whether to add an implementation dependency on `gradle-plugin-runtime`. Plugins that don't
@@ -118,7 +133,7 @@ public class DevKitGradlePlugin : Plugin<Project> {
         val pluginDevKit =
             project.extensions.create<GradlePluginConfigExtension>("pluginDevKit", project)
         val compilerPlugin = pluginDevKit.compilerPlugin
-        val pluginAnnotations = pluginDevKit.pluginAnnotations
+        val extraLibraries = pluginDevKit.extraLibraries
         pluginDevKit.addRuntimeDependency.convention(true)
         pluginDevKit.defaultTestTarget.convention(pluginDevKit.testAgainst(kotlinToolingVersion))
 
@@ -176,31 +191,36 @@ public class DevKitGradlePlugin : Plugin<Project> {
             testClassesDirs = files()
             dependsOn(pluginDevKit.defaultTestTarget.map { it.testTask })
         }
-
-        extensions.getByType<BuildConfigExtension>().forClass(
-            "$group",
-            "PluginInfo",
-        ) {
-            buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"$group\"")
-            buildConfigField("KOTLIN_PLUGIN_ARTIFACT") {
-                type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
-                expression(
-                    compilerPlugin.map {
-                        """
+        val buildConfig = extensions.getByType<BuildConfigExtension>()
+        buildConfig.packageName(group.toString())
+        buildConfig.forClass("PluginInfo") {
+            useKotlinOutput { topLevelConstants = false }
+            val pluginId = buildConfigField("String", "PLUGIN_ID", "\"$group\"")
+            val pluginArtifact =
+                buildConfigField("PLUGIN_ARTIFACT") {
+                    type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
+                    expression(
+                        compilerPlugin.map {
+                            """
                         |SubpluginArtifact(
                         |  groupId = "$group",
                         |  artifactId = "${it.name}",
                         |  version = "$version",
                         |)
                         """
-                            .trimMargin()
-                    }
-                )
-            }
-            buildConfigField("ANNOTATIONS_LIBRARY_COORDINATES") {
-                type("String")
-                expression(pluginAnnotations.map { "\"$group:${it.name}:$version\"" })
-            }
+                                .trimMargin()
+                        }
+                    )
+                }
+            val extraLibraryCoordinates =
+                buildConfigField("EXTRA_LIBRARY_COORDINATES") {
+                    type("List<String>")
+                    expression(
+                        extraLibraries.map { library ->
+                            library.joinToString(", ", "listOf(", ")") { "\"$it\"" }
+                        }
+                    )
+                }
             buildConfigField("PLUGIN_INFO") {
                 type.value(
                     project
@@ -217,13 +237,13 @@ public class DevKitGradlePlugin : Plugin<Project> {
                             if (
                                 pluginDevKit.addRuntimeDependency.orNull == true &&
                                     compilerPlugin.isPresent &&
-                                    pluginAnnotations.isPresent
+                                    extraLibraries.isPresent
                             )
                                 """
                                 |DevKitPluginInfo(
-                                |  id = KOTLIN_PLUGIN_ID,
-                                |  artifact = KOTLIN_PLUGIN_ARTIFACT,
-                                |  libraryCoordinates = ANNOTATIONS_LIBRARY_COORDINATES,
+                                |  id = ${pluginId.name},
+                                |  artifact = ${pluginArtifact.name},
+                                |  extraLibraryCoordinates = ${extraLibraryCoordinates.name},
                                 |)
                                 """
                                     .trimMargin()

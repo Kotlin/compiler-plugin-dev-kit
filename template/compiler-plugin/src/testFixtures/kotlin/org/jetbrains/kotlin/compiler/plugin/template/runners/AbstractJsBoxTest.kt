@@ -4,5 +4,4 @@ import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitJsBoxTest
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
 import org.jetbrains.kotlin.compiler.plugin.template.SimpleCompilerPluginRegistrar
 
-open class AbstractJsBoxTest :
-    DevKitJsBoxTest({ configurePlugin(SimpleCompilerPluginRegistrar()) })
+open class AbstractJsBoxTest : DevKitJsBoxTest({ configurePlugin(SimpleCompilerPluginRegistrar()) })

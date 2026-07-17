@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
 import org.jetbrains.kotlin.test.runners.AbstractFirBlackBoxCodegenTestSpecBase
 
-open class DevKitJvmBoxTest(
+public open class DevKitJvmBoxTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     parser: FirParser = FirParser.LightTree,
 ) :
@@ -27,10 +27,10 @@ open class DevKitJvmBoxTest(
         *config,
     )
 
-open class DevKitJsBoxTestDumpless(
+public open class DevKitJsBoxTestDumpless(
     vararg config: TestConfigurationBuilder.() -> Unit,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
-    val parser: FirParser = FirParser.LightTree,
+    public val parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
         object :
@@ -51,7 +51,7 @@ open class DevKitJsBoxTestDumpless(
         *config,
     )
 
-open class DevKitJsBoxTest(
+public open class DevKitJsBoxTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     parser: FirParser = FirParser.LightTree,
