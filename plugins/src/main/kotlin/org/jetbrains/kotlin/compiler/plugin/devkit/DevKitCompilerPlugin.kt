@@ -50,6 +50,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
@@ -116,18 +117,14 @@ internal constructor(override val project: Project) : HasProject {
     internal val kotlinExtension: KotlinJvmProjectExtension = project.the()
     internal val idea: IdeaModel = project.the()
     internal val d8EnvSpec: D8EnvSpec = project.the()
-    internal val sharedMainCompilation =
-        kotlinExtension.target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
-    internal val sharedTestCompilation =
-        kotlinExtension.target.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
     internal val testFixturesFeature =
         JavaPluginHelper.getJavaComponent(project)
             .features
             .getByName(TestFixturesSupport.TEST_FIXTURES_FEATURE_NAME)
 
-    internal val sharedMain = sharedMainCompilation.javaSourceSet
-    internal val sharedTest = sharedTestCompilation.javaSourceSet
+    internal val sharedMain = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+    internal val sharedTest = sourceSets.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
     internal val sharedTestFixtures = testFixturesFeature.sourceSet
 
@@ -509,7 +506,12 @@ internal constructor(override val project: Project) : HasProject {
 
     internal fun configurePlugins() {
         for (set in listOf(sharedMain, sharedTest, sharedTestFixtures)) {
-            set.withCompilerVersionAttribute(kotlinToolingVersion)
+            configurations.named(set.compileClasspathConfigurationName) {
+                withCompilerVersionAttribute(kotlinToolingVersion)
+            }
+            configurations.named(set.runtimeClasspathConfigurationName) {
+                withCompilerVersionAttribute(kotlinToolingVersion)
+            }
         }
         sharedTest.resources.setSrcDirs(listOf("src/test/data"))
         buildConfig {
@@ -787,42 +789,37 @@ internal constructor(override val project: Project) : HasProject {
     // Based on mrjar and Gradle test-fixtures sourceSet setup
     // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
     // https://github.com/melix/mrjar-gradle-plugin
-    internal fun configureCompilationWiring() {
-        developFor.configureEach {
-            main {
-                dependencies {
-                    // allow it to see shared main sources
-                    compileOnlyConfigurationName(sharedMain.output.classesDirs)
-                }
-                extendsFrom(sharedMain) { it.implementationConfigurationName }
-                extendsFrom(sharedMain) { it.compileOnlyConfigurationName }
-            }
-        }
+    internal fun configureCompilationWiring() = kotlinExtension.run {
+        // https://kotlinlang.org/docs/gradle-configure-project.html#disable-use-of-artifact-in-compilation-task
+        // KT-78269
+        project.extraProperties["kotlin.build.archivesTaskOutputAsFriendModule"] = false
+
+        val sharedMainCompilation = sharedMain.compilation.get()
+        val sharedTestCompilation = sharedTest.compilation.get()
+        val sharedTestFixturesCompilation = sharedTestFixtures.compilation.get()
+        developFor.configureEach { main { compilation { associateWith(sharedMainCompilation) } } }
 
         withFixtures.configureEach {
-            testFixtures {
-                extendsFrom(sharedTestFixtures) { it.implementationConfigurationName }
-                extendsFrom(sharedTestFixtures) { it.compileOnlyConfigurationName }
-                kotlinExtension.target.compilations.named(name) {
-                    associateWith(sharedMainCompilation)
-                }
-            }
-
-            kotlinExtension.target.compilations.named(testSuite.name) {
-                associateWith(kotlinExtension.target.compilations.getByName(testFixtures.name))
-            }
+            testFixtures { compilation { associateWith(sharedTestFixturesCompilation) } }
+            val testFixturesCompilation = testFixtures.flatMap { it.compilation }
+            test { compilation { associateWith(testFixturesCompilation.get()) } }
         }
 
+        testAgainst.configureEach { test { compilation { associateWith(sharedTestCompilation) } } }
         testAgainst.configureEach {
-            testSuite {
-                sources {
-                    kotlinExtension.target.compilations.named(name) {
-                        associateWith(sharedMainCompilation)
-                    }
-
-                    extendsFrom(sharedTest) { it.implementationConfigurationName }
-                    extendsFrom(sharedTest) { it.compileOnlyConfigurationName }
-                }
+            testTask {
+                // associateWith adds runtime dependencies on shared modules classes
+                // this is rather annoying since they take priority over shared module jars,
+                // so we remove them explicitly
+                classpath -=
+                    project.files(
+                        listOf(
+                                sharedMainCompilation,
+                                sharedTestCompilation,
+                                sharedTestFixturesCompilation,
+                            )
+                            .map { it.output.allOutputs }
+                    )
             }
         }
     }

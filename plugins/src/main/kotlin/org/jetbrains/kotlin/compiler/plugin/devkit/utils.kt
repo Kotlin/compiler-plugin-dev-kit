@@ -10,6 +10,7 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -47,6 +48,10 @@ internal inline fun <reified T : Any> ObjectFactory.property(convention: Provide
 
 internal val SourceSet.kotlin: SourceDirectorySet
     get() = extensions.getByName("kotlin") as SourceDirectorySet
+
+context(kotlinExtension: KotlinJvmProjectExtension)
+internal val SourceSet.compilation
+    get() = kotlinExtension.target.compilations.named(name)
 
 context(hp: HasProject)
 internal val project
