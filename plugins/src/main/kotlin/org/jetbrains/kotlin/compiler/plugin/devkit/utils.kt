@@ -24,16 +24,6 @@ public val KotlinToolingVersion.baseVersionName: String
 public val KotlinToolingVersion.versionName: String
     get() = "k$baseVersionName"
 
-internal fun DependencyHandler.registerMultiReleasePluginTransform(
-    version: Provider<KotlinToolingVersion>
-) {
-    registerTransform(MultiReleasePluginTransform::class.java) {
-        parameters { kotlinVersion.set(version.map(KotlinToolingVersion::versionString)) }
-        from.attribute(KotlinCompilerVersion.attribute, noVersion)
-        to.attributeProvider(KotlinCompilerVersion.attribute, version.map(::KotlinCompilerVersion))
-    }
-}
-
 internal fun DependencyHandler.setupCompilerVersionAttribute() {
     artifactTypes {
         all {

@@ -4,10 +4,12 @@ import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
+import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.tasks.SourceSet
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.named
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion.Companion.noVersion
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -79,5 +81,13 @@ internal fun SourceSet.extendsFrom(
 ) {
     configurations.named(extractName(this)) {
         extendsFrom(configurations.named(extractName(otherSourceSet)))
+    }
+}
+
+internal fun DependencyHandler.registerMultiReleasePluginTransform(version: KotlinToolingVersion) {
+    registerTransform(MultiReleasePluginTransform::class.java) {
+        parameters { kotlinVersion.set(version.versionString) }
+        from.attribute(KotlinCompilerVersion.attribute, noVersion)
+        to.attribute(KotlinCompilerVersion.attribute, version.let(::KotlinCompilerVersion))
     }
 }
