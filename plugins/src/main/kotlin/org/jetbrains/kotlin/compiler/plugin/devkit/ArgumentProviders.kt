@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import java.io.File
 import org.gradle.api.file.Directory
 import org.gradle.api.file.FileCollection
-import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
@@ -15,6 +14,7 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.testing.Test
 import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.process.JavaForkOptions
 
@@ -63,11 +63,11 @@ internal class ClasspathSystemPropertyArgumentProvider(
 
 internal class FileSystemPropertyArgumentProvider(
     @Input val propName: String,
-    @Internal val fileLocation: Provider<out FileSystemLocation>,
+    @Internal val file: Provider<out File>,
 ) : CommandLineArgumentProviderFlatMap {
     @get:Input
     val filePath: String
-        get() = fileLocation().asFile.toString()
+        get() = file().toString()
 
     override fun asArguments(): Iterable<String> = listOf("-D$propName=$filePath")
 }
@@ -95,3 +95,10 @@ internal class NestedArgumentProvider(
 
 context(exec: JavaForkOptions)
 internal operator fun CommandLineArgumentProvider.unaryPlus() = exec.jvmArgumentProviders.add(this)
+
+public fun Test.setClasspathProperty(
+    propName: String,
+    configuration: Provider<out FileCollection>,
+) {
+    +ClasspathSystemPropertyArgumentProvider(propName, configuration)
+}
