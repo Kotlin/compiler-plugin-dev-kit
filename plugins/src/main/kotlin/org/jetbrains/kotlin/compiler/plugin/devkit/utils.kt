@@ -3,6 +3,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import org.gradle.api.Action
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
@@ -82,3 +84,11 @@ internal val kotlinToolingVersion
 context(_: HasProject)
 internal fun dependencies(configuration: DependencyHandlerScope.() -> Unit) =
     project.dependencies(configuration)
+
+context(_: HasProject)
+internal fun files(vararg paths: Any?) = project.files(*paths)
+
+// TODO make it lazy? Fails with some decoding error at runtime otherwise
+context(_: HasProject)
+internal operator fun ConfigurableFileCollection.minusAssign(collection: FileCollection) =
+    setFrom((files(from) - collection).toList())

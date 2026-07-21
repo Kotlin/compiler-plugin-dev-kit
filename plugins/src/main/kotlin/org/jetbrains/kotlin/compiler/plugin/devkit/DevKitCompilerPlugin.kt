@@ -20,8 +20,7 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
-import org.gradle.api.plugins.JavaPlugin
-import org.gradle.api.plugins.internal.JavaPluginHelper
+import org.gradle.api.plugins.JvmTestSuitePlugin
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
@@ -50,10 +49,10 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
+import org.jetbrains.kotlin.gradle.tasks.BaseKotlinCompile
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
@@ -118,15 +117,11 @@ internal constructor(override val project: Project) : HasProject {
     internal val idea: IdeaModel = project.the()
     internal val d8EnvSpec: D8EnvSpec = project.the()
 
-    internal val testFixturesFeature =
-        JavaPluginHelper.getJavaComponent(project)
-            .features
-            .getByName(TestFixturesSupport.TEST_FIXTURES_FEATURE_NAME)
-
     internal val sharedMain = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
     internal val sharedTest = sourceSets.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
-    internal val sharedTestFixtures = testFixturesFeature.sourceSet
+    internal val sharedTestFixtures =
+        sourceSets.getByName(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME)
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -549,10 +544,12 @@ internal constructor(override val project: Project) : HasProject {
                 signatures += project.files(signatureGenTask.map { it.outputFiles })
             }
         }
-        JavaPluginHelper.getDefaultTestSuite(project).targets.all {
-            testTask {
-                enabled = false
-                dependsOn(defaultTestTarget.map { it.testSuite })
+        testing.suites.named<JvmTestSuite>(JvmTestSuitePlugin.DEFAULT_TEST_SUITE_NAME) {
+            targets.all {
+                testTask {
+                    enabled = false
+                    dependsOn(defaultTestTarget.map { it.testSuite })
+                }
             }
         }
     }
@@ -671,7 +668,7 @@ internal constructor(override val project: Project) : HasProject {
                 }
             }
         developFor.configureEach {
-            tasks.named<Jar>(JavaPlugin.JAR_TASK_NAME) {
+            tasks.named<Jar>(sharedMain.jarTaskName) {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `main` has no output.
@@ -685,7 +682,7 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
         withFixtures.configureEach {
-            testFixturesFeature.jarTask {
+            tasks.named<Jar>(sharedTestFixtures.jarTaskName) {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `testFixtures` has no
@@ -790,17 +787,32 @@ internal constructor(override val project: Project) : HasProject {
     // https://github.com/gradle/gradle/blob/2ad2f1e3a67ad8f2d07c532874e36d55a786c7e9/platforms/jvm/plugins-jvm-test-fixtures/src/main/java/org/gradle/api/plugins/JavaTestFixturesPlugin.java#L67
     // https://github.com/melix/mrjar-gradle-plugin
     internal fun configureCompilationWiring() = kotlinExtension.run {
-        // https://kotlinlang.org/docs/gradle-configure-project.html#disable-use-of-artifact-in-compilation-task
-        // KT-78269
-        project.extraProperties["kotlin.build.archivesTaskOutputAsFriendModule"] = false
-
+        // See also KT-78269
         val sharedMainCompilation = sharedMain.compilation.get()
         val sharedTestCompilation = sharedTest.compilation.get()
         val sharedTestFixturesCompilation = sharedTestFixtures.compilation.get()
-        developFor.configureEach { main { compilation { associateWith(sharedMainCompilation) } } }
+        developFor.configureEach {
+            main {
+                compilation {
+                    associateWith(sharedMainCompilation)
+                    tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
+                        // Remove main jar from friendPaths to avoid circular dependency error
+                        friendPaths -= files(tasks.named(sharedMain.jarTaskName))
+                    }
+                }
+            }
+        }
 
         withFixtures.configureEach {
-            testFixtures { compilation { associateWith(sharedTestFixturesCompilation) } }
+            testFixtures {
+                compilation {
+                    associateWith(sharedTestFixturesCompilation)
+                    tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
+                        // Remove main jar from friendPaths to avoid circular dependency error
+                        friendPaths -= files(tasks.named(sharedTestFixtures.jarTaskName))
+                    }
+                }
+            }
             val testFixturesCompilation = testFixtures.flatMap { it.compilation }
             test { compilation { associateWith(testFixturesCompilation.get()) } }
         }
