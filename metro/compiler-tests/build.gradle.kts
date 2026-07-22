@@ -6,7 +6,6 @@ import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestFixturesTarget
 import org.jetbrains.kotlin.compiler.plugin.devkit.baseVersionName
 import org.jetbrains.kotlin.compiler.plugin.devkit.setClasspathProperty
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
@@ -15,8 +14,6 @@ plugins {
   alias(libs.plugins.kotlin.compiler.plugin.devkit)
   java
 }
-
-project.plugins.apply(D8Plugin::class.java)
 
 val versionAliases =
   rootProject.isolated.projectDirectory
@@ -28,6 +25,7 @@ val versionAliases =
     .map(::KotlinToolingVersion)
 
 pluginDevKit {
+  pluginPackage = "$group.compiler"
   fun DevKitTestFixturesTarget.setupFixtures() {
     testFixtures {
       kotlin.srcDirs(
@@ -40,10 +38,10 @@ pluginDevKit {
       )
     }
   }
-  developForWithFixtures(KotlinToolingVersion("2.4.0")) { setupFixtures() }
-  val k2320Target = developForWithFixtures(KotlinToolingVersion("2.3.20")) { setupFixtures() }
+  testAgainstWithFixtures("2.4.0") { setupFixtures() }
+  val k2320Target = testAgainstWithFixtures("2.3.20") { setupFixtures() }
 
-  developForWithFixtures(KotlinToolingVersion("2.4.0-dev-2124")) {
+  testAgainstWithFixtures("2.4.0-dev-2124") {
     testFixtures {
       kotlin.srcDirs(k2320Target.testFixtures.map { it.kotlin.sourceDirectories })
       java.srcDirs(k2320Target.testFixtures.map { it.java.sourceDirectories })
@@ -51,28 +49,25 @@ pluginDevKit {
     }
   }
   val k2420Target =
-    developForWithFixtures(KotlinToolingVersion("2.4.20-dev-6138")) { setupFixtures() }
+    testAgainstWithFixtures("2.4.20-dev-6138") { setupFixtures() }
 
-  versionAliases
-    .filterNot { alias -> testAgainst.any { it.version == alias } }
-    .forEach {
-      if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
-        developForWithFixtures(it) {
-          testFixtures {
-            kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
-            java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
-            resources.srcDirs(k2420Target.testFixtures.map { it.resources.sourceDirectories })
-          }
+  versionAliases.forEach {
+    // TODO provide easy way to do this in DevKit DSL
+    if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
+      testAgainstWithFixtures(it) {
+        if (this == k2420Target) return@testAgainstWithFixtures
+        testFixtures {
+          kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
+          java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
+          resources.srcDirs(k2420Target.testFixtures.map { it.resources.sourceDirectories })
         }
-      else testAgainst(it)
-    }
+      }
+    else testAgainst(it)
+  }
 
   defaultTestVersion(
-    KotlinToolingVersion(
-      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
-    )
+    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
   )
-  generateTestsClass = "$group.compiler.GenerateTestsKt"
 }
 
 // Configure the compiler-version-related test properties per registered devkit test suite, so
@@ -106,7 +101,6 @@ pluginDevKit {
   val circuitRuntimeClasspath = registerRuntimeLibrariesJvm("circuit", isTransitive = true)
   val circuitRuntimeKlibClasspath =
     registerRuntimeLibrariesJs("circuitKlib", isTransitive = true) {
-      // exclude(group = "org.jetbrains.kotlin")
       extendsFrom(circuitRuntimeClasspath)
     }
 

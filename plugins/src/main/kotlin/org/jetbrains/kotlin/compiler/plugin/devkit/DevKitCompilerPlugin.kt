@@ -3,6 +3,9 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
+import com.github.jengelman.gradle.plugins.shadow.ShadowBasePlugin.Companion.shadow
+import com.github.jengelman.gradle.plugins.shadow.relocation.SimpleRelocator
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 import java.io.File
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -14,7 +17,9 @@ import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.attributes.Bundling
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
@@ -110,18 +115,21 @@ private fun DevKitTestTarget.test(action: SourceSet.() -> Unit) = testSuite {
 @OptIn(ExperimentalWasmDsl::class)
 public abstract class DevKitCompilerPluginConfigExtension
 internal constructor(override val project: Project) : HasProject {
-    internal val buildConfig: BuildConfigExtension = project.the()
-    internal val testing: TestingExtension = project.the()
-    internal val sourceSets: SourceSetContainer = project.the()
-    internal val kotlinExtension: KotlinJvmProjectExtension = project.the()
-    internal val idea: IdeaModel = project.the()
-    internal val d8EnvSpec: D8EnvSpec = project.the()
+    private val buildConfig: BuildConfigExtension = project.the()
+    private val testing: TestingExtension = project.the()
+    private val sourceSets: SourceSetContainer = project.the()
+    private val kotlinExtension: KotlinJvmProjectExtension = project.the()
+    private val idea: IdeaModel = project.the()
+    private val d8EnvSpec: D8EnvSpec = project.the()
 
-    internal val sharedMain = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
-    internal val sharedTest = sourceSets.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
+    private val sharedMain = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+    private val sharedTest = sourceSets.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
-    internal val sharedTestFixtures =
+    private val sharedTestFixtures =
         sourceSets.getByName(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME)
+
+    private val mainJar = tasks.named<Jar>(sharedMain.jarTaskName)
+    private val testFixturesJar = tasks.named<Jar>(sharedTestFixtures.jarTaskName)
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -183,7 +191,18 @@ internal constructor(override val project: Project) : HasProject {
      * @see [defaultTestTarget] if you have a reference to the [DevKitTestTarget] already
      */
     public fun defaultTestVersion(version: KotlinToolingVersion) {
-        defaultTestTarget.set(testAgainst.named(version.versionString))
+        defaultTestVersion(version.versionString)
+    }
+
+    /**
+     * Sets the [testAgainst] version the generic `test` task delegates to. Defaults to the Kotlin
+     * version applied to this build. This is identical to setting [defaultTestTarget] with the
+     * target corresponding to [version]. You can change this version multiple times.
+     *
+     * @see [defaultTestTarget] if you have a reference to the [DevKitTestTarget] already
+     */
+    public fun defaultTestVersion(version: String) {
+        defaultTestTarget.set(testAgainst.named(version))
     }
 
     /**
@@ -390,7 +409,17 @@ internal constructor(override val project: Project) : HasProject {
     public fun testAgainst(
         version: KotlinToolingVersion,
         action: DevKitTestTarget.() -> Unit = {},
-    ): DevKitTestTarget = testAgainst.maybeCreate(version.versionString).apply(action)
+    ): DevKitTestTarget = testAgainst(version.versionString, action)
+
+    /**
+     * Declares a version that the plugin should be tested against. This method is idempotent.
+     *
+     * @see [testAgainstWithFixtures], [developFor], [developForWithFixtures]
+     */
+    public fun testAgainst(
+        version: String,
+        action: DevKitTestTarget.() -> Unit = {},
+    ): DevKitTestTarget = testAgainst.maybeCreate(version).apply(action)
 
     /**
      * Declares a version that the plugin should be tested against and explicitly customizes its
@@ -409,6 +438,22 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTestFixturesTarget = testAgainst(version).withFixtures().apply(action)
 
     /**
+     * Declares a version that the plugin should be tested against and explicitly customizes its
+     * test fixtures. Shortcut for:
+     * ```kotlin
+     * testAgainst(version).withFixtures().apply(action)
+     * ```
+     *
+     * This method is idempotent.
+     *
+     * @see [testAgainst], [developForWithFixtures], [developFor]
+     */
+    public fun testAgainstWithFixtures(
+        version: String,
+        action: DevKitTestFixturesTarget.() -> Unit = {},
+    ): DevKitTestFixturesTarget = testAgainst(version).withFixtures().apply(action)
+
+    /**
      * Declares a version that the plugin should be tested against and has explicit customization
      * for. Shortcut for:
      * ```kotlin
@@ -417,10 +462,26 @@ internal constructor(override val project: Project) : HasProject {
      *
      * This method is idempotent.
      *
-     * @see [testAgainstWithFixtures], [developForWithFixtures]
+     * @see [testAgainst], [testAgainstWithFixtures], [developForWithFixtures]
      */
     public fun developFor(
         version: KotlinToolingVersion,
+        action: DevKitMainTarget.() -> Unit = {},
+    ): DevKitMainTarget = testAgainst(version).withMain().apply(action)
+
+    /**
+     * Declares a version that the plugin should be tested against and has explicit customization
+     * for. Shortcut for:
+     * ```kotlin
+     * testAgainst(version).withMain().apply(action)
+     * ```
+     *
+     * This method is idempotent.
+     *
+     * @see [testAgainst], [testAgainstWithFixtures], [developForWithFixtures]
+     */
+    public fun developFor(
+        version: String,
         action: DevKitMainTarget.() -> Unit = {},
     ): DevKitMainTarget = testAgainst(version).withMain().apply(action)
 
@@ -433,10 +494,26 @@ internal constructor(override val project: Project) : HasProject {
      *
      * This method is idempotent.
      *
-     * @see [testAgainstWithFixtures], [developFor]
+     * @see [testAgainst], [testAgainstWithFixtures], [developFor]
      */
     public fun developForWithFixtures(
         version: KotlinToolingVersion,
+        action: DevKitTarget.() -> Unit = {},
+    ): DevKitTarget = developFor(version).withFixtures().apply(action)
+
+    /**
+     * Declares a version that the plugin should be tested against, customizes its test fixtures,
+     * and has explicit customization for. Shortcut for:
+     * ```kotlin
+     * developFor(version).withFixtures().apply(action)
+     * ```
+     *
+     * This method is idempotent.
+     *
+     * @see [testAgainst], [testAgainstWithFixtures], [developFor]
+     */
+    public fun developForWithFixtures(
+        version: String,
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget = developFor(version).withFixtures().apply(action)
 
@@ -504,9 +581,6 @@ internal constructor(override val project: Project) : HasProject {
             configurations.named(set.compileClasspathConfigurationName) {
                 withCompilerVersionAttribute(kotlinToolingVersion)
             }
-            configurations.named(set.runtimeClasspathConfigurationName) {
-                withCompilerVersionAttribute(kotlinToolingVersion)
-            }
         }
         sharedTest.resources.setSrcDirs(listOf("src/test/data"))
         buildConfig {
@@ -550,6 +624,39 @@ internal constructor(override val project: Project) : HasProject {
                     enabled = false
                     dependsOn(defaultTestTarget.map { it.testSuite })
                 }
+            }
+        }
+        project.pluginManager.withPlugin("com.gradleup.shadow") {
+            tasks.shadowJar {
+                enableAutoRelocation.set(true)
+                relocationPrefix.set(pluginPackage)
+                archiveClassifier.set("")
+                // relocate plugin package to itself, so it isn't accidentally auto-relocated
+                relocators.add(provider { SimpleRelocator(pluginPackage(), pluginPackage()) })
+                duplicatesStrategy = DuplicatesStrategy.INCLUDE
+                mergeServiceFiles()
+                dependencies {
+                    exclude(dependency("org.jetbrains:.*"))
+                    exclude(dependency("org.intellij:.*"))
+                    exclude(dependency("org.jetbrains.kotlin:.*"))
+                }
+            }
+            mainJar { archiveClassifier.set("unshaded") }
+
+            // https://github.com/GradleUp/shadow/blob/ec0900ee6ef6f6965e568e32e51bbd34ab299635/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/ShadowJavaPlugin.kt#L58
+            configurations {
+                fun Configuration.useShadowJar() {
+                    setExtendsFrom(emptyList())
+                    extendsFrom(shadow)
+                    outgoing.artifacts.clear()
+                    outgoing.variants.clear()
+                    outgoing.artifact(tasks.shadowJar)
+                    attributes {
+                        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.SHADOWED))
+                    }
+                }
+                named("apiElements") { useShadowJar() }
+                named("runtimeElements") { useShadowJar() }
             }
         }
     }
@@ -668,21 +775,23 @@ internal constructor(override val project: Project) : HasProject {
                 }
             }
         developFor.configureEach {
-            tasks.named<Jar>(sharedMain.jarTaskName) {
-                metaInf {
-                    into("kotlin/plugin/versions/$version") {
-                        // Ensures the directory exists in the jar even if `main` has no output.
-                        from(versionMarker)
-                        from(main.map { it.output }) {
-                            exclude("META-INF/*kotlin_module")
-                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                        }
+            val copyVersionFilesSpec = project.copySpec {
+                into("kotlin/plugin/versions/$version") {
+                    // Ensures the directory exists in the jar even if `main` has no output.
+                    from(versionMarker)
+                    from(main.map { it.output }) {
+                        exclude("META-INF/*kotlin_module")
+                        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                     }
                 }
             }
+            mainJar { metaInf { with(copyVersionFilesSpec) } }
+            project.pluginManager.withPlugin("com.gradleup.shadow") {
+                tasks.shadowJar { metaInf { with(copyVersionFilesSpec) } }
+            }
         }
         withFixtures.configureEach {
-            tasks.named<Jar>(sharedTestFixtures.jarTaskName) {
+            testFixturesJar {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `testFixtures` has no
@@ -743,10 +852,16 @@ internal constructor(override val project: Project) : HasProject {
         withFixtures.configureEach { testFixtures { forceKotlinVersion(version) } }
         dependencies {
             setupCompilerVersionAttribute()
+
+            configurations.named(sharedTestFixtures.apiConfigurationName) {
+                dependencies.remove(project())
+            }
+            sharedTestFixtures.apiConfigurationName(files(mainJar))
+
             testAgainst.configureEach { registerMultiReleasePluginTransform(version) }
 
             withFixtures.configureEach {
-                this.testFixtures { implementationConfigurationName(project()) }
+                this.testFixtures { apiConfigurationName(files(mainJar)) }
             }
             testAgainst.configureEach {
                 testSuite { dependencies { implementation(testFixtures(project())) } }
@@ -797,7 +912,7 @@ internal constructor(override val project: Project) : HasProject {
                     associateWith(sharedMainCompilation)
                     tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
                         // Remove main jar from friendPaths to avoid circular dependency error
-                        friendPaths -= files(tasks.named(sharedMain.jarTaskName))
+                        friendPaths -= files(mainJar)
                     }
                 }
             }
@@ -809,7 +924,7 @@ internal constructor(override val project: Project) : HasProject {
                     associateWith(sharedTestFixturesCompilation)
                     tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
                         // Remove main jar from friendPaths to avoid circular dependency error
-                        friendPaths -= files(tasks.named(sharedTestFixtures.jarTaskName))
+                        friendPaths -= files(testFixturesJar)
                     }
                 }
             }

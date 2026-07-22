@@ -16,6 +16,12 @@ dependencies {
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)
     implementation(libs.testkit)
+    /*
+    Even though this is optional, it cannot be made compileOnly
+    else, any project that uses this as includedBuild will fail with
+    NoClassDefFoundError
+    */
+    implementation(libs.gradleup.shadow)
     api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
 }
 

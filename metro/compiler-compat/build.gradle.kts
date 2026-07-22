@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-
 // Copyright (C) 2025 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
 plugins {
@@ -64,12 +62,12 @@ pluginDevKit {
         "2.4.20-dev-6138",
         "2.4.20-Beta1",
       )
-      .map(::KotlinToolingVersion)
   versions.forEachIndexed { i, version ->
     developFor(version) {
       main {
+        // TODO this could be default behavior
         for (lower in versions.subList(0, i)) dependOn(
-          developFor.named(lower.toString()).flatMap { it.main }
+          developFor.named(lower).flatMap { it.main }
         )
       }
     }

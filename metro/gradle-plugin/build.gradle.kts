@@ -75,9 +75,7 @@ pluginDevKit {
 
   supportedVersions.forEach { testAgainst(it) }
   defaultTestVersion(
-    KotlinToolingVersion(
-      providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
-    )
+    providers.gradleProperty("metro.testCompilerVersion").getOrElse(libs.versions.kotlin.get())
   )
 }
 
@@ -122,7 +120,8 @@ val shadowJar =
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
 
-    // Exclude JAR signature files so embedded signed JARs don't break the shadow JAR's integrity check
+    // Exclude JAR signature files so embedded signed JARs don't break the shadow JAR's integrity
+    // check
     exclude("META-INF/*.SF")
     exclude("META-INF/*.DSA")
     exclude("META-INF/*.RSA")

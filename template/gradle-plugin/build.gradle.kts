@@ -7,6 +7,14 @@ pluginDevKit {
     compilerPlugin = project(":compiler-plugin")
 }
 
+val testKitProjectsClasspath = configurations.dependencyScope("testKitProjectsClasspath")
+
+dependencies {
+    // TODO configure automatically
+    testKitProjectsClasspath(project(":plugin-annotations"))
+    testKitProjectsClasspath(project(":compiler-plugin"))
+}
+
 gradlePlugin {
     plugins {
         create("SimplePlugin") {
@@ -20,10 +28,9 @@ gradlePlugin {
 }
 
 gradleTestKitSupport {
-    // These can go away once we're doing shadowing
-    withIncludedBuildProjects(
-        "compiler-plugin-dev-kit:compiler-plugin-runtime",
-        "compiler-plugin-dev-kit:gradle-plugin-runtime",
-        "artifact-transform:",
-    )
+    // TODO this definitely violates Isolated Projects. DevKit should instead
+    //  publish needed dependencies into functionalTestRepo itself
+    withClasspaths(testKitProjectsClasspath.name)
+    // This can go away once we're shadowing gradle plugins
+    withIncludedBuildProjects("compiler-plugin-dev-kit:gradle-plugin-runtime")
 }

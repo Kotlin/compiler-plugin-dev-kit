@@ -2,7 +2,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
-import org.gradle.api.Action
 import org.gradle.api.ExtensiblePolymorphicDomainObjectContainer
 import org.gradle.api.Named
 import org.gradle.api.Plugin
@@ -59,9 +58,13 @@ public fun Project.DevKitGradlePluginTestTarget(
     )
 
 public abstract class GradlePluginConfigExtension(override val project: Project) : HasProject {
+    /** The compiler plugin project that this Gradle plugin applies */
     public abstract val compilerPlugin: Property<Project>
+
+    /** Libraries that this Gradle plugin adds to its users */
     public abstract val extraLibraries: ListProperty<String>
 
+    /** Adds a library to this Gradle plugin's users */
     public fun extraLibrary(project: Project, group: Any? = null, version: Any? = null) {
         val group = project.provider { group ?: project.group }
         val version = project.provider { version ?: project.version }
@@ -72,6 +75,7 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
         )
     }
 
+    /** Adds a library to this Gradle plugin's users */
     public fun extraLibrary(dependencyNotation: String) {
         extraLibraries.add(dependencyNotation)
     }
@@ -90,8 +94,14 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
      */
     public abstract val defaultTestTarget: Property<DevKitGradlePluginTestTarget>
 
+    /** The default Kotlin version to run the `functionalTest` suite against. */
     public fun defaultTestVersion(version: KotlinToolingVersion) {
-        defaultTestTarget.set(testAgainst.find { it.version == version })
+        defaultTestVersion(version.versionString)
+    }
+
+    /** The default Kotlin version to run the `functionalTest` suite against. */
+    public fun defaultTestVersion(version: String) {
+        defaultTestTarget.set(testAgainst.named(version))
     }
 
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
@@ -104,11 +114,23 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
         }
     }
 
+    /**
+     * Registers a new Kotlin version to run the `functionalTest` suite against. This operation is
+     * idempotent.
+     */
     public fun testAgainst(
         version: KotlinToolingVersion,
-        action: Action<DevKitGradlePluginTestTarget> = Action {},
-    ): DevKitGradlePluginTestTarget =
-        testAgainst.maybeCreate(version.versionString).apply(action::execute)
+        action: DevKitGradlePluginTestTarget.() -> Unit = {},
+    ): DevKitGradlePluginTestTarget = testAgainst(version.versionString, action)
+
+    /**
+     * Registers a new Kotlin version to run the `functionalTest` suite against. This operation is
+     * idempotent.
+     */
+    public fun testAgainst(
+        version: String,
+        action: DevKitGradlePluginTestTarget.() -> Unit = {},
+    ): DevKitGradlePluginTestTarget = testAgainst.maybeCreate(version).apply(action)
 }
 
 public class DevKitGradlePlugin : Plugin<Project> {
