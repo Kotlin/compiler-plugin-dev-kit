@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-import dev.zacsweers.metro.compiler.compat.KotlinToolingVersion
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
 
 class MetroTestConfiguratorTest {
 

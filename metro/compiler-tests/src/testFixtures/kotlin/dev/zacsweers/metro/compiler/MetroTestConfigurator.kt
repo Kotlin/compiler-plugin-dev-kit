@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.zacsweers.metro.compiler
 
-import dev.zacsweers.metro.compiler.compat.KotlinToolingVersion
-import dev.zacsweers.metro.compiler.test.BUILD_COMPILER_VERSION
-import dev.zacsweers.metro.compiler.test.COMPILER_TOOLING_VERSION
 import dev.zacsweers.metro.compiler.test.COMPILER_VERSION
 import dev.zacsweers.metro.compiler.test.TEST_COMPILER_VERSION
+import dev.zacsweers.metro.compiler.test.BUILD_COMPILER_VERSION
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives
@@ -27,10 +26,10 @@ class MetroTestConfigurator(testServices: TestServices) : MetaTestConfigurator(t
     if (MetroDirectives.METRO_IGNORE in directives) return true
 
     if (
-      testServices.isJsBackend() && TEST_COMPILER_TOOLING_VERSION != BUILD_COMPILER_TOOLING_VERSION
+      testServices.isJsBackend() && TEST_COMPILER_VERSION < BUILD_COMPILER_VERSION
     ) {
       // JS box tests compile against Metro's runtime KLIB. KLIB compatibility depends on the
-      // producing compiler, so only run these tests against the compiler version that built it.
+      // producing compiler, so only run these tests against the compiler version that built it or higher
       return true
     }
 
@@ -76,7 +75,7 @@ class MetroTestConfigurator(testServices: TestServices) : MetaTestConfigurator(t
       irOnlyClassesSuite &&
         shouldSkipForCompilerVersion(
           compilerVersion = COMPILER_VERSION,
-          compilerToolingVersion = KotlinToolingVersion(COMPILER_TOOLING_VERSION),
+          compilerToolingVersion = TEST_COMPILER_VERSION,
           minVersion = MIN_IR_ONLY_CLASSES_COMPILER_VERSION,
         )
     ) {
@@ -91,7 +90,7 @@ class MetroTestConfigurator(testServices: TestServices) : MetaTestConfigurator(t
     }
     return shouldSkipForCompilerVersion(
       compilerVersion = COMPILER_VERSION,
-      compilerToolingVersion = KotlinToolingVersion(COMPILER_TOOLING_VERSION),
+      compilerToolingVersion = TEST_COMPILER_VERSION,
       targetVersion = directives[MetroDirectives.COMPILER_VERSION].firstOrNull(),
       minVersion = directives[MetroDirectives.MIN_COMPILER_VERSION].firstOrNull(),
       maxVersion = directives[MetroDirectives.MAX_COMPILER_VERSION].firstOrNull(),
@@ -139,9 +138,6 @@ class MetroTestConfigurator(testServices: TestServices) : MetaTestConfigurator(t
     }
   }
 }
-
-private val BUILD_COMPILER_TOOLING_VERSION = KotlinToolingVersion(BUILD_COMPILER_VERSION)
-private val TEST_COMPILER_TOOLING_VERSION = KotlinToolingVersion(TEST_COMPILER_VERSION)
 
 fun RegisteredDirectivesBuilder.commonMetroTestDirectives() {
   OPT_IN.with("dev.zacsweers.metro.ExperimentalMetroApi")

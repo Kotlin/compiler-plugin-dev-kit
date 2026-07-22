@@ -79,10 +79,6 @@ pluginDevKit.testAgainst.configureEach {
         systemProperty("metro.test.compilerVersion", version.toString())
         systemProperty("metro.test.jvmTarget", libs.versions.jvmTarget.get())
         systemProperty("metro.test.buildCompilerVersion", libs.versions.kotlin.get())
-        systemProperty(
-          "metro.test.overrideCompilerVersion",
-          true,
-        )
       }
     }
   }

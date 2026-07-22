@@ -22,7 +22,6 @@ import dev.zacsweers.metro.compiler.circuit.CircuitContributionExtension
 import dev.zacsweers.metro.compiler.circuit.CircuitFirExtension
 import dev.zacsweers.metro.compiler.circuit.CircuitIrExtension
 import dev.zacsweers.metro.compiler.compat.CompatContext
-import dev.zacsweers.metro.compiler.compat.KotlinToolingVersion
 import dev.zacsweers.metro.compiler.fir.MetroFirExtensionRegistrar
 import dev.zacsweers.metro.compiler.hilt.HiltContributionExtension
 import dev.zacsweers.metro.compiler.hilt.HiltFirDeclarationExtension
@@ -33,6 +32,7 @@ import dev.zacsweers.metro.compiler.tracing.TraceContext
 import kotlin.io.path.Path
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
+import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureDefaultTestDataLibraries
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureTestDataLibrary
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -384,13 +384,11 @@ class MetroExtensionRegistrarConfigurator(
 
 private val MIN_KOTLIN_VERSION_FOR_JS_FIR_CONTRIBUTION_HINTS = KotlinToolingVersion("2.3.21")
 
-private val TEST_COMPILER_TOOLING_VERSION = KotlinToolingVersion(TEST_COMPILER_VERSION)
-
 private fun TestServices.shouldGenerateContributionHintsInFirForBackend(): Boolean {
   return when (defaultsProvider.targetBackend) {
     TargetBackend.JS_IR,
     TargetBackend.JS_IR_ES6 -> {
-      TEST_COMPILER_TOOLING_VERSION >= MIN_KOTLIN_VERSION_FOR_JS_FIR_CONTRIBUTION_HINTS
+      TEST_COMPILER_VERSION >= MIN_KOTLIN_VERSION_FOR_JS_FIR_CONTRIBUTION_HINTS
     }
     else -> false
   }

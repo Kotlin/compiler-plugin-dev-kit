@@ -25,6 +25,7 @@ kotlin {
 
 dependencies {
     api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
+    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
 }
 
 pluginDevKit {
