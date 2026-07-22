@@ -8,8 +8,5 @@ plugins {
 pluginDevKit {
     developForWithFixtures(kotlinToolingVersion)
     developForWithFixtures("2.4.20-dev-7680")
-}
-
-dependencies {
-    defaultRuntimeLibraries(project(":plugin-annotations"))
+    testDataLibraries { common(project(":plugin-annotations")) }
 }

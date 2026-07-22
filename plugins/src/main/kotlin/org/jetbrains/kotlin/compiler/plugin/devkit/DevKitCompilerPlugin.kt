@@ -7,6 +7,7 @@ import com.github.jengelman.gradle.plugins.shadow.ShadowBasePlugin.Companion.sha
 import com.github.jengelman.gradle.plugins.shadow.relocation.SimpleRelocator
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 import java.io.File
+import javax.inject.Inject
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import org.gradle.api.Action
@@ -18,7 +19,8 @@ import org.gradle.api.NamedDomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.artifacts.dsl.DependencyCollector
+import org.gradle.api.artifacts.dsl.GradleDependencies
 import org.gradle.api.attributes.Bundling
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.Directory
@@ -42,6 +44,7 @@ import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
@@ -87,6 +90,41 @@ public typealias DevKitTestFixturesTarget =
 public typealias DevKitTarget =
     DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, NamedDomainObjectProvider<SourceSet>>
 
+public interface DevKitTestDataLibrary : GradleDependencies {
+    /** Dependency collector for all platforms */
+    public val common: DependencyCollector
+
+    /** Dependency collector for JVM */
+    public val jvm: DependencyCollector
+
+    /** Dependency collector for JS */
+    public val js: DependencyCollector
+}
+
+public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
+    /**
+     * Registers a library for test data.
+     *
+     * You should use [DevKitCompilerPluginConfigExtension.testDataLibraries].[common], or one of
+     * its platform-specific collectors, if you want to register a library for all test data.
+     *
+     * This provides a convenient way of registering a conditionally available library for test
+     * data. You should use `configureTestDataLibrary` in your `testFixtures`, providing the
+     * `condition` for the library to be available.
+     *
+     * The library will be passed to tests under the property "[name].[jvm|js].classpath". if
+     * [addToBuildConfig], it'll also be available under TestDataLibraries.[name].
+     *
+     * This is *not* idempotent.
+     */
+    public fun register(
+        name: String,
+        isTransitive: Boolean = false,
+        addToBuildConfig: Boolean = true,
+        block: DevKitTestDataLibrary.() -> Unit = {},
+    ): DevKitTestDataLibrary
+}
+
 @Suppress("UNCHECKED_CAST")
 private class DevKitTestTargetImpl<
     out Fixtures : NamedDomainObjectProvider<SourceSet>?,
@@ -104,6 +142,22 @@ private class DevKitTestTargetImpl<
     override var nullableMain: @UnsafeVariance Main = null as Main
 }
 
+private abstract class DevKitTestDataLibrariesImpl
+@Inject
+constructor(private val pluginDevKit: DevKitCompilerPluginConfigExtension) :
+    DevKitTestDataLibraries {
+    override fun register(
+        name: String,
+        isTransitive: Boolean,
+        addToBuildConfig: Boolean,
+        block: DevKitTestDataLibrary.() -> Unit,
+    ): DevKitTestDataLibrary =
+        pluginDevKit.project.objects.newInstance<DevKitTestDataLibrary>().apply {
+            pluginDevKit.register(this, name, isTransitive, addToBuildConfig)
+            block()
+        }
+}
+
 private fun DevKitTestTarget.testTask(action: Test.() -> Unit) = testSuite {
     targets.all { this.testTask(action) }
 }
@@ -113,7 +167,7 @@ private fun DevKitTestTarget.test(action: SourceSet.() -> Unit) = testSuite {
 }
 
 @OptIn(ExperimentalWasmDsl::class)
-public abstract class DevKitCompilerPluginConfigExtension
+public open class DevKitCompilerPluginConfigExtension
 internal constructor(override val project: Project) : HasProject {
     private val buildConfig: BuildConfigExtension = project.the()
     private val testing: TestingExtension = project.the()
@@ -284,41 +338,40 @@ internal constructor(override val project: Project) : HasProject {
     }
 
     /** Libraries that all test data files can use */
-    public val defaultRuntimeLibraries: NamedDomainObjectProvider<DependencyScopeConfiguration> =
-        registerRuntimeLibraries("defaultRuntimeLibraries", addToBuildConfig = false)
+    public val testDataLibraries: DevKitTestDataLibraries =
+        objects.newInstance<DevKitTestDataLibrariesImpl>(this).also {
+            register(it, "defaultTestDataLibraries", addToBuildConfig = false)
+        }
 
-    /**
-     * Registers a runtime library for this plugin. The library will be passed to tests under the
-     * name "[name].[jvm|js].classpath", if [addToBuildConfig], it'll also be available under
-     * RuntimeClasspaths.[name]. This is *not* idempotent. Libraries for each `name` should be
-     * registered once by one of the `registerRuntimeLibraries` methods.
-     *
-     * @see [registerRuntimeLibrariesJvm], [registerRuntimeLibrariesJs] if you only care about one
-     *   platform
-     */
-    public fun registerRuntimeLibraries(
+    /** Configure libraries that test data files can use */
+    public fun testDataLibraries(block: DevKitTestDataLibraries.() -> Unit) {
+        testDataLibraries.block()
+    }
+
+    internal fun register(
+        library: DevKitTestDataLibrary,
         name: String,
         isTransitive: Boolean = false,
-        forJvm: Boolean = true,
-        forJs: Boolean = true,
         addToBuildConfig: Boolean = true,
-        configure: DependencyScopeConfiguration.() -> Unit = {},
-    ): NamedDomainObjectProvider<DependencyScopeConfiguration> {
-        val jvm = "$name.jvm.classpath"
-        val js = "$name.js.classpath"
+    ) {
+        val jvmClasspath = "$name.jvm.classpath"
+        val jsClasspath = "$name.js.classpath"
         val configuration =
             configurations.dependencyScope(name) {
                 this.isTransitive = isTransitive
+                fromDependencyCollector(library.common)
             }
         val jvmConfiguration =
             configurations.resolvable("${name}Jvm") {
                 extendsFrom(configuration)
                 this.isTransitive = isTransitive
+                fromDependencyCollector(library.jvm)
             }
         val jsConfiguration =
             configurations.resolvable("${name}Js") {
                 extendsFrom(configuration)
                 this.isTransitive = isTransitive
+                fromDependencyCollector(library.js)
                 attributes {
                     attribute(
                         Usage.USAGE_ATTRIBUTE,
@@ -329,77 +382,21 @@ internal constructor(override val project: Project) : HasProject {
             }
         testAgainst.configureEach {
             testTask {
-                if (forJvm) setClasspathProperty(jvm, jvmConfiguration)
-                if (forJs) setClasspathProperty(js, jsConfiguration)
+                setClasspathProperty(jvmClasspath, jvmConfiguration)
+                setClasspathProperty(jsClasspath, jsConfiguration)
             }
         }
         buildConfig.sourceSets.named(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME) {
             if (!addToBuildConfig) return@named
-            forClass("RuntimeClasspaths") {
-                if (forJvm)
-                    buildConfigField(
-                        "List<java.io.File>",
-                        if (forJs) "${name}Jvm" else name,
-                        """org.jetbrains.kotlin.compiler.plugin.devkit.services.classpathFiles("$jvm")""",
-                    )
-                if (forJs)
-                    buildConfigField(
-                        "List<java.io.File>",
-                        if (forJvm) "${name}Js" else name,
-                        """org.jetbrains.kotlin.compiler.plugin.devkit.services.classpathFiles("$js")""",
-                    )
+            forClass("TestDataLibraries") {
+                buildConfigField(
+                    "org.jetbrains.kotlin.compiler.plugin.devkit.services.TestDataLibrary",
+                    name,
+                    """TestDataLibrary("$jvmClasspath", "$jsClasspath")""",
+                )
             }
         }
-        configuration(configure)
-
-        return configuration
     }
-
-    /**
-     * Registers a runtime library for this plugin. The library will be passed to tests under the
-     * name "[name].jvm.classpath", if [addToBuildConfig], it'll also be available under
-     * RuntimeClasspaths.[name]. This is *not* idempotent. Libraries for each `name` should be
-     * registered once by one of the `registerRuntimeLibraries` methods. Shortcut for
-     * [registerRuntimeLibraries] with `forJs = false`.
-     *
-     * @see [registerRuntimeLibraries], [registerRuntimeLibrariesJs]
-     */
-    public fun registerRuntimeLibrariesJvm(
-        name: String,
-        isTransitive: Boolean = false,
-        addToBuildConfig: Boolean = true,
-        configure: DependencyScopeConfiguration.() -> Unit = {},
-    ): NamedDomainObjectProvider<DependencyScopeConfiguration> =
-        registerRuntimeLibraries(
-            name,
-            isTransitive = isTransitive,
-            forJs = false,
-            addToBuildConfig = addToBuildConfig,
-            configure = configure,
-        )
-
-    /**
-     * Registers a runtime library for this plugin. The library will be passed to tests under the
-     * name "[name].js.classpath", if [addToBuildConfig], it'll also be available under
-     * RuntimeClasspaths.[name]. This is *not* idempotent. Libraries for each `name` should be
-     * registered once by one of the `registerRuntimeLibraries` methods. Shortcut for
-     * [registerRuntimeLibraries] with `forJvm = false`.
-     *
-     * @see [registerRuntimeLibraries], [registerRuntimeLibrariesJvm]
-     */
-    public fun registerRuntimeLibrariesJs(
-        name: String,
-        isTransitive: Boolean = false,
-        addToBuildConfig: Boolean = true,
-        configure: DependencyScopeConfiguration.() -> Unit = {},
-    ): NamedDomainObjectProvider<DependencyScopeConfiguration> =
-        registerRuntimeLibraries(
-            name,
-            isTransitive = isTransitive,
-            forJvm = false,
-            addToBuildConfig = addToBuildConfig,
-            configure = configure,
-        )
 
     /**
      * Declares a version that the plugin should be tested against. This method is idempotent.

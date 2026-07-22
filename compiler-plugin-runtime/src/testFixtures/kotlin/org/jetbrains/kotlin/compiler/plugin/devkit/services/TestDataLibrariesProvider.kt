@@ -14,13 +14,28 @@ import org.jetbrains.kotlin.test.services.RuntimeClasspathProvider
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.targetPlatform
 
-public fun TestConfigurationBuilder.configureDefaultRuntimeLibraries() {
-    configureRuntimeLibraries(defaultLibrariesJvm, defaultLibrariesJs) { true }
+public class TestDataLibrary(
+    public val jvmClasspath: List<File> = emptyList(),
+    public val jsClasspath: List<File> = emptyList(),
+) {
+    public constructor(
+        jvmProperty: String,
+        jsProperty: String,
+    ) : this(classpathFiles(jvmProperty), classpathFiles(jsProperty))
+
+    public operator fun plus(other: TestDataLibrary): TestDataLibrary =
+        TestDataLibrary(
+            jvmClasspath = jvmClasspath + other.jvmClasspath,
+            jsClasspath = jsClasspath + other.jsClasspath,
+        )
 }
 
-public fun TestConfigurationBuilder.configureRuntimeLibraries(
-    jvmClasspath: List<File> = emptyList(),
-    jsClasspath: List<File> = emptyList(),
+public fun TestConfigurationBuilder.configureDefaultTestDataLibraries() {
+    configureTestDataLibrary(defaultTestDataLibrary) { true }
+}
+
+public fun TestConfigurationBuilder.configureTestDataLibrary(
+    library: TestDataLibrary,
     condition: TestServices.(TestModule) -> Boolean,
 ) {
     useConfigurators({
@@ -33,14 +48,14 @@ public fun TestConfigurationBuilder.configureRuntimeLibraries(
                 val platform = module.targetPlatform(testServices)
                 when {
                     platform.isJvm() -> {
-                        configuration.addJvmClasspathRoots(jvmClasspath)
+                        configuration.addJvmClasspathRoots(library.jvmClasspath)
                     }
 
                     platform.isJs() -> {
                         val libraries = configuration.getList(JSConfigurationKeys.LIBRARIES)
                         configuration.put(
                             JSConfigurationKeys.LIBRARIES,
-                            libraries + jsClasspath.map { it.absolutePath },
+                            libraries + library.jsClasspath.map(File::getAbsolutePath),
                         )
                     }
                 }
@@ -53,8 +68,8 @@ public fun TestConfigurationBuilder.configureRuntimeLibraries(
                 if (!testServices.condition(module)) return emptyList()
                 val targetPlatform = module.targetPlatform(testServices)
                 return when {
-                    targetPlatform.isJvm() -> jvmClasspath
-                    targetPlatform.isJs() -> jsClasspath
+                    targetPlatform.isJvm() -> library.jvmClasspath
+                    targetPlatform.isJs() -> library.jsClasspath
                     else -> emptyList()
                 }
             }
@@ -62,10 +77,13 @@ public fun TestConfigurationBuilder.configureRuntimeLibraries(
     })
 }
 
-private val defaultLibrariesJvm = classpathFiles("defaultRuntimeLibraries.jvm.classpath")
-private val defaultLibrariesJs = classpathFiles("defaultRuntimeLibraries.js.classpath")
+private val defaultTestDataLibrary =
+    TestDataLibrary(
+        "defaultTestDataLibraries.jvm.classpath",
+        "defaultTestDataLibraries.js.classpath",
+    )
 
-public fun classpathFiles(property: String): List<File> {
+private fun classpathFiles(property: String): List<File> {
     val property =
         System.getProperty(property)
             ?: error("Unable to get a valid classpath from '$property' property")

@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.test.services.TestServices
 
 public fun TestConfigurationBuilder.configurePlugin(registrar: CompilerPluginRegistrar) {
     useConfigurators(registrar::ExtensionRegistrarConfigurator)
-    configureDefaultRuntimeLibraries()
+    configureDefaultTestDataLibraries()
 }
 
 private fun CompilerPluginRegistrar.ExtensionRegistrarConfigurator(testServices: TestServices) =

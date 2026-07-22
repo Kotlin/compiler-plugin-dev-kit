@@ -32,9 +32,9 @@ import dev.zacsweers.metro.compiler.test.TEST_COMPILER_VERSION
 import dev.zacsweers.metro.compiler.tracing.TraceContext
 import kotlin.io.path.Path
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureRuntimeLibraries
-import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureDefaultRuntimeLibraries
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
+import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureDefaultTestDataLibraries
+import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureTestDataLibrary
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.test.TargetBackend
@@ -50,8 +50,8 @@ fun TestConfigurationBuilder.configurePlugin(
   compatContext: CompatContext = CompatContext.create()
 ) {
   useConfigurators({ MetroExtensionRegistrarConfigurator(it, compatContext) })
-  configureDefaultRuntimeLibraries()
-  configureRuntimeLibraries(RuntimeClasspaths.runtimeTracing) {
+  configureDefaultTestDataLibraries()
+  configureTestDataLibrary(TestDataLibraries.runtimeTracing) {
     MetroDirectives.ENABLE_RUNTIME_TRACING in it.directives
   }
 
@@ -59,30 +59,30 @@ fun TestConfigurationBuilder.configurePlugin(
 
   useSourcePreprocessor(::MetroDefaultImportPreprocessor)
 
-  configureRuntimeLibraries(RuntimeClasspaths.anvil) {
+  configureTestDataLibrary(TestDataLibraries.anvil) {
     MetroDirectives.WITH_ANVIL in it.directives || MetroDirectives.ENABLE_ANVIL_KSP in it.directives
   }
-  configureRuntimeLibraries(RuntimeClasspaths.kiAnvil) {
+  configureTestDataLibrary(TestDataLibraries.kiAnvil) {
     MetroDirectives.WITH_KI_ANVIL in it.directives
   }
-  configureRuntimeLibraries(
-    RuntimeClasspaths.javaxInterop + RuntimeClasspaths.jakartaInterop + RuntimeClasspaths.dagger
+  configureTestDataLibrary(
+    TestDataLibraries.javaxInterop + TestDataLibraries.jakartaInterop + TestDataLibraries.dagger
   ) {
     MetroDirectives.enableDaggerRuntime(it.directives)
   }
-  configureRuntimeLibraries(RuntimeClasspaths.daggerInterop) {
+  configureTestDataLibrary(TestDataLibraries.daggerInterop) {
     MetroDirectives.enableDaggerRuntimeInterop(it.directives)
   }
-  configureRuntimeLibraries(RuntimeClasspaths.guice) {
+  configureTestDataLibrary(TestDataLibraries.guice) {
     MetroDirectives.enableGuiceInterop(it.directives)
   }
-  configureRuntimeLibraries(RuntimeClasspaths.jakartaInterop) {
+  configureTestDataLibrary(TestDataLibraries.jakartaInterop) {
     MetroDirectives.enableGuiceAnnotations(it.directives)
   }
-  configureRuntimeLibraries(RuntimeClasspaths.hiltCore) {
+  configureTestDataLibrary(TestDataLibraries.hiltCore) {
     MetroDirectives.enableHilt(it.directives)
   }
-  configureRuntimeLibraries(RuntimeClasspaths.circuit, RuntimeClasspaths.circuitKlib) {
+  configureTestDataLibrary(TestDataLibraries.circuit) {
     MetroDirectives.ENABLE_CIRCUIT in it.directives
   }
   useAdditionalSourceProviders(::Ksp2AdditionalSourceProvider)

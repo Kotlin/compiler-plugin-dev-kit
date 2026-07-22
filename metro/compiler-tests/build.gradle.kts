@@ -48,8 +48,7 @@ pluginDevKit {
       resources.srcDirs(k2320Target.testFixtures.map { it.resources.sourceDirectories })
     }
   }
-  val k2420Target =
-    testAgainstWithFixtures("2.4.20-dev-6138") { setupFixtures() }
+  val k2420Target = testAgainstWithFixtures("2.4.20-dev-6138") { setupFixtures() }
 
   versionAliases.forEach {
     // TODO provide easy way to do this in DevKit DSL
@@ -89,82 +88,57 @@ pluginDevKit.testAgainst.configureEach {
   }
 }
 
-buildConfig {
-  packageName("$group.compiler")
+pluginDevKit.testDataLibraries {
+  common(project(":runtime"))
+  register("runtimeTracing", isTransitive = true) { jvm(project(":metro-trace")) }
+  register("anvil") {
+    jvm(libs.anvil.annotations)
+    jvm(libs.anvil.annotations.optional)
+  }
+  register("kiAnvil") {
+    jvm(libs.kotlinInject.anvil.runtime)
+    jvm(libs.kotlinInject.runtime)
+  }
+  // include transitive in this case to grab compose and circuit runtimes
+  register("circuit", isTransitive = true) {
+    common(libs.circuit.runtime.presenter)
+    common(libs.circuit.runtime.ui)
+    common(libs.circuit.codegenAnnotations)
+    js(libs.compose.ui)
+    js(libs.kotlinInject.anvil.runtime.optional)
+    js(libs.kotlinInject.runtime)
+    js(libs.kotlinx.browser)
+  }
+  // include transitive in this case to grab jakarta and javax
+  register("dagger", isTransitive = true) { jvm(libs.dagger.runtime) }
+  register("daggerInterop") { jvm(project(":interop-dagger")) }
+  register("hiltCore") { jvm(libs.hilt.core) }
+  // include transitive in this case to grab jakarta and javax
+  register("guice", isTransitive = true) {
+    jvm(project(":interop-guice"))
+    jvm(libs.guice)
+  }
+  register("javaxInterop") { jvm(project(":interop-javax")) }
+  register("jakartaInterop") { jvm(project(":interop-jakarta")) }
 }
 
-pluginDevKit {
-  val runtimeTracingClasspath = registerRuntimeLibrariesJvm("runtimeTracing", isTransitive = true)
-  val anvilRuntimeClasspath = registerRuntimeLibrariesJvm("anvil")
-  val kiAnvilRuntimeClasspath = registerRuntimeLibrariesJvm("kiAnvil")
-  // include transitive in this case to grab compose and circuit runtimes
-  val circuitRuntimeClasspath = registerRuntimeLibrariesJvm("circuit", isTransitive = true)
-  val circuitRuntimeKlibClasspath =
-    registerRuntimeLibrariesJs("circuitKlib", isTransitive = true) {
-      extendsFrom(circuitRuntimeClasspath)
-    }
+dependencies {
+  testFixturesApi(kotlin("compose-compiler-plugin"))
 
-  // include transitive in this case to grab jakarta and javax
-  val daggerRuntimeClasspath = registerRuntimeLibrariesJvm("dagger", isTransitive = true)
-  val daggerInteropClasspath = registerRuntimeLibrariesJvm("daggerInterop")
-  val hiltCoreClasspath = registerRuntimeLibrariesJvm("hiltCore")
-  // include transitive in this case to grab jakarta and javax
-  val guiceClasspath = registerRuntimeLibrariesJvm("guice", isTransitive = true)
-  val javaxInteropClasspath = registerRuntimeLibrariesJvm("javaxInterop")
-  val jakartaInteropClasspath = registerRuntimeLibrariesJvm("jakartaInterop")
+  testFixturesApi(project(":compiler"))
+  testFixturesApi(project(":compiler-compat"))
+  testFixturesCompileOnlyApi(project(":metro-common"))
 
-  dependencies {
-    testFixturesApi(kotlin("compose-compiler-plugin"))
-
-    testFixturesApi(project(":compiler"))
-    testFixturesApi(project(":compiler-compat"))
-    testFixturesCompileOnlyApi(project(":metro-common"))
-
-    testFixturesRuntimeOnly(libs.ksp.symbolProcessing)
-    testFixturesApi(libs.ksp.symbolProcessing.aaEmbeddable)
-    testFixturesApi(libs.ksp.symbolProcessing.commonDeps)
-    testFixturesApi(libs.ksp.symbolProcessing.api)
-    testFixturesApi(libs.dagger.compiler)
-    testFixturesApi(libs.hilt.compiler)
-    testFixturesApi(libs.hilt.core)
-
-    defaultRuntimeLibraries(project(":runtime"))
-
-    runtimeTracingClasspath(project(":metro-trace"))
-
-    daggerInteropClasspath(project(":interop-dagger"))
-
-    guiceClasspath(project(":interop-guice"))
-    guiceClasspath(libs.guice)
-
-    javaxInteropClasspath(project(":interop-javax"))
-    jakartaInteropClasspath(project(":interop-jakarta"))
-
-    anvilRuntimeClasspath(libs.anvil.annotations)
-    anvilRuntimeClasspath(libs.anvil.annotations.optional)
-
-    daggerRuntimeClasspath(libs.dagger.runtime)
-
-    hiltCoreClasspath(libs.hilt.core)
-
-    kiAnvilRuntimeClasspath(libs.kotlinInject.anvil.runtime)
-    kiAnvilRuntimeClasspath(libs.kotlinInject.runtime)
-
-    circuitRuntimeClasspath(libs.circuit.runtime.presenter)
-    circuitRuntimeClasspath(libs.circuit.runtime.ui)
-    circuitRuntimeClasspath(libs.circuit.codegenAnnotations)
-    circuitRuntimeKlibClasspath(libs.circuit.runtime.presenter)
-    circuitRuntimeKlibClasspath(libs.circuit.runtime.ui)
-    circuitRuntimeKlibClasspath(libs.circuit.codegenAnnotations)
-    circuitRuntimeKlibClasspath(libs.compose.ui)
-    circuitRuntimeKlibClasspath(libs.kotlinInject.anvil.runtime.optional)
-    circuitRuntimeKlibClasspath(libs.kotlinInject.runtime)
-    circuitRuntimeKlibClasspath(libs.kotlinx.browser)
-
-    // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
-    // ServiceLoader
-    testFixturesRuntimeOnly(libs.anvil.kspCompiler)
-  }
+  testFixturesRuntimeOnly(libs.ksp.symbolProcessing)
+  testFixturesApi(libs.ksp.symbolProcessing.aaEmbeddable)
+  testFixturesApi(libs.ksp.symbolProcessing.commonDeps)
+  testFixturesApi(libs.ksp.symbolProcessing.api)
+  testFixturesApi(libs.dagger.compiler)
+  testFixturesApi(libs.hilt.compiler)
+  testFixturesApi(libs.hilt.core)
+  // Anvil KSP processors, only needs to be on the classpath at runtime since they're loaded via
+  // ServiceLoader
+  testFixturesRuntimeOnly(libs.anvil.kspCompiler)
 }
 
 val largeTestMode = providers.gradleProperty("metro.enableLargeTests").isPresent
