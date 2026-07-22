@@ -17,7 +17,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-  includeBuild("..")
+  includeBuild("..") { name = "compiler-plugin-dev-kit" }
   repositories {
     mavenCentral()
     google()

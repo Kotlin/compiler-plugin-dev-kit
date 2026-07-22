@@ -27,3 +27,5 @@ dependencyResolutionManagement {
 include("compiler-plugin-runtime")
 
 include("gradle-plugin-runtime")
+
+rootProject.name = "compiler-plugin-dev-kit"

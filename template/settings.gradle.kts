@@ -12,7 +12,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    includeBuild("..")
+    includeBuild("..") { name = "compiler-plugin-dev-kit" }
     includeBuild("../artifact-transform")
     repositories {
         mavenCentral()
