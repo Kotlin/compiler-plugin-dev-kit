@@ -26,7 +26,6 @@ plugins {
   alias(libs.plugins.wire)
   alias(libs.plugins.shadow)
   id("metro.publish")
-  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
   // apply false to put metro on the classpath. Conditionally applied below.
   alias(libs.plugins.metro)
 }

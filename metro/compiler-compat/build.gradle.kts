@@ -4,7 +4,6 @@ plugins {
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.kotlin.compiler.plugin.devkit)
   id("metro.publish")
-  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
 }
 
 metroArtifact {

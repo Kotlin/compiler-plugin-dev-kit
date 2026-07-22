@@ -1,28 +1,32 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
 import org.gradle.api.ExtensiblePolymorphicDomainObjectContainer
 import org.gradle.api.Named
+import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.artifacts.DependencyScopeConfiguration
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.create
-import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
+import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.polymorphicDomainObjectContainer
+import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.the
 import org.gradle.language.base.plugins.LifecycleBasePlugin
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
-import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 /** A single Kotlin version that the consuming Gradle plugin's functional tests run against. */
@@ -44,35 +48,44 @@ private class DevKitGradlePluginTestTargetImpl(
 }
 
 // GradleTestKitSupportExtension doesn't expose it publicly
-private const val FUNCTIONAL_TEST_SOURCE_SET_NAME = "functionalTest"
+private const val FUNCTIONAL_TEST = "functionalTest"
 
 private val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
     setOf("RepoAndVersionArgumentProvider", "IncludeBuildReposArgumentProvider")
 
-public fun Project.DevKitGradlePluginTestTarget(
-    version: KotlinToolingVersion
-): DevKitGradlePluginTestTarget =
-    DevKitGradlePluginTestTargetImpl(
-        version,
-        tasks.register<Test>("${version.versionName}FunctionalTest"),
-    )
+public open class GradlePluginConfigExtension(override val project: Project) : HasProject {
+    private val buildConfig: BuildConfigExtension = project.the()
+    private val gradleTestKitSupport: GradleTestKitSupportExtension = project.the()
+    private val sourceSets: SourceSetContainer = project.the()
+    private val main = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+    private val functionalTest = sourceSets.getByName(FUNCTIONAL_TEST)
 
-public abstract class GradlePluginConfigExtension(override val project: Project) : HasProject {
+    private val kmpTarget = providers.gradleProperty(KMP_TARGET)
+
+    /** The package name of this Gradle plugin. Defaults to the project group. */
+    public val pluginPackage: Property<String> =
+        objects.property(provider { project.group.toString() })
+
     /** The compiler plugin project that this Gradle plugin applies */
-    public abstract val compilerPlugin: Property<Project>
+    public val compilerPlugin: Property<Project> = objects.property()
 
     /** Libraries that this Gradle plugin adds to its users */
-    public abstract val extraLibraries: ListProperty<String>
+    public val extraLibraries: ListProperty<String> = objects.listProperty()
+
+    /**
+     * Projects that the `functionalTest` suite relies on. By default, includes [compilerPlugin] and
+     * [extraLibraries].
+     */
+    public val functionalTestProjectsClasspath:
+        NamedDomainObjectProvider<DependencyScopeConfiguration> =
+        configurations.dependencyScope("functionalTestProjectsClasspath")
 
     /** Adds a library to this Gradle plugin's users */
     public fun extraLibrary(project: Project, group: Any? = null, version: Any? = null) {
-        val group = project.provider { group ?: project.group }
-        val version = project.provider { version ?: project.version }
-        extraLibraries.add(
-            project.providerFlatMap {
-                "${group()}:${project.name}:${version()}"
-            }
-        )
+        val group = provider { group ?: project.group }
+        val version = provider { version ?: project.version }
+        extraLibraries.add(provider { "${group()}:${project.name}:${version()}" })
+        dependencies { functionalTestProjectsClasspath }
     }
 
     /** Adds a library to this Gradle plugin's users */
@@ -85,32 +98,20 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
      * use its APIs can turn this off to avoid an unused dependency leaking into their published
      * POM.
      */
-    public abstract val addRuntimeDependency: Property<Boolean>
-
-    /**
-     * Which registered [testAgainst] version the generic `functionalTest` task delegates to.
-     * Defaults to the Kotlin Gradle Plugin version currently applied to this build. If no
-     * [testAgainst] entry matches, `functionalTest` is left alone.
-     */
-    public abstract val defaultTestTarget: Property<DevKitGradlePluginTestTarget>
-
-    /** The default Kotlin version to run the `functionalTest` suite against. */
-    public fun defaultTestVersion(version: KotlinToolingVersion) {
-        defaultTestVersion(version.versionString)
-    }
-
-    /** The default Kotlin version to run the `functionalTest` suite against. */
-    public fun defaultTestVersion(version: String) {
-        defaultTestTarget.set(testAgainst.named(version))
-    }
+    public val addRuntimeDependency: Property<Boolean> = objects.property(true)
 
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
-    public abstract val testAgainst:
-        ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget>
+    public val testAgainst:
+        ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget> =
+        objects.polymorphicDomainObjectContainer(DevKitGradlePluginTestTarget::class)
 
     init {
         testAgainst.registerFactory(DevKitGradlePluginTestTarget::class.java) {
-            project.DevKitGradlePluginTestTarget(KotlinToolingVersion(it))
+            val version = KotlinToolingVersion(it)
+            DevKitGradlePluginTestTargetImpl(
+                version,
+                tasks.register<Test>("${version.versionName}FunctionalTest"),
+            )
         }
     }
 
@@ -131,42 +132,52 @@ public abstract class GradlePluginConfigExtension(override val project: Project)
         version: String,
         action: DevKitGradlePluginTestTarget.() -> Unit = {},
     ): DevKitGradlePluginTestTarget = testAgainst.maybeCreate(version).apply(action)
-}
 
-public class DevKitGradlePlugin : Plugin<Project> {
-    override fun apply(project: Project): Unit = project.run {
-        // TODO should we apply SAM and assign plugins?
-        pluginManager.apply {
-            apply("org.jetbrains.kotlin.jvm")
-            apply("com.github.gmazzo.buildconfig")
-            apply("java-gradle-plugin")
-            apply(DevKitFunctionalTestPublishingPlugin::class.java)
-        }
-        val kotlinExtension = extensions.getByType<KotlinJvmProjectExtension>()
-        val mainCompilation =
-            kotlinExtension.target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
-        val functionalTestCompilation =
-            kotlinExtension.target.compilations.getByName(FUNCTIONAL_TEST_SOURCE_SET_NAME)
+    /**
+     * Which registered [testAgainst] version the generic `functionalTest` task delegates to.
+     * Defaults to the Kotlin Gradle Plugin version currently applied to this build. If no
+     * [testAgainst] entry matches, `functionalTest` is left alone.
+     */
+    public val defaultTestTarget: Property<DevKitGradlePluginTestTarget> =
+        objects.property(testAgainst(kotlinToolingVersion))
 
-        dependencies {
-            mainCompilation.javaSourceSet.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
-        }
+    /** The default Kotlin version to run the `functionalTest` suite against. */
+    public fun defaultTestVersion(version: KotlinToolingVersion) {
+        defaultTestVersion(version.versionString)
+    }
 
-        val pluginDevKit =
-            project.extensions.create<GradlePluginConfigExtension>("pluginDevKit", project)
-        val compilerPlugin = pluginDevKit.compilerPlugin
-        val extraLibraries = pluginDevKit.extraLibraries
-        pluginDevKit.addRuntimeDependency.convention(true)
-        pluginDevKit.defaultTestTarget.convention(pluginDevKit.testAgainst(kotlinToolingVersion))
+    /** The default Kotlin version to run the `functionalTest` suite against. */
+    public fun defaultTestVersion(version: String) {
+        defaultTestTarget.set(testAgainst.named(version))
+    }
 
-        val kmpTargetProperty = "$DEV_KIT_GROUP.gradle.test.kmpTarget"
-        val kmpTarget = providers.gradleProperty(kmpTargetProperty)
-        pluginDevKit.testAgainst.configureEach {
+    public companion object {
+        /**
+         * Property that's passed to each `functionalTest` to specify which KMP target to run
+         * against.
+         */
+        public const val KMP_TARGET: String = "$DEV_KIT_GROUP.gradle.test.kmpTarget"
+    }
+
+    private fun configureDependencies() = dependencies {
+        main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
+        functionalTestProjectsClasspath(compilerPlugin)
+
+        addIf(
+            addRuntimeDependency,
+            main.implementationConfigurationName,
+            "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION",
+        )
+        functionalTest.implementationConfigurationName(
+            testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION")
+        )
+    }
+
+    private fun configureTestTasks() {
+        testAgainst.configureEach {
             testTask {
                 val functionalTestSourceSet =
-                    project.extensions
-                        .getByType<SourceSetContainer>()
-                        .named(FUNCTIONAL_TEST_SOURCE_SET_NAME)
+                    project.extensions.getByType<SourceSetContainer>().named(FUNCTIONAL_TEST)
                 group = "verification"
                 description = "Runs the functional tests against Kotlin ${version.versionString}."
                 testClassesDirs = files(functionalTestSourceSet.map { it.output.classesDirs })
@@ -177,87 +188,81 @@ public class DevKitGradlePlugin : Plugin<Project> {
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
                 systemProperty("$DEV_KIT_GROUP.gradle.test.kotlin-version", version.versionString)
                 +NestedArgumentProvider(
-                    (tasks.getByName(FUNCTIONAL_TEST_SOURCE_SET_NAME) as Test)
+                    (tasks.getByName(FUNCTIONAL_TEST) as Test)
                         .jvmArgumentProviders
                         // Hacky: pick up repo and included-build repos from functionalTest
                         .filter { it.javaClass.simpleName in FUNCTIONAL_TEST_ARGUMENT_PROVIDERS }
                 )
-                +OptionalStringSystemPropertyArgumentProvider(kmpTargetProperty, kmpTarget)
+                +OptionalStringSystemPropertyArgumentProvider(KMP_TARGET, kmpTarget)
             }
         }
-
-        dependencies {
-            addIf(
-                pluginDevKit.addRuntimeDependency,
-                mainCompilation.implementationConfigurationName,
-                "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION",
-            )
-            functionalTestCompilation.implementationConfigurationName(
-                testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION")
-            )
-        }
-
         val allVersionedFunctionalTests =
             tasks.register<Test>("allVersionedFunctionalTests") {
                 description = "Run all functional tests."
                 group = "verification"
                 enabled = false
-                pluginDevKit.testAgainst.configureEach { this@register.dependsOn(testTask) }
+                testAgainst.configureEach { this@register.dependsOn(testTask) }
             }
 
         tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) { dependsOn(allVersionedFunctionalTests) }
+    }
 
-        tasks.named<Test>(FUNCTIONAL_TEST_SOURCE_SET_NAME) {
+    private fun configurePlugins() {
+        tasks.named<Test>(FUNCTIONAL_TEST) {
             enabled = false
             classpath = files()
             testClassesDirs = files()
-            dependsOn(pluginDevKit.defaultTestTarget.map { it.testTask })
+            dependsOn(defaultTestTarget.map { it.testTask })
         }
-        val buildConfig = extensions.getByType<BuildConfigExtension>()
-        buildConfig.packageName(group.toString())
-        buildConfig.forClass("PluginInfo") {
-            useKotlinOutput { topLevelConstants = false }
-            val pluginId = buildConfigField("String", "PLUGIN_ID", "\"$group\"")
-            val pluginArtifact =
-                buildConfigField("PLUGIN_ARTIFACT") {
-                    type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
-                    expression(
-                        compilerPlugin.map {
-                            """
-                        |SubpluginArtifact(
-                        |  groupId = "$group",
-                        |  artifactId = "${it.name}",
-                        |  version = "$version",
-                        |)
-                        """
-                                .trimMargin()
-                        }
-                    )
-                }
-            val extraLibraryCoordinates =
-                buildConfigField("EXTRA_LIBRARY_COORDINATES") {
-                    type("List<String>")
-                    expression(
-                        extraLibraries.map { library ->
-                            library.joinToString(", ", "listOf(", ")") { "\"$it\"" }
-                        }
-                    )
-                }
-            buildConfigField("PLUGIN_INFO") {
-                type.value(
-                    project
-                        .providerFlatMap {
-                            if (pluginDevKit.addRuntimeDependency())
-                                "$DEV_KIT_GROUP.DevKitPluginInfo"
+
+        gradleTestKitSupport.apply {
+            // TODO this definitely violates Isolated Projects. DevKit should instead
+            //  publish needed dependencies into functionalTestRepo itself
+            withClasspaths(functionalTestProjectsClasspath.name)
+        }
+
+        buildConfig {
+            packageName.convention(pluginPackage)
+            forClass("PluginInfo") {
+                useKotlinOutput { topLevelConstants = false }
+                val pluginId = buildConfigField("String", "PLUGIN_ID", "\"$pluginPackage\"")
+                val pluginArtifact =
+                    buildConfigField("PLUGIN_ARTIFACT") {
+                        type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
+                        expression(
+                            compilerPlugin.map {
+                                """
+                                |SubpluginArtifact(
+                                |  groupId = "${project.group}",
+                                |  artifactId = "${it.name}",
+                                |  version = "${project.version}",
+                                |)
+                                """
+                                    .trimMargin()
+                            }
+                        )
+                    }
+                val extraLibraryCoordinates =
+                    buildConfigField("EXTRA_LIBRARY_COORDINATES") {
+                        type("List<String>")
+                        expression(
+                            extraLibraries.map { library ->
+                                library.joinToString(", ", "listOf(", ")") { "\"$it\"" }
+                            }
+                        )
+                    }
+                buildConfigField("PLUGIN_INFO") {
+                    type.value(
+                        provider {
+                            if (addRuntimeDependency()) "$DEV_KIT_GROUP.DevKitPluginInfo"
                             else "kotlin.Nothing"
                         }
-                        .map { BuildConfigType(it) }
-                )
-                expression(
-                    project
-                        .providerFlatMap {
+                            .map { BuildConfigType(it) }
+                    )
+                    expression(
+                        provider {
                             if (
-                                pluginDevKit.addRuntimeDependency.orNull == true &&
+                                addRuntimeDependency() &&
                                     compilerPlugin.isPresent &&
                                     extraLibraries.isPresent
                             )
@@ -271,9 +276,32 @@ public class DevKitGradlePlugin : Plugin<Project> {
                                     .trimMargin()
                             else ""
                         }
-                        .filter { it.isNotEmpty() }
-                )
+                            .filter { it.isNotEmpty() }
+                    )
+                }
             }
         }
+    }
+
+    internal fun configure() {
+        configureDependencies()
+        configureTestTasks()
+        configurePlugins()
+    }
+}
+
+public class DevKitGradlePlugin : Plugin<Project> {
+    override fun apply(project: Project): Unit = project.run {
+        // TODO should we apply SAM and assign plugins?
+        pluginManager.apply {
+            apply("org.jetbrains.kotlin.jvm")
+            apply("com.github.gmazzo.buildconfig")
+            apply("java-gradle-plugin")
+            apply(DevKitFunctionalTestPublishingPlugin::class.java)
+        }
+
+        val pluginDevKit =
+            project.extensions.create<GradlePluginConfigExtension>("pluginDevKit", project)
+        pluginDevKit.configure()
     }
 }

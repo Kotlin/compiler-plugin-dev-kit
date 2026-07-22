@@ -80,6 +80,9 @@ internal val objects
 context(_: HasProject)
 internal val kotlinToolingVersion
     get() = project.kotlinToolingVersion
+context(_: HasProject)
+internal val providers
+    get() = project.providers
 
 context(_: HasProject)
 internal fun dependencies(configuration: DependencyHandlerScope.() -> Unit) =

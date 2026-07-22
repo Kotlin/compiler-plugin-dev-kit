@@ -17,7 +17,6 @@ plugins {
   alias(libs.plugins.kotlin.compiler.plugin.devkit.gradle.plugin)
   id("metro.base")
   id("metro.publish")
-  id("org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing")
 }
 
 metroArtifact {

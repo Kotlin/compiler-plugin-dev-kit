@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 
 plugins {
-    id("com.gradleup.shadow")
+    id("com.gradleup.shadow") version "9.6.0"
     kotlin("compiler.plugin.devkit.compiler-plugin")
 }
 
