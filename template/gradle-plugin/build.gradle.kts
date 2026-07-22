@@ -3,7 +3,7 @@ plugins {
 }
 
 pluginDevKit {
-    extraLibrary(project(":plugin-annotations"))
+    companionLibrary(project(":plugin-annotations"))
     compilerPlugin = project(":compiler-plugin")
 }
 

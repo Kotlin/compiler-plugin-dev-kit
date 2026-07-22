@@ -70,27 +70,34 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
     public val compilerPlugin: Property<Project> = objects.property()
 
     /** Libraries that this Gradle plugin adds to its users */
-    public val extraLibraries: ListProperty<String> = objects.listProperty()
+    public val companionLibraries: ListProperty<String> = objects.listProperty()
 
     /**
-     * Projects that the `functionalTest` suite relies on. By default, includes [compilerPlugin] and
-     * [extraLibraries].
+     * Indicate that [project] is used within `functionalTest` suite. By default, includes
+     * [compilerPlugin] and [companionLibraries].
      */
-    public val functionalTestProjectsClasspath:
+    public fun functionalTestProject(project: Project) {
+        // functionalTestRuntimeOnly is automatically pulled in by installForFunctionalTest
+        // User might reflectively call methods from Gradle output, so we need these projects
+        // on our runtime classpath
+        dependencies { functionalTest.runtimeOnlyConfigurationName(project) }
+    }
+
+    private val functionalTestProjectsClasspath:
         NamedDomainObjectProvider<DependencyScopeConfiguration> =
         configurations.dependencyScope("functionalTestProjectsClasspath")
 
     /** Adds a library to this Gradle plugin's users */
-    public fun extraLibrary(project: Project, group: Any? = null, version: Any? = null) {
+    public fun companionLibrary(project: Project, group: Any? = null, version: Any? = null) {
         val group = provider { group ?: project.group }
         val version = provider { version ?: project.version }
-        extraLibraries.add(provider { "${group()}:${project.name}:${version()}" })
-        dependencies { functionalTestProjectsClasspath }
+        companionLibraries.add(provider { "${group()}:${project.name}:${version()}" })
+        functionalTestProject(project)
     }
 
     /** Adds a library to this Gradle plugin's users */
-    public fun extraLibrary(dependencyNotation: String) {
-        extraLibraries.add(dependencyNotation)
+    public fun companionLibrary(dependencyNotation: String) {
+        companionLibraries.add(dependencyNotation)
     }
 
     /**
@@ -246,7 +253,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                     buildConfigField("EXTRA_LIBRARY_COORDINATES") {
                         type("List<String>")
                         expression(
-                            extraLibraries.map { library ->
+                            companionLibraries.map { library ->
                                 library.joinToString(", ", "listOf(", ")") { "\"$it\"" }
                             }
                         )
@@ -264,7 +271,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                             if (
                                 addRuntimeDependency() &&
                                     compilerPlugin.isPresent &&
-                                    extraLibraries.isPresent
+                                    companionLibraries.isPresent
                             )
                                 """
                                 |DevKitPluginInfo(

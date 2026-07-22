@@ -164,10 +164,14 @@ dependencies {
   functionalTestImplementation(libs.kotlin.test)
   functionalTestImplementation(libs.testkit.support)
   functionalTestImplementation(libs.testkit.truth)
-  // TODO really only here for extensions tests
-  functionalTestRuntimeOnly(project(":compiler"))
-  functionalTestRuntimeOnly(project(":runtime"))
-  functionalTestRuntimeOnly(project(":interop-dagger"))
+}
+
+pluginDevKit {
+  compilerPlugin = project(":compiler")
+  functionalTestProject(project(":runtime"))
+  functionalTestProject(project(":metro-trace"))
+  functionalTestProject(project(":interop-dagger"))
+  functionalTestProject(project(":interop-guice"))
 }
 
 fun androidHomeOrNull(): File? {
