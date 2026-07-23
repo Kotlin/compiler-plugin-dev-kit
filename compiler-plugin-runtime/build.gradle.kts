@@ -33,7 +33,7 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    testAgainstWithFixtures("2.4.20-dev-7680")
+    val testDumpDirectiveTarget = testAgainstWithFixtures("2.4.20-dev-7885")
 
     testAgainstWithFixtures("2.4.0")
     val k2320Target = testAgainstWithFixtures("2.3.20")
@@ -75,6 +75,13 @@ pluginDevKit {
                 }
             }
         else testAgainst(it)
+    }
+    testAgainstWithFixtures("2.4.20-Beta2") {
+        testFixtures {
+            kotlin.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.kotlin.sourceDirectories })
+            java.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.java.sourceDirectories })
+            resources.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.resources.sourceDirectories })
+        }
     }
 }
 
