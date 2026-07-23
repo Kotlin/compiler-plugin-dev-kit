@@ -4,6 +4,7 @@ plugins {
     embeddedKotlin("plugin.assignment")
     `java-gradle-plugin`
     id("com.vanniktech.maven.publish") version libs.versions.publish
+    `maven-publish`
 }
 
 group = "org.jetbrains.kotlin.compiler.plugin.devkit"
