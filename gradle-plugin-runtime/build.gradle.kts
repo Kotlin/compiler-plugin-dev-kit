@@ -6,7 +6,6 @@ plugins {
     `embedded-kotlin`
     `java-gradle-plugin`
     `java-test-fixtures`
-    kotlin("compiler.plugin.devkit.functional-test-publishing")
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 

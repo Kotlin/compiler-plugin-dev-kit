@@ -1,7 +1,0 @@
-public final class dev/zacsweers/metro/interop/guice/GuiceInteropKt {
-	public static final fun asGuiceMembersInjector (Ldev/zacsweers/metro/MembersInjector;)Lcom/google/inject/MembersInjector;
-	public static final fun asGuiceProvider (Ldev/zacsweers/metro/Provider;)Lcom/google/inject/Provider;
-	public static final fun asMetroMembersInjector (Lcom/google/inject/MembersInjector;)Ldev/zacsweers/metro/MembersInjector;
-	public static final fun asMetroProvider (Lcom/google/inject/Provider;)Ldev/zacsweers/metro/Provider;
-}
-

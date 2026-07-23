@@ -1,5 +1,0 @@
--P ubuntu-slim=catthehacker/ubuntu:full-latest
--P macos-latest=-self-hosted
--P ubuntu-latest=catthehacker/ubuntu:full-latest
---container-architecture linux/amd64
---pull=false

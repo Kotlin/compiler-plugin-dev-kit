@@ -1,1 +1,0 @@
-/ProvidesPropertiesCannotBeMutable.kt:8:17: error: @Provides properties cannot be var

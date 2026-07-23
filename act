@@ -1,2 +1,0 @@
-#!/bin/sh
-act -s GITHUB_TOKEN="$(gh auth token)" --artifact-server-path $PWD/.artifacts

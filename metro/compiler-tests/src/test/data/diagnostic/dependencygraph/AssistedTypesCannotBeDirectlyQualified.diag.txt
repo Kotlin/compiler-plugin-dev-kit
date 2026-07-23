@@ -1,3 +1,0 @@
-/AssistedTypesCannotBeDirectlyQualified.kt:6:7: error: @AssistedInject-annotated classes cannot be annotated with qualifier annotations.
-
-/AssistedTypesCannotBeDirectlyQualified.kt:15:7: error: @AssistedInject-annotated classes cannot be annotated with qualifier annotations.

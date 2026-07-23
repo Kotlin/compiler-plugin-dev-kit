@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     `embedded-kotlin`
     alias(libs.plugins.buildconfig)
-    alias(libs.plugins.testkit)
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
