@@ -4,6 +4,7 @@ plugins {
     `embedded-kotlin`
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.testkit)
+    id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
 group = "org.jetbrains.kotlin.compiler.plugin.devkit"
@@ -55,4 +56,14 @@ buildConfig {
                     }
             },
     )
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "devKitSpace"
+            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
+            credentials(PasswordCredentials::class)
+        }
+    }
 }

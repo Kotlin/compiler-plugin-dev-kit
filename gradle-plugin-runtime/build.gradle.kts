@@ -7,6 +7,7 @@ plugins {
     `java-gradle-plugin`
     `java-test-fixtures`
     kotlin("compiler.plugin.devkit.functional-test-publishing")
+    id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
 java {
@@ -32,4 +33,14 @@ dependencies {
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
     testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "devKitSpace"
+            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
+            credentials(PasswordCredentials::class)
+        }
+    }
 }

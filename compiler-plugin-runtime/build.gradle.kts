@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 plugins {
     alias(libs.plugins.kotlin.jvm)
     kotlin("compiler.plugin.devkit.compiler-plugin")
+    id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
 java {
@@ -62,19 +63,29 @@ pluginDevKit {
             .map(::KotlinToolingVersion)
 
     versions.forEach {
-            if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
-                testAgainstWithFixtures(it) {
-                    if (this == k2420Target) return@testAgainstWithFixtures
-                    testFixtures {
-                        kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
-                        java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
-                        resources.srcDirs(
-                            k2420Target.testFixtures.map { it.resources.sourceDirectories }
-                        )
-                    }
+        if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
+            testAgainstWithFixtures(it) {
+                if (this == k2420Target) return@testAgainstWithFixtures
+                testFixtures {
+                    kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
+                    java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
+                    resources.srcDirs(
+                        k2420Target.testFixtures.map { it.resources.sourceDirectories }
+                    )
                 }
-            else testAgainst(it)
-        }
+            }
+        else testAgainst(it)
+    }
 }
 
 tasks.generateTests { enabled = false }
+
+publishing {
+    repositories {
+        maven {
+            name = "devKitSpace"
+            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
+            credentials(PasswordCredentials::class)
+        }
+    }
+}

@@ -2,6 +2,7 @@
 buildconfig = "6.0.10"
 truth = "1.4.5"
 testkit = "0.18"
+publish = "0.37.0"
 
 [plugins]
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }

@@ -4,6 +4,7 @@ node-gradle = "7.0.2"
 animal-sniffer = "2.0.1"
 testkit = "0.18"
 shadow = "9.6.0"
+publish = "0.37.0"
 
 [libraries]
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }

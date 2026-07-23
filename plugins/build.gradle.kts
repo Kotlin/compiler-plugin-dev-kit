@@ -3,7 +3,12 @@ plugins {
     embeddedKotlin("plugin.sam.with.receiver")
     embeddedKotlin("plugin.assignment")
     `java-gradle-plugin`
+    id("com.vanniktech.maven.publish") version libs.versions.publish
 }
+
+group = "org.jetbrains.kotlin.compiler.plugin.devkit"
+
+version = "0.0.1-SNAPSHOT"
 
 samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
@@ -47,5 +52,15 @@ kotlin {
     explicitApi()
     compilerOptions {
         freeCompilerArgs.addAll("-Xcontext-sensitive-resolution", "-Xcontext-parameters")
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "devKitSpace"
+            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
+            credentials(PasswordCredentials::class)
+        }
     }
 }

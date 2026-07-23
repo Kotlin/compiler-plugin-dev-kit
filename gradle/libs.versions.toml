@@ -3,6 +3,7 @@
 kotlin = "2.4.20-dev-7885"
 testkit-support = "0.26"
 testkit-truth = "1.7.0"
+publish = "0.37.0"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
