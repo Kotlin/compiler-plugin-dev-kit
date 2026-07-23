@@ -876,22 +876,17 @@ internal constructor(override val project: Project) : HasProject {
                 addRuntimeDependency,
                 sharedMain.implementationConfigurationName,
                 "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION",
-            ) {
-                exclude(
-                    group = "org.jetbrains.kotlin",
-                    module = "kotlin-compiler",
-                )
-            }
+            )
+            addIf(
+                addRuntimeDependency,
+                sharedTestFixtures.apiConfigurationName,
+                "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION",
+            )
             addIf(
                 addRuntimeDependency,
                 sharedTestFixtures.apiConfigurationName,
                 testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"),
-            ) {
-                exclude(
-                    group = "org.jetbrains.kotlin",
-                    module = "kotlin-compiler-internal-test-framework",
-                )
-            }
+            )
         }
     }
 
