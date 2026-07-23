@@ -2,7 +2,7 @@
 buildconfig = "6.0.10"
 node-gradle = "7.0.2"
 animal-sniffer = "2.0.1"
-testkit = "0.18"
+testkit = "0.19"
 shadow = "9.6.0"
 publish = "0.37.0"
 

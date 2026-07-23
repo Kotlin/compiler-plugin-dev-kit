@@ -1,8 +1,8 @@
 [versions]
 # https://github.com/JetBrains/kotlin
 kotlin = "2.4.20-dev-7885"
-testkit-support = "0.26"
-testkit-truth = "1.7.0"
+testkit-support = "0.27"
+testkit-truth = "1.7.1"
 publish = "0.37.0"
 
 [plugins]

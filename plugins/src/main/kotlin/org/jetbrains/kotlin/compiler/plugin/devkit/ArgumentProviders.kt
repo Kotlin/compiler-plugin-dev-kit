@@ -93,6 +93,13 @@ internal class NestedArgumentProvider(
     override fun asArguments() = providers.flatMap { it.asArguments() }
 }
 
+internal class PropertiesSystemPropertyArgumentProvider(
+    @Input val propName: String,
+    @Input val properties: Provider<List<String>>,
+) : CommandLineArgumentProviderFlatMap {
+    override fun asArguments() = listOf("-D$propName=${properties.get().joinToString(",")}")
+}
+
 context(exec: JavaForkOptions)
 internal operator fun CommandLineArgumentProvider.unaryPlus() = exec.jvmArgumentProviders.add(this)
 

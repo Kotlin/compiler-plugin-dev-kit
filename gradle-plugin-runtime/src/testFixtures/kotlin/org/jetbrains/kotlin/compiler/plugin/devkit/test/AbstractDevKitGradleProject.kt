@@ -250,13 +250,28 @@ public abstract class AbstractDevKitGradleProject(
                 "systemProp.org.gradle.configuration-cache.read-only=true",
                 "kotlin.native.enableKlibsCrossCompilation=true",
                 "kotlin.native.ignoreDisabledTargets=true",
-            )
+            ) +
+                System.getProperty(
+                        "org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.properties"
+                    )
+                    .orEmpty()
+                    .split(",")
         private val KOTLIN_REPOS =
             listOf(
                     "https://packages.jetbrains.team/maven/p/kt/bootstrap",
                     "https://packages.jetbrains.team/maven/p/kt/dev/",
                     "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/",
                 )
-                .map(Repository::ofMaven)
+                .map(Repository::ofMaven) +
+                Repository.Method(
+                    """
+                    maven {
+                        name = "devKitSpace"
+                        url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
+                        credentials(PasswordCredentials::class)
+                    }
+                    """
+                        .trimIndent()
+                )
     }
 }
