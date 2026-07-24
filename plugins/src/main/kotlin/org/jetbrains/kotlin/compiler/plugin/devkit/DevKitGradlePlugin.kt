@@ -84,7 +84,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
     }
 
     private val functionalTestProjectsClasspath:
-        NamedDomainObjectProvider<DependencyScopeConfiguration> =
+            NamedDomainObjectProvider<DependencyScopeConfiguration> =
         configurations.dependencyScope("functionalTestProjectsClasspath")
 
     /** Adds a library to this Gradle plugin's users */
@@ -109,7 +109,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
 
     /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
     public val testAgainst:
-        ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget> =
+            ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget> =
         objects.polymorphicDomainObjectContainer(DevKitGradlePluginTestTarget::class)
 
     init {
@@ -232,7 +232,10 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
             packageName.convention(pluginPackage)
             forClass("PluginInfo") {
                 useKotlinOutput { topLevelConstants = false }
-                val pluginId = buildConfigField("String", "PLUGIN_ID", "\"$pluginPackage\"")
+                val pluginId = buildConfigField("PLUGIN_ID") {
+                    type("String")
+                    expression(pluginPackage.map { "\"$it\"" })
+                }
                 val pluginArtifact =
                     buildConfigField("PLUGIN_ARTIFACT") {
                         type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
@@ -270,8 +273,8 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                         provider {
                             if (
                                 addRuntimeDependency() &&
-                                    compilerPlugin.isPresent &&
-                                    companionLibraries.isPresent
+                                compilerPlugin.isPresent &&
+                                companionLibraries.isPresent
                             )
                                 """
                                 |DevKitPluginInfo(
