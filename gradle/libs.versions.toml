@@ -1,13 +1,31 @@
 [versions]
 # https://github.com/JetBrains/kotlin
-kotlin = "2.4.20-dev-7885"
+kotlin = "2.4.10"
+animal-sniffer = "2.0.1"
+buildconfig = "6.0.10"
+gradle = "9.2.0"
+node-gradle = "7.0.2"
+publish = "0.37.0"
+shadow = "9.6.0"
+tapmoc = "0.4.2"
+testkit-plugin = "0.19"
 testkit-support = "0.27"
 testkit-truth = "1.7.1"
-publish = "0.37.0"
+truth = "1.4.5"
 
 [plugins]
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
+tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
 
 [libraries]
-testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support"}
-testkit-truth = { group = "com.autonomousapps", name = "gradle-testkit-truth", version.ref = "testkit-truth"}
+animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
+buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
+gradle-public-api = { group = "org.gradle.experimental", name = "gradle-public-api", version.ref = "gradle" }
+gradleup-shadow = { group = "com.gradleup.shadow", name = "shadow-gradle-plugin", version.ref = "shadow" }
+node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }
+testkit-plugin = { group = "com.autonomousapps", name = "gradle-testkit-plugin", version.ref = "testkit-plugin" }
+testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support" }
+testkit-truth = { group = "com.autonomousapps", name = "gradle-testkit-truth", version.ref = "testkit-truth" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }

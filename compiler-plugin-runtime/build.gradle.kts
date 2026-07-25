@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    kotlin("jvm")
     kotlin("compiler.plugin.devkit.compiler-plugin")
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
@@ -25,8 +25,8 @@ kotlin {
 }
 
 dependencies {
-    api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
-    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
+    api(pluginDevKit("artifact-transform"))
+    testFixturesApi(pluginDevKit("artifact-transform"))
 }
 
 pluginDevKit {
@@ -80,7 +80,9 @@ pluginDevKit {
         testFixtures {
             kotlin.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.kotlin.sourceDirectories })
             java.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.java.sourceDirectories })
-            resources.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.resources.sourceDirectories })
+            resources.srcDirs(
+                testDumpDirectiveTarget.testFixtures.map { it.resources.sourceDirectories }
+            )
         }
     }
 }

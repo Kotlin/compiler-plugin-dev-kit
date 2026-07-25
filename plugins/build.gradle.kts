@@ -1,32 +1,32 @@
+import tapmoc.Severity
+
 plugins {
-    `embedded-kotlin`
-    embeddedKotlin("plugin.sam.with.receiver")
-    embeddedKotlin("plugin.assignment")
     `java-gradle-plugin`
-    id("com.vanniktech.maven.publish") version libs.versions.publish
+    kotlin("jvm") version libs.versions.kotlin
+    kotlin("plugin.sam.with.receiver") version libs.versions.kotlin
+    kotlin("plugin.assignment") version libs.versions.kotlin
+    alias(libs.plugins.maven.publish)
+    alias(libs.plugins.tapmoc)
 }
-
-group = "org.jetbrains.kotlin.compiler.plugin.devkit"
-
-version = "0.0.1-SNAPSHOT"
 
 samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
 assignment { annotation("org.gradle.api.SupportsKotlinAssignmentOverloading") }
 
 dependencies {
-    implementation(gradleKotlinDsl())
-    compileOnly(embeddedKotlin("gradle-plugin"))
+    compileOnlyApi(libs.gradle.public.api) {
+        capabilities {
+            requireCapability("org.gradle.experimental:gradle-public-api-internal")
+        }
+    }
+    compileOnly(gradleKotlinDsl())
+
+    compileOnly(kotlin("gradle-plugin"))
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)
-    implementation(libs.testkit)
-    /*
-    Even though this is optional, it cannot be made compileOnly
-    else, any project that uses this as includedBuild will fail with
-    NoClassDefFoundError
-    */
-    implementation(libs.gradleup.shadow)
+    implementation(libs.testkit.plugin)
+    compileOnly(libs.gradleup.shadow)
     api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
 }
 
@@ -51,7 +51,11 @@ gradlePlugin {
 kotlin {
     explicitApi()
     compilerOptions {
-        freeCompilerArgs.addAll("-Xcontext-sensitive-resolution", "-Xcontext-parameters")
+        freeCompilerArgs.addAll(
+            "-Xcontext-sensitive-resolution",
+            "-Xcontext-parameters",
+            "-Xallow-contracts-on-more-functions",
+        )
     }
 }
 
@@ -63,4 +67,9 @@ publishing {
             credentials(PasswordCredentials::class)
         }
     }
+}
+
+tapmoc {
+    gradle(libs.versions.gradle.get())
+    checkDependencies(Severity.ERROR)
 }

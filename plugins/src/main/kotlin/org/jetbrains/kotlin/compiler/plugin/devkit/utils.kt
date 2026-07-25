@@ -39,7 +39,7 @@ internal fun DependencyHandler.addIf(
     condition: Provider<out Boolean>,
     configurationName: String,
     dependencyNotation: Any,
-    action: Action<in ExternalModuleDependency> = {},
+    action: Action<in ExternalModuleDependency> = Action {},
 ) = addProvider(configurationName, condition.filter { it }.map { dependencyNotation }, action)
 
 internal inline fun <reified T : Any> ObjectFactory.property(convention: T) =

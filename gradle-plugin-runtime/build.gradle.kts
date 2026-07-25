@@ -1,20 +1,19 @@
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import tapmoc.Severity
 
 plugins {
-    `embedded-kotlin`
-    `java-gradle-plugin`
+    `java-library`
     `java-test-fixtures`
-    id("com.vanniktech.maven.publish") version libs.versions.publish
+    kotlin("jvm")
+    alias(libs.plugins.maven.publish)
+    alias(libs.plugins.tapmoc)
 }
 
-java {
-    targetCompatibility = JavaVersion.VERSION_17
-}
+val minGradleVersion = libs.versions.gradle.get()
+val minKotlinVersion = tapmoc.kotlinVersionForGradle(minGradleVersion)
 
 kotlin {
-    compilerOptions.jvmTarget = JvmTarget.JVM_17
     explicitApi()
     target.compilations.named("testFixtures") {
         tasks.named<KotlinCompile>(compileKotlinTaskName) {
@@ -23,15 +22,25 @@ kotlin {
     }
 }
 
+configurations.testFixturesApi {
+    // KGP pins this to its own version, ignoring `coreLibrariesVersion`
+    withDependencies {
+        removeIf { it.group == "org.jetbrains.kotlin" && it.name == "kotlin-stdlib" }
+    }
+}
+
 dependencies {
-    implementation(kotlin("gradle-plugin-api"))
+    compileOnly(libs.gradle.public.api) {
+        capabilities { requireCapability("org.gradle.experimental:gradle-public-api-internal") }
+    }
+    compileOnly(kotlin("gradle-plugin-api"))
 
     testFixturesApi(gradleTestKit())
-    testFixturesApi(kotlin("test-junit5"))
+    testFixturesApi(kotlin("test-junit5", minKotlinVersion))
     testFixturesApi("junit:junit:4.13.2") // TODO don't force junit version
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
-    testFixturesApi("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
+    testFixturesApi(pluginDevKit("artifact-transform"))
 }
 
 publishing {
@@ -42,4 +51,10 @@ publishing {
             credentials(PasswordCredentials::class)
         }
     }
+}
+
+tapmoc {
+    gradle(minGradleVersion)
+    checkDependencies(Severity.ERROR)
+    checkKotlinStdlibs(Severity.ERROR)
 }

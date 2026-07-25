@@ -1,9 +1,10 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import tapmoc.Severity
 
 plugins {
-    `embedded-kotlin`
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.buildconfig)
-    id("com.vanniktech.maven.publish") version libs.versions.publish
+    alias(libs.plugins.maven.publish)
+    alias(libs.plugins.tapmoc)
 }
 
 group = "org.jetbrains.kotlin.compiler.plugin.devkit"
@@ -14,15 +15,8 @@ dependencies {
     testImplementation(libs.truth)
 }
 
-java {
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
 kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xcontext-sensitive-resolution")
-        jvmTarget = JvmTarget.JVM_17
-    }
+    compilerOptions.freeCompilerArgs.add("-Xcontext-sensitive-resolution")
     explicitApi()
 }
 
@@ -65,4 +59,10 @@ publishing {
             credentials(PasswordCredentials::class)
         }
     }
+}
+
+tapmoc {
+    gradle(libs.versions.gradle.get())
+    checkDependencies(Severity.ERROR)
+    checkKotlinStdlibs(Severity.ERROR)
 }

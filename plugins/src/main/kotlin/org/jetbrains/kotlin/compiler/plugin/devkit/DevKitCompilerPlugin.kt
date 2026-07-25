@@ -545,7 +545,7 @@ internal constructor(override val project: Project) : HasProject {
      */
     public fun <Fixtures : NamedDomainObjectProvider<SourceSet>?> DevKitTestTargetT<Fixtures, *>
         .withMain(
-        action: Action<in SourceSet> = {}
+        action: Action<in SourceSet> = Action {}
     ): DevKitTestTargetT<Fixtures, NamedDomainObjectProvider<SourceSet>> {
         @Suppress("KotlinConstantConditions") // KTIJ-39636
         contract {

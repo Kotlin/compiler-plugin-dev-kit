@@ -2,23 +2,17 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
-        maven("https://redirector.kotlinlang.org/maven/bootstrap")
-        maven("https://redirector.kotlinlang.org/maven/dev/")
-        // Publications used by IJ
-        // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
-        maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
     }
 }
 
 dependencyResolutionManagement {
     includeBuild("../artifact-transform")
+    versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }
     repositories {
         gradlePluginPortal()
         mavenCentral()
-        maven("https://redirector.kotlinlang.org/maven/bootstrap")
-        maven("https://redirector.kotlinlang.org/maven/dev/")
-        // Publications used by IJ
-        // https://kotlinlang.slack.com/archives/C7L3JB43G/p1757001642402909
-        maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
+        maven("https://repo.gradle.org/gradle/libs-releases/")
     }
 }
+
+include("settings")

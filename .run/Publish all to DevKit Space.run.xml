@@ -13,6 +13,7 @@
           <option value="compiler-plugin-runtime:publishMavenPublicationToDevKitSpaceRepository" />
           <option value="gradle-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:publishAllPublicationsToDevKitSpaceRepository" />
+          <option value=":plugins:settings:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":artifact-transform:publishAllPublicationsToDevKitSpaceRepository" />
         </list>
       </option>
