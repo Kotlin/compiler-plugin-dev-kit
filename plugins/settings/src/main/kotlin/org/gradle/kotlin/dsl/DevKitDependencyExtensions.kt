@@ -3,11 +3,11 @@ package org.gradle.kotlin.dsl
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.plugin.use.PluginDependenciesSpec
 import org.gradle.plugin.use.PluginDependencySpec
-
-private const val pluginDevKitVersion = "0.0.1-SNAPSHOT"
+import org.jetbrains.kotlin.compiler.plugin.devkit.DEV_KIT_GROUP
+import org.jetbrains.kotlin.compiler.plugin.devkit.DEV_KIT_VERSION
 
 public fun DependencyHandler.pluginDevKit(module: String, version: String? = null): String =
-    "org.jetbrains.kotlin.compiler.plugin.devkit:$module:${version ?: pluginDevKitVersion }"
+    "$DEV_KIT_GROUP:$module:${version ?: DEV_KIT_VERSION}"
 
 public fun PluginDependenciesSpec.pluginDevKit(module: String): PluginDependencySpec =
-    kotlin("compiler.plugin.devkit.$module") version pluginDevKitVersion
+    id("$DEV_KIT_GROUP.$module") version DEV_KIT_VERSION

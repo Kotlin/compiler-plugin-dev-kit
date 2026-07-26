@@ -10,6 +10,10 @@ plugins {
     alias(libs.plugins.tapmoc)
 }
 
+group = libs.versions.devkit.group.get()
+
+version = libs.versions.devkit.version.get()
+
 val minGradleVersion = libs.versions.gradle.get()
 val minKotlinVersion = tapmoc.kotlinVersionForGradle(minGradleVersion)
 

@@ -7,9 +7,9 @@ plugins {
     alias(libs.plugins.tapmoc)
 }
 
-group = "org.jetbrains.kotlin.compiler.plugin.devkit"
+group = libs.versions.devkit.group.get()
 
-version = "0.0.1-SNAPSHOT"
+version = libs.versions.devkit.version.get()
 
 dependencies {
     testImplementation(libs.truth)

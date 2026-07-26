@@ -5,9 +5,14 @@ plugins {
     kotlin("jvm") version libs.versions.kotlin
     kotlin("plugin.sam.with.receiver") version libs.versions.kotlin
     kotlin("plugin.assignment") version libs.versions.kotlin
+    alias(libs.plugins.buildconfig)
     alias(libs.plugins.maven.publish)
     alias(libs.plugins.tapmoc)
 }
+
+group = libs.versions.devkit.group.get()
+
+version = libs.versions.devkit.version.get()
 
 samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
@@ -27,21 +32,21 @@ dependencies {
     implementation(libs.animal.sniffer)
     implementation(libs.testkit.plugin)
     compileOnly(libs.gradleup.shadow)
-    api("org.jetbrains.kotlin.compiler.plugin.devkit:artifact-transform:0.0.1-SNAPSHOT")
+    api("$group:artifact-transform:$version")
 }
 
 gradlePlugin {
     plugins {
         create("compilerPlugin") {
-            id = "org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin"
+            id = "$group.compiler-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPlugin"
         }
         create("gradlePlugin") {
-            id = "org.jetbrains.kotlin.compiler.plugin.devkit.gradle-plugin"
+            id = "$group.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
         }
         create("functionalTestPublishing") {
-            id = "org.jetbrains.kotlin.compiler.plugin.devkit.functional-test-publishing"
+            id = "$group.functional-test-publishing"
             implementationClass =
                 "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitFunctionalTestPublishingPlugin"
         }
@@ -57,6 +62,18 @@ kotlin {
             "-Xallow-contracts-on-more-functions",
         )
     }
+}
+
+// Not the default `BuildConfig`: artifact-transform already generates one into this same package.
+buildConfig {
+    packageName(group.toString())
+    className("DevKitCoordinates")
+    useKotlinOutput {
+        internalVisibility = true
+        topLevelConstants = true
+    }
+    buildConfigField("DEV_KIT_GROUP", group.toString())
+    buildConfigField("DEV_KIT_VERSION", version.toString())
 }
 
 publishing {

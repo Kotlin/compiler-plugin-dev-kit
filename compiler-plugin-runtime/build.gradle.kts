@@ -10,6 +10,10 @@ plugins {
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
+group = libs.versions.devkit.group.get()
+
+version = libs.versions.devkit.version.get()
+
 java {
     targetCompatibility = JavaVersion.VERSION_17
 }
