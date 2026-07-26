@@ -20,5 +20,5 @@ internal fun <T : Any> Project.providerFlatMap(provider: ProviderFlatMap.() -> T
     }
 
 context(_: HasProject)
-internal fun <T : Any> provider(provider: ProviderFlatMap.() -> T): Provider<T> =
+internal fun <T : Any> provider(provider: ProviderFlatMap.() -> T?): Provider<T> =
     project.providerFlatMap(provider)

@@ -40,7 +40,6 @@ import org.gradle.internal.component.external.model.TestFixturesSupport
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.create
-import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
@@ -76,6 +75,18 @@ public sealed class DevKitTestTargetT<
 
     public abstract val version: KotlinToolingVersion
     public abstract val testSuite: NamedDomainObjectProvider<JvmTestSuite>
+
+    /**
+     * Every target compiles test fixtures, so that they are compiled against its own compiler;
+     * [nullableTestFixtures] is the view of this that opting in via `withFixtures` hands out.
+     */
+    internal abstract val fixtures: NamedDomainObjectProvider<SourceSet>
+
+    /**
+     * The target whose fixture overlay this one reuses. Conventionally the closest compatible
+     * target that owns an overlay, absent once this target opts into owning one.
+     */
+    internal abstract val fixturesFrom: Property<DevKitTestFixturesTarget>
     internal abstract val nullableTestFixtures: Fixtures
     internal abstract val nullableMain: Main
 }
@@ -132,6 +143,8 @@ private class DevKitTestTargetImpl<
 >(
     override val version: KotlinToolingVersion,
     override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    override val fixtures: NamedDomainObjectProvider<SourceSet>,
+    override val fixturesFrom: Property<DevKitTestFixturesTarget>,
 ) : DevKitTestTargetT<Fixtures, Main>() {
     override fun equals(other: Any?): Boolean =
         other is DevKitTestTarget && other.version == version
@@ -165,6 +178,18 @@ private fun DevKitTestTarget.testTask(action: Test.() -> Unit) = testSuite {
 private fun DevKitTestTarget.test(action: SourceSet.() -> Unit) = testSuite {
     sources(action)
 }
+
+/** Adds every source directory of [other] to this source set, or none if [other] has no value. */
+context(_: HasProject)
+private fun SourceSet.srcDirsFrom(other: Provider<out SourceSet>) {
+    val empty = files()
+    kotlin.srcDir(other.map { it.kotlin.sourceDirectories }.orElse(empty))
+    java.srcDir(other.map { it.java.sourceDirectories }.orElse(empty))
+    resources.srcDir(other.map { it.resources.sourceDirectories }.orElse(empty))
+}
+
+context(_: HasProject)
+private fun SourceSet.srcDirsFrom(other: SourceSet) = srcDirsFrom(provider { other })
 
 @OptIn(ExperimentalWasmDsl::class)
 public open class DevKitCompilerPluginConfigExtension
@@ -216,14 +241,22 @@ internal constructor(override val project: Project) : HasProject {
      */
     public val testAgainst: ExtensiblePolymorphicDomainObjectContainer<DevKitTestTarget> =
         objects.polymorphicDomainObjectContainer(DevKitTestTarget::class.java).apply {
-            registerFactory(DevKitTestTarget::class.java) {
-                val version = KotlinToolingVersion(it)
+            registerFactory(DevKitTestTarget::class.java) { versionString ->
+                val version = KotlinToolingVersion(versionString)
                 DevKitTestTargetImpl<
                     NamedDomainObjectProvider<SourceSet>?,
                     NamedDomainObjectProvider<SourceSet>?,
                 >(
                     version,
                     testing.suites.register<JvmTestSuite>("${version.versionName}Test"),
+                    sourceSets.register("${version.versionName}TestFixtures"),
+                    objects.property(
+                        provider {
+                            val candidates = withFixtures.filterNot { it.version == version }
+                            val resolved = version.resolveAmong(candidates.map { it.version })
+                            candidates.firstOrNull { it.version == resolved }
+                        }
+                    ),
                 )
             }
         }
@@ -260,15 +293,15 @@ internal constructor(override val project: Project) : HasProject {
     }
 
     /**
-     * Versions that the plugin wants explicit customization for.
+     * Versions that own a `main` overlay.
      *
-     * @see [testAgainst], [testAgainstWithFixtures], [developForWithFixtures]
+     * @see [testAgainst], [withFixtures], [testAgainstWithFixtures], [developForWithFixtures]
      */
     public val developFor: NamedDomainObjectSet<DevKitMainTarget> =
         objects.namedDomainObjectSet(DevKitMainTarget::class.java)
 
     /**
-     * Versions that testFixtures should be customized for.
+     * Versions that own a `testFixtures` overlay. Every other version reuses the closest of these.
      *
      * @see [testAgainst], [developFor], [testAgainstWithFixtures], [developForWithFixtures]
      */
@@ -419,8 +452,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTestTarget = testAgainst.maybeCreate(version).apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against and explicitly customizes its
-     * test fixtures. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns a testFixtures
+     * overlay. Shortcut for:
      * ```kotlin
      * testAgainst(version).withFixtures().apply(action)
      * ```
@@ -435,8 +468,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTestFixturesTarget = testAgainst(version).withFixtures().apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against and explicitly customizes its
-     * test fixtures. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns a testFixtures
+     * overlay. Shortcut for:
      * ```kotlin
      * testAgainst(version).withFixtures().apply(action)
      * ```
@@ -451,8 +484,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTestFixturesTarget = testAgainst(version).withFixtures().apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against and has explicit customization
-     * for. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns a main overlay.
+     * Shortcut for:
      * ```kotlin
      * testAgainst(version).withMain().apply(action)
      * ```
@@ -467,8 +500,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitMainTarget = testAgainst(version).withMain().apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against and has explicit customization
-     * for. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns a main overlay.
+     * Shortcut for:
      * ```kotlin
      * testAgainst(version).withMain().apply(action)
      * ```
@@ -483,8 +516,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitMainTarget = testAgainst(version).withMain().apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against, customizes its test fixtures,
-     * and has explicit customization for. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns both a main and a
+     * testFixtures overlay. Shortcut for:
      * ```kotlin
      * developFor(version).withFixtures().apply(action)
      * ```
@@ -499,8 +532,8 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTarget = developFor(version).withFixtures().apply(action)
 
     /**
-     * Declares a version that the plugin should be tested against, customizes its test fixtures,
-     * and has explicit customization for. Shortcut for:
+     * Declares a version that the plugin should be tested against and that owns both a main and a
+     * testFixtures overlay. Shortcut for:
      * ```kotlin
      * developFor(version).withFixtures().apply(action)
      * ```
@@ -515,8 +548,11 @@ internal constructor(override val project: Project) : HasProject {
     ): DevKitTarget = developFor(version).withFixtures().apply(action)
 
     /**
-     * Adds testFixture customization for this version. This is the same as having declared the
-     * target using [testAgainstWithFixtures] or [developForWithFixtures]
+     * Declares that this version owns a `testFixtures` overlay. This is the same as having declared
+     * the target using [testAgainstWithFixtures] or [developForWithFixtures].
+     *
+     * @see [sourceFixturesFrom] if you want to reuse some other version's overlay, but add a little
+     *   of your own on top
      */
     public fun <Main : NamedDomainObjectProvider<SourceSet>?> DevKitTestTargetT<*, Main>
         .withFixtures(
@@ -530,18 +566,33 @@ internal constructor(override val project: Project) : HasProject {
         when (this) {
             is DevKitTestTargetImpl -> {}
         }
-        if (testFixtures != null) testFixtures(action)
-        else {
-            nullableTestFixtures = sourceSets.register("${version.versionName}TestFixtures", action)
+        if (testFixtures == null) {
+            nullableTestFixtures = fixtures
             check(testFixtures != null) // smart cast!
             withFixtures.add(this)
+            // Stop it from automatically using the closest version's fixtures
+            fixturesFrom.unsetConvention()
         }
+        fixtures(action)
         return this
     }
 
     /**
-     * Adds main customization for this version. This is the same as having declared the target
-     * using [developFor] or [developForWithFixtures]
+     * Compiles this target's testFixtures from [other]'s overlay, for versions whose test framework
+     * APIs are pretty similar, so one can use another's overlay.
+     *
+     * A target sources from exactly one other target: calling this again replaces which one, and
+     * [other] may not be this target itself. Only needed when the target either owns an overlay
+     * (see [withFixtures]) or is closest to the wrong one.
+     */
+    public fun DevKitTestTarget.sourceFixturesFrom(other: DevKitTestFixturesTarget) {
+        require(this != other) { "$name cannot source its testFixtures from itself" }
+        fixturesFrom.set(other)
+    }
+
+    /**
+     * Declares that this version owns a `main` overlay. This is the same as having declared the
+     * target using [developFor] or [developForWithFixtures]
      */
     public fun <Fixtures : NamedDomainObjectProvider<SourceSet>?> DevKitTestTargetT<Fixtures, *>
         .withMain(
@@ -787,14 +838,14 @@ internal constructor(override val project: Project) : HasProject {
                 tasks.shadowJar { metaInf { with(copyVersionFilesSpec) } }
             }
         }
-        withFixtures.configureEach {
+        testAgainst.configureEach {
             testFixturesJar {
                 metaInf {
                     into("kotlin/plugin/versions/$version") {
                         // Ensures the directory exists in the jar even if `testFixtures` has no
                         // output.
                         from(versionMarker)
-                        from(testFixtures.map { it.output }) {
+                        from(fixtures.map { it.output }) {
                             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                         }
                     }
@@ -811,15 +862,14 @@ internal constructor(override val project: Project) : HasProject {
                 resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
             }
         }
-        withFixtures.configureEach {
-            testFixtures {
+        testAgainst.configureEach {
+            fixtures {
                 java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
                 kotlin.setSrcDirs(listOf("$versionName/src/testFixtures/kotlin"))
                 resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
 
-                kotlin.srcDir(sharedTestFixtures.kotlin.sourceDirectories)
-                java.srcDir(sharedTestFixtures.java.sourceDirectories)
-                resources.srcDir(sharedTestFixtures.resources.sourceDirectories)
+                srcDirsFrom(fixturesFrom.flatMap { it.fixtures })
+                srcDirsFrom(sharedTestFixtures)
             }
         }
         testAgainst.configureEach {
@@ -829,9 +879,7 @@ internal constructor(override val project: Project) : HasProject {
                     java.setSrcDirs(listOf("$versionName/src/test/java"))
                     resources.setSrcDirs(listOf("${versionName}/src/test/data"))
 
-                    kotlin.srcDir(sharedTest.kotlin.sourceDirectories)
-                    java.srcDir(sharedTest.java.sourceDirectories)
-                    resources.srcDir(sharedTest.resources.sourceDirectories)
+                    srcDirsFrom(sharedTest)
                     val directory = generatedTestsDir.dir(this.name)
                     java.srcDir(directory)
                     // This is needed until IDEA fixes IDEA-339729.
@@ -846,7 +894,7 @@ internal constructor(override val project: Project) : HasProject {
     internal fun configureDependencies() {
         testAgainst.configureEach { test { forceKotlinVersion(version) } }
         developFor.configureEach { main { forceKotlinVersion(version) } }
-        withFixtures.configureEach { testFixtures { forceKotlinVersion(version) } }
+        testAgainst.configureEach { fixtures { forceKotlinVersion(version) } }
         dependencies {
             setupCompilerVersionAttribute()
 
@@ -857,9 +905,7 @@ internal constructor(override val project: Project) : HasProject {
 
             testAgainst.configureEach { registerMultiReleasePluginTransform(version) }
 
-            withFixtures.configureEach {
-                this.testFixtures { apiConfigurationName(files(mainJar)) }
-            }
+            testAgainst.configureEach { fixtures { apiConfigurationName(files(mainJar)) } }
             testAgainst.configureEach {
                 testSuite { dependencies { implementation(testFixtures(project())) } }
             }
@@ -910,8 +956,8 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
 
-        withFixtures.configureEach {
-            testFixtures {
+        testAgainst.configureEach {
+            fixtures {
                 compilation {
                     associateWith(sharedTestFixturesCompilation)
                     tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
@@ -920,8 +966,8 @@ internal constructor(override val project: Project) : HasProject {
                     }
                 }
             }
-            val testFixturesCompilation = testFixtures.flatMap { it.compilation }
-            test { compilation { associateWith(testFixturesCompilation.get()) } }
+            val fixturesCompilation = fixtures.flatMap { it.compilation }
+            test { compilation { associateWith(fixturesCompilation.get()) } }
         }
 
         testAgainst.configureEach { test { compilation { associateWith(sharedTestCompilation) } } }

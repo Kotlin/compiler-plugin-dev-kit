@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 plugins {
     kotlin("jvm")
@@ -37,21 +36,7 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    val testDumpDirectiveTarget = testAgainstWithFixtures("2.4.20-dev-7885")
-
-    testAgainstWithFixtures("2.4.0")
-    val k2320Target = testAgainstWithFixtures("2.3.20")
-
-    // 2.4.0-dev-2124 predates the TestConfigurationBuilder rename (like 2.3.0/2.3.20/2.4.0), so
-    // reuse 2320's sources rather than a dedicated directory
-    testAgainstWithFixtures("2.4.0-dev-2124") {
-        testFixtures {
-            kotlin.srcDirs(k2320Target.testFixtures.map { it.kotlin.sourceDirectories })
-            java.srcDirs(k2320Target.testFixtures.map { it.java.sourceDirectories })
-            resources.srcDirs(k2320Target.testFixtures.map { it.resources.sourceDirectories })
-        }
-    }
-    val k2420Target = testAgainstWithFixtures("2.4.20-dev-6138")
+    testAgainstWithFixtures("2.3.20")
 
     val versions =
         listOf(
@@ -66,29 +51,14 @@ pluginDevKit {
             )
             .map(::KotlinToolingVersion)
 
-    versions.forEach {
-        if (it.toKotlinVersion() == KotlinVersion(2, 4, 20))
-            testAgainstWithFixtures(it) {
-                if (this == k2420Target) return@testAgainstWithFixtures
-                testFixtures {
-                    kotlin.srcDirs(k2420Target.testFixtures.map { it.kotlin.sourceDirectories })
-                    java.srcDirs(k2420Target.testFixtures.map { it.java.sourceDirectories })
-                    resources.srcDirs(
-                        k2420Target.testFixtures.map { it.resources.sourceDirectories }
-                    )
-                }
-            }
-        else testAgainst(it)
-    }
-    testAgainstWithFixtures("2.4.20-Beta2") {
-        testFixtures {
-            kotlin.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.kotlin.sourceDirectories })
-            java.srcDirs(testDumpDirectiveTarget.testFixtures.map { it.java.sourceDirectories })
-            resources.srcDirs(
-                testDumpDirectiveTarget.testFixtures.map { it.resources.sourceDirectories }
-            )
-        }
-    }
+    versions.forEach { testAgainst(it) }
+
+    // lowest 2.4.20 dev version we support
+    val k2420Target = testAgainstWithFixtures("2.4.20-dev-3583")
+    testAgainst("2.4.20-Beta1") { sourceFixturesFrom(k2420Target) }
+    // version where DUMP_CLASSIFIER was added
+    val testDumpDirectiveTarget = testAgainstWithFixtures("2.4.20-dev-7885")
+    testAgainst("2.4.20-Beta2") { sourceFixturesFrom(testDumpDirectiveTarget) }
 }
 
 tasks.generateTests { enabled = false }

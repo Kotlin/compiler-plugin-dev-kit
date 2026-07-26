@@ -15,6 +15,24 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
+// KGP's KotlinToolingVersion and the one vendored into artifact-transform are distinct types.
+private fun KotlinToolingVersion.toDevKitVersion() =
+    org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion(versionString)
+
+/**
+ * The best match for this version among [candidates], picked exactly like
+ * [MultiReleasePluginTransform] and the compiler runtime pick a version directory out of a
+ * multi-release jar. `null` if nothing is compatible.
+ */
+internal fun KotlinToolingVersion.resolveAmong(
+    candidates: Iterable<KotlinToolingVersion>
+): KotlinToolingVersion? {
+    val realVersion = CompilerVersionAliases.map(toDevKitVersion()) ?: return null
+    val byDevKitVersion = candidates.associateBy { it.toDevKitVersion() }
+    return byDevKitVersion[
+        VersionResolution.resolveVersion(realVersion, byDevKitVersion.keys.toList())]
+}
+
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
     version: KotlinToolingVersion,
