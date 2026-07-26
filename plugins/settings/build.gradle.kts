@@ -19,8 +19,7 @@ gradlePlugin {
     plugins {
         create("settingsPlugin") {
             id = "org.jetbrains.kotlin.compiler.plugin.devkit"
-            implementationClass =
-                "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitSettingsPlugin"
+            implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitSettingsPlugin"
         }
     }
 }

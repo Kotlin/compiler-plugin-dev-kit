@@ -4,9 +4,11 @@ kotlin = "2.4.10"
 animal-sniffer = "2.0.1"
 buildconfig = "6.0.10"
 gradle = "9.2.0"
+ktfmt = "0.64"
 node-gradle = "7.0.2"
 publish = "0.37.0"
 shadow = "9.6.0"
+spotless = "8.8.0"
 tapmoc = "0.4.2"
 testkit-plugin = "0.19"
 testkit-support = "0.27"
@@ -17,6 +19,7 @@ truth = "1.4.5"
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
 
 [libraries]
