@@ -212,10 +212,15 @@ internal constructor(override val project: Project) : HasProject {
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
-     * resides. It's also assumed to be the plugin ID. Defaults to [Project.getGroup]
+     * resides. It's also assumed to be the plugin ID. Defaults to [PLUGIN_PACKAGE_PROPERTY], else
+     * [Project.getGroup]
      */
     public val pluginPackage: Property<String> =
-        objects.property(provider { project.group.toString() })
+        objects.property(
+            providers
+                .gradleProperty(PLUGIN_PACKAGE_PROPERTY)
+                .orElse(provider { project.group.toString() })
+        )
 
     /**
      * The name of the class within testFixtures that generates tests. Defaults to
@@ -235,7 +240,7 @@ internal constructor(override val project: Project) : HasProject {
 
     /**
      * Versions that this plugin should be tested against. By default, it includes the Kotlin
-     * version applied to this build.
+     * version applied to this build and everything listed in [TEST_AGAINST_PROPERTY].
      *
      * @see [developFor], [testAgainstWithFixtures], [developForWithFixtures]
      */
@@ -261,14 +266,28 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
 
+    init {
+        // The shared source sets compile against the build's own Kotlin version, so that version
+        // always needs a target, whatever the default test target ends up being.
+        testAgainst(kotlinToolingVersion)
+        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
+    }
+
     /**
-     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to the
-     * Kotlin version applied to this build.
+     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to
+     * [DEFAULT_TEST_VERSION_PROPERTY], or to the Kotlin version applied to this build if that
+     * property isn't set.
      *
      * @see [defaultTestVersion] to set this using a version instead
      */
     public val defaultTestTarget: Property<DevKitTestTarget> =
-        objects.property(testAgainst(kotlinToolingVersion))
+        objects.property(
+            testAgainst(
+                providers
+                    .gradleProperty(DEFAULT_TEST_VERSION_PROPERTY)
+                    .getOrElse(kotlinToolingVersion.versionString)
+            )
+        )
 
     /**
      * Sets the [testAgainst] version the generic `test` task delegates to. Defaults to the Kotlin
@@ -370,11 +389,17 @@ internal constructor(override val project: Project) : HasProject {
         }
     }
 
-    /** Libraries that all test data files can use */
+    /** Libraries that all test data files can use, including [COMPANION_LIBRARIES_PROPERTY]'s */
     public val testDataLibraries: DevKitTestDataLibraries =
         objects.newInstance<DevKitTestDataLibrariesImpl>(this).also {
             register(it, "defaultTestDataLibraries", addToBuildConfig = false)
         }
+
+    init {
+        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+            testDataLibraries { if (it.isProjectPath) common(project(it)) else common(it) }
+        }
+    }
 
     /** Configure libraries that test data files can use */
     public fun testDataLibraries(block: DevKitTestDataLibraries.() -> Unit) {

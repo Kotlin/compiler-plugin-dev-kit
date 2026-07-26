@@ -67,9 +67,12 @@ For the compiler-plugin module.
 - Shared source sets are `src/main`, `src/testFixtures`, `src/test`; **test resources are remapped to
   `src/test/data`** (used by kotlin-compiler-internal-test-framework).
 - Every source set forces all `org.jetbrains.kotlin` dependencies to its target version.
+- Versions come from the `…devkit.testAgainst` Gradle property (comma- or whitespace-separated) plus whatever the
+  `pluginDevKit { }` block declares; the build's own Kotlin version is always registered, since the shared source sets
+  compile against it.
 - Each registered version gets its own test suite. `test` itself is **disabled** and just depends on
-  `defaultTestTarget` (default: the build's own Kotlin version); `allVersionedTests` aggregates all of them and is wired
-  into `check`.
+  `defaultTestTarget` (default: the `…devkit.defaultTestVersion` property, else the build's own Kotlin version);
+  `allVersionedTests` aggregates all of them and is wired into `check`.
 - `generateTests` runs `generateTestsClass` (default `<pluginPackage>.GenerateTestsKt`) into
   `build/test-gen`, and every version's `compileJava` depends on it.
 - If `com.gradleup.shadow` is applied, the main jar becomes `-unshaded` and `shadowJar` takes the empty classifier;
@@ -123,6 +126,9 @@ the generated `DevKitPluginInfo`. `testFixtures` has the TestKit functional-test
   `targetCompatibility`.
 - `plugins/src/main/kotlin/.../utils.kt` defines `context(_: HasProject)` accessors — that is why plugin code writes
   bare `tasks`, `configurations`, `objects`, `layout` with no `project.` prefix.
+- **Gradle properties cover the boilerplate cases**, all prefixed `org.jetbrains.kotlin.compiler.plugin.devkit.` and all
+  read by **both** plugins, except `compilerPlugin` which is the Gradle plugin's alone.
+- **Isolated Projects should not be violated** unless absolutely necessary.
 - **Gradle APIs come from `compileOnly(libs.gradle.public.api)`, never `gradleApi()`**, so the compile classpath is the
   oldest supported Gradle's rather than the building one's. This needs
   `org.gradle.unsafe.suppress-gradle-api=true` to stop `java-gradle-plugin` re-adding `gradleApi()`.
@@ -134,6 +140,8 @@ the generated `DevKitPluginInfo`. `testFixtures` has the TestKit functional-test
   `dependencyResolutionManagement`. Don't re-add per-build catalogs.
 - **Build cache and configuration cache are enabled** (root `gradle.properties`). Gradle code must be
   configuration-cache safe: lazy `Provider`s, no `Project` access at execution time, no eager configuration resolution.
+  Laziness has a limit, though: a `map { }` that touches an extension member captures the whole extension, so a provider
+  that ends up serialized (buildconfig fields do) must instead close over plain values.
 - **The dev kit's own coordinates live only in `gradle/libs.versions.toml`** (`devkit-group`,
   `devkit-version`). Every publishing project sets `group`/`version` from there — don't put them back in a
   `gradle.properties`, which included builds can't share. The Kotlin-side `DEV_KIT_GROUP` / `DEV_KIT_VERSION` are
@@ -143,8 +151,9 @@ the generated `DevKitPluginInfo`. `testFixtures` has the TestKit functional-test
 
 ## Recipe: support a new Kotlin version
 
-1. Add `testAgainst("X.Y.Z")` (or `testAgainstWithFixtures`) to the `pluginDevKit { }` block in
-   `compiler-plugin-runtime/build.gradle.kts`.
+1. Add the version to `org.jetbrains.kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`. Only
+   reach for `testAgainstWithFixtures` in the `pluginDevKit { }` block of `compiler-plugin-runtime/build.gradle.kts` if
+   it needs its own overlay.
 2. If the Kotlin test-framework API changed, add
    `k<name>/src/testFixtures/kotlin/.../DevKitTestCompatImpl.kt` plus its
    `META-INF/services/org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestCompat` resource. If it didn't, point the

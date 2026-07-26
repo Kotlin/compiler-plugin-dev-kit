@@ -1,7 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
     kotlin("jvm")
@@ -36,22 +35,8 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
+    // Plain versions live in gradle.properties; only the ones needing fixtures are named here.
     testAgainstWithFixtures("2.3.20")
-
-    val versions =
-        listOf(
-                "2.3.20",
-                "2.3.21",
-                "2.4.0-dev-2124",
-                "2.4.0",
-                "2.4.10-RC",
-                "2.4.20-dev-3583",
-                "2.4.20-dev-6138",
-                "2.4.20-Beta1",
-            )
-            .map(::KotlinToolingVersion)
-
-    versions.forEach { testAgainst(it) }
 
     // lowest 2.4.20 dev version we support
     val k2420Target = testAgainstWithFixtures("2.4.20-dev-3583")

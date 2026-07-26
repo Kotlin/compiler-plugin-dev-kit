@@ -65,12 +65,28 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
 
     private val kmpTarget = providers.gradleProperty(KMP_TARGET)
 
-    /** The package name of this Gradle plugin. Defaults to the project group. */
+    /**
+     * The package name of this Gradle plugin. Defaults to [PLUGIN_PACKAGE_PROPERTY], else the
+     * project group.
+     */
     public val pluginPackage: Property<String> =
-        objects.property(provider { project.group.toString() })
+        objects.property(
+            providers
+                .gradleProperty(PLUGIN_PACKAGE_PROPERTY)
+                .orElse(provider { project.group.toString() })
+        )
 
-    /** The compiler plugin project that this Gradle plugin applies */
+    /**
+     * The compiler plugin project that this Gradle plugin applies. Defaults to the project at the
+     * path in [COMPILER_PLUGIN_PROPERTY], if that is set.
+     */
     public val compilerPlugin: Property<Project> = objects.property()
+
+    init {
+        providers.gradleProperty(COMPILER_PLUGIN_PROPERTY).orNull?.let {
+            compilerPlugin.convention(project.project(it))
+        }
+    }
 
     /** Libraries that this Gradle plugin adds to its users */
     public val companionLibraries: ListProperty<String> = objects.listProperty()
@@ -83,7 +99,8 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
         // functionalTestRuntimeOnly is automatically pulled in by installForFunctionalTest
         // User might reflectively call methods from Gradle output, so we need these projects
         // on our runtime classpath
-        dependencies { functionalTest.runtimeOnlyConfigurationName(project) }
+        val path = project.isolated.path
+        dependencies { functionalTest.runtimeOnlyConfigurationName(project(path)) }
     }
 
     private val functionalTestProjectsClasspath:
@@ -91,16 +108,22 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
         configurations.dependencyScope("functionalTestProjectsClasspath")
 
     /** Adds a library to this Gradle plugin's users */
-    public fun companionLibrary(project: Project, group: Any? = null, version: Any? = null) {
+    public fun companionLibrary(companion: Project, group: Any? = null, version: Any? = null) {
         val group = provider { group ?: project.group }
         val version = provider { version ?: project.version }
-        companionLibraries.add(provider { "${group()}:${project.name}:${version()}" })
-        functionalTestProject(project)
+        companionLibraries.add(provider { "${group()}:${companion.isolated.name}:${version()}" })
+        functionalTestProject(companion)
     }
 
     /** Adds a library to this Gradle plugin's users */
     public fun companionLibrary(dependencyNotation: String) {
         companionLibraries.add(dependencyNotation)
+    }
+
+    init {
+        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+            if (it.isProjectPath) companionLibrary(project.project(it)) else companionLibrary(it)
+        }
     }
 
     /**
@@ -110,7 +133,11 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
      */
     public val addRuntimeDependency: Property<Boolean> = objects.property(true)
 
-    /** The Kotlin versions to run the `functionalTest` suite against, one task per version. */
+    /**
+     * The Kotlin versions to run the `functionalTest` suite against, one task per version. By
+     * default, it includes the Kotlin version applied to this build and everything listed in
+     * [TEST_AGAINST_PROPERTY].
+     */
     public val testAgainst:
         ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget> =
         objects.polymorphicDomainObjectContainer(DevKitGradlePluginTestTarget::class)
@@ -123,6 +150,8 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                 tasks.register<Test>("${version.versionName}FunctionalTest"),
             )
         }
+        testAgainst(kotlinToolingVersion)
+        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
     }
 
     /**
@@ -145,11 +174,18 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
 
     /**
      * Which registered [testAgainst] version the generic `functionalTest` task delegates to.
-     * Defaults to the Kotlin Gradle Plugin version currently applied to this build. If no
-     * [testAgainst] entry matches, `functionalTest` is left alone.
+     * Defaults to [DEFAULT_TEST_VERSION_PROPERTY], or to the Kotlin Gradle Plugin version currently
+     * applied to this build if that property isn't set. If no [testAgainst] entry matches,
+     * `functionalTest` is left alone.
      */
     public val defaultTestTarget: Property<DevKitGradlePluginTestTarget> =
-        objects.property(testAgainst(kotlinToolingVersion))
+        objects.property(
+            testAgainst(
+                providers
+                    .gradleProperty(DEFAULT_TEST_VERSION_PROPERTY)
+                    .getOrElse(kotlinToolingVersion.versionString)
+            )
+        )
 
     /** The default Kotlin version to run the `functionalTest` suite against. */
     public fun defaultTestVersion(version: KotlinToolingVersion) {
@@ -198,7 +234,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
 
     private fun configureDependencies() = dependencies {
         main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
-        functionalTestProjectsClasspath(compilerPlugin)
+        functionalTestProjectsClasspath(compilerPlugin.map { project(it.isolated.path) })
 
         addIf(
             addRuntimeDependency,
@@ -266,7 +302,11 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
             packageName.convention(pluginPackage)
             forClass("PluginInfo") {
                 useKotlinOutput { topLevelConstants = false }
-                val pluginId = buildConfigField("String", "PLUGIN_ID", "\"$pluginPackage\"")
+                val pluginId =
+                    buildConfigField("PLUGIN_ID") {
+                        type(String::class)
+                        expression(pluginPackage.map { "\"$it\"" })
+                    }
                 val pluginArtifact =
                     buildConfigField("PLUGIN_ARTIFACT") {
                         type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
@@ -275,7 +315,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                                 """
                                 |SubpluginArtifact(
                                 |  groupId = "${project.group}",
-                                |  artifactId = "${it.name}",
+                                |  artifactId = "${it.isolated.name}",
                                 |  version = "${project.version}",
                                 |)
                                 """
