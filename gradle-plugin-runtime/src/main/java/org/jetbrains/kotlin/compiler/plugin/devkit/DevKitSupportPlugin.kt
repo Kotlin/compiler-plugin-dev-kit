@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
 public data class DevKitPluginInfo(
     public val id: String,
     public val artifact: SubpluginArtifact,
-    public val extraLibraryCoordinates: List<String>,
+    public val companionLibraryCoordinates: List<String>,
 )
 
 public abstract class DevKitSupportPlugin(public val info: DevKitPluginInfo) :
@@ -27,7 +27,7 @@ public abstract class DevKitSupportPlugin(public val info: DevKitPluginInfo) :
         val project = kotlinCompilation.project
 
         kotlinCompilation.defaultSourceSet.dependencies {
-            info.extraLibraryCoordinates.forEach(::implementation)
+            info.companionLibraryCoordinates.forEach(::implementation)
         }
 
         return project.applyToCompilation(kotlinCompilation)

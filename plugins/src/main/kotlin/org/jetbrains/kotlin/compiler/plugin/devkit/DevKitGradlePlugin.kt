@@ -323,8 +323,8 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                             }
                         )
                     }
-                val extraLibraryCoordinates =
-                    buildConfigField("EXTRA_LIBRARY_COORDINATES") {
+                val companionLibraryCoordinates =
+                    buildConfigField("COMPANION_LIBRARY_COORDINATES") {
                         type("List<String>")
                         expression(
                             companionLibraries.map { library ->
@@ -351,7 +351,7 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
                                 |DevKitPluginInfo(
                                 |  id = ${pluginId.name},
                                 |  artifact = ${pluginArtifact.name},
-                                |  extraLibraryCoordinates = ${extraLibraryCoordinates.name},
+                                |  companionLibraryCoordinates = ${companionLibraryCoordinates.name},
                                 |)
                                 """
                                     .trimMargin()
