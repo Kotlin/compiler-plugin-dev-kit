@@ -45,11 +45,6 @@ gradlePlugin {
             id = "$group.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
         }
-        create("functionalTestPublishing") {
-            id = "$group.functional-test-publishing"
-            implementationClass =
-                "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitFunctionalTestPublishingPlugin"
-        }
     }
 }
 

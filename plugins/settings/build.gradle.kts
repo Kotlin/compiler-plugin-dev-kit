@@ -3,10 +3,13 @@ import tapmoc.Severity
 plugins {
     `java-gradle-plugin`
     kotlin("jvm")
+    kotlin("plugin.sam.with.receiver")
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.maven.publish)
     alias(libs.plugins.tapmoc)
 }
+
+samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
 group = libs.versions.devkit.group.get()
 
@@ -18,6 +21,7 @@ dependencies {
             requireCapability("org.gradle.experimental:gradle-public-api-internal")
         }
     }
+    implementation(libs.testkit.plugin)
 }
 
 gradlePlugin {
@@ -25,6 +29,11 @@ gradlePlugin {
         create("settingsPlugin") {
             id = group.toString()
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitSettingsPlugin"
+        }
+        create("functionalTestPublishing") {
+            id = "$group.functional-test-publishing"
+            implementationClass =
+                "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitFunctionalTestPublishingPlugin"
         }
     }
 }

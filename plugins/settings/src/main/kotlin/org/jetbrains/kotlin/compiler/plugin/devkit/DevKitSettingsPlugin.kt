@@ -9,6 +9,9 @@ public class DevKitSettingsPlugin : Plugin<Settings> {
     override fun apply(target: Settings): Unit = target.run {
         pluginManagement.repositories.kotlinDevRepositories()
         dependencyResolutionManagement.repositories.kotlinDevRepositories()
+        gradle.lifecycle.beforeProject {
+            this@beforeProject.pluginManager.apply("$DEV_KIT_GROUP.functional-test-publishing")
+        }
     }
 }
 

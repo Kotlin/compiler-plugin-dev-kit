@@ -1049,7 +1049,7 @@ public class DevKitCompilerPlugin : Plugin<Project> {
             apply("com.github.node-gradle.node")
             apply("idea")
             apply("maven-publish")
-            apply(DevKitFunctionalTestPublishingPlugin::class.java)
+            apply("$DEV_KIT_GROUP.functional-test-publishing")
             apply(D8Plugin::class.java)
         }
         val pluginDevKit =

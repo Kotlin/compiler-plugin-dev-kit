@@ -378,7 +378,7 @@ public class DevKitGradlePlugin : Plugin<Project> {
             apply("org.jetbrains.kotlin.jvm")
             apply("com.github.gmazzo.buildconfig")
             apply("java-gradle-plugin")
-            apply(DevKitFunctionalTestPublishingPlugin::class.java)
+            apply("$DEV_KIT_GROUP.functional-test-publishing")
         }
 
         val pluginDevKit =
