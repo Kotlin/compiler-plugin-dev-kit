@@ -9,7 +9,7 @@ pluginManagement {
 plugins { kotlin("compiler.plugin.devkit") }
 
 dependencyResolutionManagement {
-    includeBuild("artifact-transform")
+    includeBuild("version-resolution")
     repositories {
         mavenCentral()
         maven("https://repo.gradle.org/gradle/libs-releases/")

@@ -32,7 +32,7 @@ dependencies {
     implementation(libs.animal.sniffer)
     implementation(libs.testkit.plugin)
     compileOnly(libs.gradleup.shadow)
-    api("$group:artifact-transform:$version")
+    api("$group:version-resolution:$version")
 }
 
 gradlePlugin {

@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
-// KGP's KotlinToolingVersion and the one vendored into artifact-transform are distinct types.
+// KGP's KotlinToolingVersion and the one vendored into version-resolution are distinct types.
 private fun KotlinToolingVersion.toDevKitVersion() =
     org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion(versionString)
 

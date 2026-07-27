@@ -14,7 +14,7 @@
           <option value="gradle-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:settings:publishAllPublicationsToDevKitSpaceRepository" />
-          <option value=":artifact-transform:publishAllPublicationsToDevKitSpaceRepository" />
+          <option value=":version-resolution:publishAllPublicationsToDevKitSpaceRepository" />
         </list>
       </option>
       <option name="vmOptions" />

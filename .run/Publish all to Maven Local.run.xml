@@ -14,7 +14,7 @@
           <option value="gradle-plugin-runtime:publishToMavenLocal" />
           <option value=":plugins:publishToMavenLocal" />
           <option value=":plugins:settings:publishToMavenLocal" />
-          <option value=":artifact-transform:publishToMavenLocal" />
+          <option value=":version-resolution:publishToMavenLocal" />
         </list>
       </option>
       <option name="vmOptions" />

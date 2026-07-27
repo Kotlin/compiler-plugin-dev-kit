@@ -44,7 +44,7 @@ dependencies {
     testFixturesApi("junit:junit:4.13.2") // TODO don't force junit version
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
-    testFixturesApi(pluginDevKit("artifact-transform"))
+    testFixturesApi(pluginDevKit("version-resolution"))
 }
 
 publishing {

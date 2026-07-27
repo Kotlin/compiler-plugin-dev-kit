@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    includeBuild("../artifact-transform")
+    includeBuild("../version-resolution")
     versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }
     repositories {
         gradlePluginPortal()

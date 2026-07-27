@@ -27,8 +27,8 @@ kotlin {
 }
 
 dependencies {
-    api(pluginDevKit("artifact-transform"))
-    testFixturesApi(pluginDevKit("artifact-transform"))
+    api(pluginDevKit("version-resolution"))
+    testFixturesApi(pluginDevKit("version-resolution"))
 }
 
 pluginDevKit {
