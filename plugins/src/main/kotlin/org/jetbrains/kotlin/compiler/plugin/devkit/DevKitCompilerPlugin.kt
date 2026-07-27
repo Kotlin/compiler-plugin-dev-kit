@@ -800,6 +800,12 @@ internal constructor(override val project: Project) : HasProject {
                     "kotlin.js.test.root.out.dir",
                     layout.buildDirectory.dir("js-test-output").map { it.asFile },
                 )
+
+                // Regenerate golden files: ./gradlew :compiler-plugin:test -PupdateTestData=true
+                +StringSystemPropertyArgumentProvider(
+                    "kotlin.test.update.test.data",
+                    provider { providers.gradleProperty("updateTestData").isPresent.toString() },
+                )
             }
         }
         dependencies {
