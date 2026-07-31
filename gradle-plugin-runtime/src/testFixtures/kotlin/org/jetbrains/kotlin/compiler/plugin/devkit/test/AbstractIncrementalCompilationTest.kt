@@ -14,9 +14,8 @@ import org.junit.Before
 
 /**
  * Base for JUnit4 [Parameterized][org.junit.runners.Parameterized] incremental-compilation tests:
- * it builds/rebuilds a generated multiplatform project for one [KmpTarget] and edits its
- * `commonMain` sources between compiles. Subclasses drive the parameter matrix via
- * [KmpTarget.selectedTargets].
+ * it builds/rebuilds a generated multiplatform project for one [KmpTarget] and edits its sources
+ * between compiles. Subclasses drive the parameter matrix via [KmpTarget.selectedTargets].
  */
 public abstract class AbstractIncrementalCompilationTest(protected val target: KmpTarget) {
 
@@ -49,13 +48,13 @@ public abstract class AbstractIncrementalCompilationTest(protected val target: K
     }
 
     protected fun GradleProject.delete(source: Source) {
-        rootDir.resolve("src/commonMain/kotlin/${source.path}/${source.name}.kt").delete()
+        rootDir.resolve("src/${source.sourceSet}/kotlin/${source.path}/${source.name}.kt").delete()
     }
 
     protected fun GradleProject.modify(source: Source, @Language("kotlin") content: String) {
         val newSource = source.copy(content, defaultImports)
         rootDir
-            .resolve("src/commonMain/kotlin/${newSource.path}/${newSource.name}.kt")
+            .resolve("src/${source.sourceSet}/kotlin/${newSource.path}/${newSource.name}.kt")
             .writeText(newSource.source)
     }
 
@@ -67,12 +66,12 @@ public abstract class AbstractIncrementalCompilationTest(protected val target: K
     ) {
         val newSource =
             source.copy(content, if (includeDefaultImports) defaultImports else emptyList())
-        val filePath = "src/commonMain/kotlin/${newSource.path}/${newSource.name}.kt"
+        val filePath = "src/${source.sourceSet}/kotlin/${newSource.path}/${newSource.name}.kt"
         subprojectDir(rootDir).resolve(filePath).writeText(newSource.source)
     }
 
     protected fun Subproject.delete(rootDir: File, source: Source) {
-        val filePath = "src/commonMain/kotlin/${source.path}/${source.name}.kt"
+        val filePath = "src/${source.sourceSet}/kotlin/${source.path}/${source.name}.kt"
         subprojectDir(rootDir).resolve(filePath).delete()
     }
 
@@ -84,9 +83,10 @@ public abstract class AbstractIncrementalCompilationTest(protected val target: K
         packageName: String,
         fileName: String,
         @Language("kotlin") content: String,
+        sourceSet: String = "commonMain",
     ) {
         val packageDir = packageName.replace('.', '/')
-        rootDir.resolve("src/commonMain/kotlin/$packageDir/$fileName").writeText(content)
+        rootDir.resolve("src/$sourceSet/kotlin/$packageDir/$fileName").writeText(content)
     }
 
     protected fun GradleProject.compileKotlin(
