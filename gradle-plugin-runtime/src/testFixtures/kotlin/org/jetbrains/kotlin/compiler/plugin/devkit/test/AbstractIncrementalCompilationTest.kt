@@ -17,13 +17,17 @@ import org.junit.Before
  * it builds/rebuilds a generated multiplatform project for one [KmpTarget] and edits its sources
  * between compiles. Subclasses drive the parameter matrix via [KmpTarget.selectedTargets].
  */
-public abstract class AbstractIncrementalCompilationTest(protected val target: KmpTarget) {
+public abstract class AbstractIncrementalCompilationTest(
+    protected val target: KmpTarget,
+    private val requiresMultiplatformIc: Boolean = true,
+) {
 
     /** Imports re-applied to a [Source] when [modify] rewrites it. */
     protected open val defaultImports: List<String> = emptyList()
 
     @Before
     public fun assumeMultiplatformIcSupported() {
+        if (!requiresMultiplatformIc) return
         assumeTrue(
             "KMP incremental compilation requires Kotlin $MULTIPLATFORM_IC_MIN_VERSION+",
             getTestCompilerToolingVersion() >= MULTIPLATFORM_IC_MIN_VERSION,

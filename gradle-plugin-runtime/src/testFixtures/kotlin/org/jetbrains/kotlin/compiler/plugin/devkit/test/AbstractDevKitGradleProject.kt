@@ -119,6 +119,7 @@ public abstract class AbstractDevKitGradleProject(
                             withBuildScript {
                                 if (config.plugins.isNotEmpty()) {
                                     plugins(*config.plugins.toTypedArray())
+                                    withKotlin(pluginConfigBlock())
                                 } else {
                                     applyDefaultBuildScript()
                                 }
