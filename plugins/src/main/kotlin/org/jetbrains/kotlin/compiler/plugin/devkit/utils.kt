@@ -1,19 +1,19 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.Action
+import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
-import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.SourceSet
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -89,12 +89,12 @@ internal inline fun <reified T : Any> ObjectFactory.property(convention: T) =
 internal inline fun <reified T : Any> ObjectFactory.property(convention: Provider<T>) =
     property<T>().convention(convention)
 
-internal val SourceSet.kotlin: SourceDirectorySet
-    get() = extensions.getByName("kotlin") as SourceDirectorySet
-
 context(kotlinExtension: KotlinJvmProjectExtension)
-internal val SourceSet.compilation
-    get() = kotlinExtension.target.compilations.named(name)
+internal val NamedDomainObjectProvider<out KotlinCompilation<*>>.defaultSourceSet
+    get() = kotlinExtension.sourceSets.named(name)
+
+internal val Provider<out KotlinCompilation<*>>.defaultSourceSet
+    get() = map { it.defaultSourceSet }
 
 context(hp: HasProject)
 internal val project

@@ -31,8 +31,6 @@ import org.gradle.api.plugins.JvmTestSuitePlugin
 import org.gradle.api.plugins.jvm.JvmTestSuite
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.SourceSet
-import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
@@ -56,7 +54,9 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaCompilation
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.gradle.tasks.BaseKotlinCompile
@@ -64,16 +64,20 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 
-public typealias SourceSetProvider = NamedDomainObjectProvider<out SourceSet>
+public typealias SourceSetProvider = NamedDomainObjectProvider<out KotlinSourceSet>
+
+internal typealias JvmCompilation = KotlinWithJavaCompilation<*, *>
+
+internal typealias CompilationProvider = NamedDomainObjectProvider<out JvmCompilation>
 
 @Suppress("FINAL_UPPER_BOUND", "unused")
 public class DevKitTestTargetT<out Fixtures : Unit, out Main : Unit>
 internal constructor(
     public val version: KotlinToolingVersion,
     public val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
-    internal val fixtures: SourceSetProvider,
+    internal val fixturesCompilation: CompilationProvider,
     internal val fixturesFrom: Property<DevKitTestFixturesTarget>,
-    makeMain: () -> SourceSetProvider,
+    makeMain: () -> CompilationProvider,
 ) : Named {
     override fun getName(): String = version.versionString
 
@@ -88,12 +92,12 @@ internal constructor(
      * [other] may not be this target itself. Only needed when the target either owns an overlay
      * (see [DevKitCompilerPluginConfigExtension.withFixtures]) or is closest to the wrong one.
      */
-    public fun DevKitTestTarget.sourceFixturesFrom(other: DevKitTestFixturesTarget) {
+    public fun sourceFixturesFrom(other: DevKitTestFixturesTarget) {
         require(this != other) { "$name cannot source its testFixtures from itself" }
         fixturesFrom.set(other)
     }
 
-    internal val lazyMain: SourceSetProvider by lazy(makeMain)
+    internal val lazyMain: CompilationProvider by lazy(makeMain)
 
     override fun equals(other: Any?): Boolean =
         other is DevKitTestTarget && other.version == version
@@ -164,40 +168,48 @@ private fun DevKitTestTarget.testTask(action: Test.() -> Unit) = testSuite {
     targets.all { this.testTask(action) }
 }
 
-private fun DevKitTestTarget.test(action: SourceSet.() -> Unit) = testSuite {
-    sources(action)
+context(kotlinExtension: KotlinJvmProjectExtension)
+private fun DevKitTestTarget.test(action: KotlinSourceSet.() -> Unit) = testCompilation {
+    defaultSourceSet(action)
+}
+
+context(kotlinExtension: KotlinJvmProjectExtension)
+private fun DevKitTestTarget.testCompilation(action: JvmCompilation.() -> Unit) = testSuite {
+    sources { kotlinExtension.target.compilations.getByName(this@sources.name).action() }
 }
 
 /** Adds every source directory of [other] to this source set, or none if [other] has no value. */
-context(_: HasProject)
-private fun SourceSet.srcDirsFrom(other: Provider<out SourceSet>) {
+private fun JvmCompilation.srcDirsFrom(other: Provider<out JvmCompilation>) {
     val empty = files()
-    kotlin.srcDir(other.map { it.kotlin.sourceDirectories }.orElse(empty))
-    java.srcDir(other.map { it.java.sourceDirectories }.orElse(empty))
-    resources.srcDir(other.map { it.resources.sourceDirectories }.orElse(empty))
+    defaultSourceSet {
+        kotlin.srcDir(other.defaultSourceSet.map { it.kotlin.sourceDirectories }.orElse(empty))
+        resources.srcDir(
+            other.defaultSourceSet.map { it.resources.sourceDirectories }.orElse(empty)
+        )
+    }
+    javaSourceSet.java.srcDir(other.map { it.javaSourceSet.java.sourceDirectories }.orElse(empty))
 }
 
-context(_: HasProject)
-private fun SourceSet.srcDirsFrom(other: SourceSet) = srcDirsFrom(provider { other })
+private fun JvmCompilation.srcDirsFrom(other: JvmCompilation) = srcDirsFrom(provider { other })
 
 @OptIn(ExperimentalWasmDsl::class)
 public open class DevKitCompilerPluginConfigExtension
 internal constructor(override val project: Project) : HasProject {
     private val buildConfig: BuildConfigExtension = project.the()
     private val testing: TestingExtension = project.the()
-    private val sourceSets: SourceSetContainer = project.the()
     private val kotlinExtension: KotlinJvmProjectExtension = project.the()
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
 
-    private val sharedMain = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
-    private val sharedTest = sourceSets.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
+    private val compilations = kotlinExtension.target.compilations
+    private val sharedMain = compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+    private val sharedTest = compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
     private val sharedTestFixtures =
-        sourceSets.getByName(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME)
+        compilations.getByName(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME)
 
-    private val mainJar = tasks.named<Jar>(sharedMain.jarTaskName)
-    private val testFixturesJar = tasks.named<Jar>(sharedTestFixtures.jarTaskName)
+    private val mainJar = tasks.named<Jar>(kotlinExtension.target.artifactsTaskName)
+    private val testFixturesJar = tasks.named<Jar>(sharedTestFixtures.javaSourceSet.jarTaskName)
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -240,7 +252,7 @@ internal constructor(override val project: Project) : HasProject {
                 DevKitTestTargetT<Nothing, Nothing>(
                     version,
                     testing.suites.register<JvmTestSuite>("${version.versionName}Test"),
-                    sourceSets.register("${version.versionName}TestFixtures"),
+                    compilations.register("${version.versionName}TestFixtures"),
                     objects.property(
                         provider {
                             val candidates = withFixtures.filterNot { it.version == version }
@@ -249,7 +261,7 @@ internal constructor(override val project: Project) : HasProject {
                         }
                     ),
                 ) {
-                    sourceSets.register(version.versionName)
+                    compilations.register(version.versionName)
                 }
             }
         }
@@ -317,11 +329,14 @@ internal constructor(override val project: Project) : HasProject {
 
     /** The (lazily configured) testFixtures source set for this target. */
     public val DevKitTestFixturesTarget.testFixtures: SourceSetProvider
-        get() = fixtures
+        get() = kotlinExtension.run { fixturesCompilation.defaultSourceSet }
+
+    private val DevKitMainTarget.mainCompilation: CompilationProvider
+        get() = lazyMain
 
     /** The (lazily configured) main source set for this target. */
     public val DevKitMainTarget.main: SourceSetProvider
-        get() = lazyMain
+        get() = kotlinExtension.run { mainCompilation.defaultSourceSet }
 
     /** Creates a JS Repl for use by the testing framework */
     public val createJsRepl: TaskProvider<JsReplGeneratorTask> =
@@ -334,12 +349,12 @@ internal constructor(override val project: Project) : HasProject {
      * Generates tests using [generateTestsClass], given the relevant test data directory, and
      * outputs them to [generatedTestsDir]
      */
-    public val generateTests: TaskProvider<GenerateTestsTask> =
+    public val generateTests: TaskProvider<GenerateTestsTask> = kotlinExtension.run {
         tasks.register("generateTests", GenerateTestsTask::class) {
             description = "Generate compiler plugin tests"
             generatedTestsDir.set(this@DevKitCompilerPluginConfigExtension.generatedTestsDir)
 
-            classpath(sharedTestFixtures.runtimeClasspath)
+            classpath(sharedTestFixtures.runtimeDependencyFiles, sharedTestFixtures.output)
             mainClass.set(generateTestsClass)
             workingDir = rootDir
 
@@ -349,10 +364,13 @@ internal constructor(override val project: Project) : HasProject {
                 }
             }
         }
+    }
 
     init {
         testAgainst.configureEach {
-            test { tasks.named(compileJavaTaskName) { dependsOn(generateTests) } }
+            kotlinExtension.run {
+                testCompilation { compileJavaTaskProvider { dependsOn(generateTests) } }
+            }
         }
     }
 
@@ -547,7 +565,7 @@ internal constructor(override val project: Project) : HasProject {
      *   of your own on top
      */
     public fun <Main : Unit> DevKitTestTargetT<*, Main>.withFixtures(
-        action: SourceSet.() -> Unit = {}
+        action: KotlinSourceSet.() -> Unit = {}
     ): DevKitTestTargetT<Nothing, Main> {
         @Suppress("KotlinConstantConditions") // KTIJ-39636
         contract {
@@ -567,7 +585,7 @@ internal constructor(override val project: Project) : HasProject {
      * target using [developFor] or [developForWithFixtures]
      */
     public fun <Fixtures : Unit> DevKitTestTargetT<Fixtures, *>.withMain(
-        action: SourceSet.() -> Unit = {}
+        action: KotlinSourceSet.() -> Unit = {}
     ): DevKitTestTargetT<Fixtures, Nothing> {
         @Suppress("KotlinConstantConditions") // KTIJ-39636
         contract {
@@ -588,12 +606,12 @@ internal constructor(override val project: Project) : HasProject {
     }
 
     internal fun configurePlugins() {
-        for (set in listOf(sharedMain, sharedTest, sharedTestFixtures)) {
-            configurations.named(set.compileClasspathConfigurationName) {
+        for (compilation in listOf(sharedMain, sharedTest, sharedTestFixtures)) {
+            configurations.named(compilation.compileDependencyConfigurationName) {
                 withCompilerVersionAttribute(kotlinToolingVersion)
             }
         }
-        sharedTest.resources.setSrcDirs(listOf("src/test/data"))
+        sharedTest.defaultSourceSet.resources.setSrcDirs(listOf("src/test/data"))
         buildConfig {
             packageName.set(pluginPackage)
             forClass("PluginInfo") {
@@ -611,7 +629,7 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
         project.configure<AnimalSnifferExtension> {
-            sourceSets = listOf(sharedMain, sharedTest)
+            sourceSets = listOf()
             excludeJars("kotlin-compiler*")
             ignore("java.*", "javax.*", "org.omg.*", "org.w3c.dom.*")
             testAgainst.configureEach {
@@ -791,115 +809,117 @@ internal constructor(override val project: Project) : HasProject {
                     }
                 }
             }
-        developFor.configureEach {
-            val copyVersionFilesSpec = project.copySpec {
-                into("kotlin/plugin/versions/$version") {
-                    // Ensures the directory exists in the jar even if `main` has no output.
-                    from(versionMarker)
-                    from(main.map { it.output }) {
-                        exclude("META-INF/*kotlin_module")
-                        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                    }
+        context(target: DevKitTestTarget)
+        fun Jar.copyVersionFiles(
+            compilation: CompilationProvider,
+            removeKotlinModule: Boolean = false,
+        ) = metaInf {
+            into("kotlin/plugin/versions/${target.version}") {
+                // Ensures the directory exists in the jar even if `main` has no output.
+                from(versionMarker)
+                from(compilation.map { it.output.allOutputs }) {
+                    if (removeKotlinModule) exclude("META-INF/*kotlin_module")
+                    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                 }
             }
-            mainJar { metaInf { with(copyVersionFilesSpec) } }
+        }
+        developFor.configureEach {
+            val mainCompilation = mainCompilation
+            mainJar { copyVersionFiles(mainCompilation, true) }
             project.pluginManager.withPlugin("com.gradleup.shadow") {
-                tasks.shadowJar { metaInf { with(copyVersionFilesSpec) } }
+                tasks.shadowJar { copyVersionFiles(mainCompilation, true) }
             }
         }
         testAgainst.configureEach {
-            testFixturesJar {
-                metaInf {
-                    into("kotlin/plugin/versions/$version") {
-                        // Ensures the directory exists in the jar even if `testFixtures` has no
-                        // output.
-                        from(versionMarker)
-                        from(fixtures.map { it.output }) {
-                            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                        }
-                    }
-                }
-            }
+            testFixturesJar { copyVersionFiles(fixturesCompilation, false) }
         }
     }
 
     internal fun configureSourceSets() {
         developFor.configureEach {
-            main {
-                kotlin.setSrcDirs(listOf("$versionName/src/main/kotlin"))
-                java.setSrcDirs(listOf("$versionName/src/main/java"))
-                resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
+            mainCompilation {
+                defaultSourceSet {
+                    kotlin.setSrcDirs(listOf("$versionName/src/main/kotlin"))
+                    resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
+                }
+                javaSourceSet.java.setSrcDirs(listOf("$versionName/src/main/java"))
             }
         }
         testAgainst.configureEach {
-            fixtures {
-                java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
-                kotlin.setSrcDirs(listOf("$versionName/src/testFixtures/kotlin"))
-                resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
+            fixturesCompilation {
+                defaultSourceSet {
+                    kotlin.setSrcDirs(listOf("$versionName/src/testFixtures/kotlin"))
+                    resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
+                }
+                javaSourceSet.java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
 
-                srcDirsFrom(fixturesFrom.flatMap { it.fixtures })
+                srcDirsFrom(fixturesFrom.flatMap { it.fixturesCompilation })
                 srcDirsFrom(sharedTestFixtures)
             }
         }
         testAgainst.configureEach {
-            testSuite {
-                sources {
-                    kotlin.setSrcDirs(listOf("$versionName/src/test/kotlin"))
-                    java.setSrcDirs(listOf("$versionName/src/test/java"))
-                    resources.setSrcDirs(listOf("${versionName}/src/test/data"))
-
+            kotlinExtension.run {
+                testCompilation {
+                    defaultSourceSet {
+                        kotlin.setSrcDirs(listOf("$versionName/src/test/kotlin"))
+                        resources.setSrcDirs(listOf("${versionName}/src/test/data"))
+                    }
+                    javaSourceSet.apply {
+                        java.setSrcDirs(listOf("$versionName/src/test/java"))
+                        val directory = generatedTestsDir.dir(this.name)
+                        java.srcDir(directory)
+                        // This is needed until IDEA fixes IDEA-339729.
+                        idea.module
+                            .getOrCreateLazyGeneratedSourcesDirs()
+                            .addLater(directory.map(Directory::getAsFile))
+                    }
                     srcDirsFrom(sharedTest)
-                    val directory = generatedTestsDir.dir(this.name)
-                    java.srcDir(directory)
-                    // This is needed until IDEA fixes IDEA-339729.
-                    idea.module
-                        .getOrCreateLazyGeneratedSourcesDirs()
-                        .addLater(directory.map(Directory::getAsFile))
                 }
             }
         }
     }
 
-    internal fun configureDependencies() {
-        testAgainst.configureEach { test { forceKotlinVersion(version) } }
-        developFor.configureEach { main { forceKotlinVersion(version) } }
-        testAgainst.configureEach { fixtures { forceKotlinVersion(version) } }
+    internal fun configureDependencies() = kotlinExtension.run {
+        testAgainst.configureEach { testCompilation { forceKotlinVersion(version) } }
+        developFor.configureEach { mainCompilation { forceKotlinVersion(version) } }
+        testAgainst.configureEach { fixturesCompilation { forceKotlinVersion(version) } }
         dependencies {
             setupCompilerVersionAttribute()
 
-            configurations.named(sharedTestFixtures.apiConfigurationName) {
-                dependencies.remove(project())
-            }
-            sharedTestFixtures.apiConfigurationName(files(mainJar))
+            val sharedTestFixturesApi =
+                configurations.named(sharedTestFixtures.defaultSourceSet.apiConfigurationName)
+
+            sharedTestFixturesApi.configure { dependencies.remove(project()) }
+            sharedTestFixturesApi(files(mainJar))
 
             testAgainst.configureEach { registerMultiReleasePluginTransform(version) }
 
-            testAgainst.configureEach { fixtures { apiConfigurationName(files(mainJar)) } }
             testAgainst.configureEach {
+                fixturesCompilation.defaultSourceSet { apiConfigurationName(files(mainJar)) }
                 testSuite { dependencies { implementation(testFixtures(project())) } }
             }
 
-            sharedMain.compileOnlyConfigurationName(kotlin("compiler"))
+            sharedMain.defaultSourceSet.compileOnlyConfigurationName(kotlin("compiler"))
 
-            sharedTestFixtures.apiConfigurationName(kotlin("stdlib"))
-            sharedTestFixtures.apiConfigurationName(kotlin("test-junit5"))
-            sharedTestFixtures.apiConfigurationName(kotlin("compiler-internal-test-framework"))
-            sharedTestFixtures.apiConfigurationName(kotlin("compiler"))
-            sharedTestFixtures.runtimeOnlyConfigurationName("junit:junit:4.13.2")
+            sharedTestFixturesApi(kotlin("stdlib"))
+            sharedTestFixturesApi(kotlin("test-junit5"))
+            sharedTestFixturesApi(kotlin("compiler-internal-test-framework"))
+            sharedTestFixturesApi(kotlin("compiler"))
+            sharedTestFixtures.defaultSourceSet.runtimeOnlyConfigurationName("junit:junit:4.13.2")
 
             addIf(
                 addRuntimeDependency,
-                sharedMain.implementationConfigurationName,
+                sharedMain.defaultSourceSet.implementationConfigurationName,
                 "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION",
             )
             addIf(
                 addRuntimeDependency,
-                sharedTestFixtures.apiConfigurationName,
+                sharedTestFixturesApi.name,
                 "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION",
             )
             addIf(
                 addRuntimeDependency,
-                sharedTestFixtures.apiConfigurationName,
+                sharedTestFixturesApi.name,
                 testFixtures("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"),
             )
         }
@@ -910,36 +930,28 @@ internal constructor(override val project: Project) : HasProject {
     // https://github.com/melix/mrjar-gradle-plugin
     internal fun configureCompilationWiring() = kotlinExtension.run {
         // See also KT-78269
-        val sharedMainCompilation = sharedMain.compilation.get()
-        val sharedTestCompilation = sharedTest.compilation.get()
-        val sharedTestFixturesCompilation = sharedTestFixtures.compilation.get()
         developFor.configureEach {
-            main {
-                compilation {
-                    associateWith(sharedMainCompilation)
-                    tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
-                        // Remove main jar from friendPaths to avoid circular dependency error
-                        friendPaths -= files(mainJar)
-                    }
+            mainCompilation {
+                associateWith(sharedMain)
+                tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
+                    // Remove main jar from friendPaths to avoid circular dependency error
+                    friendPaths -= files(mainJar)
                 }
             }
         }
 
         testAgainst.configureEach {
-            fixtures {
-                compilation {
-                    associateWith(sharedTestFixturesCompilation)
-                    tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
-                        // Remove main jar from friendPaths to avoid circular dependency error
-                        friendPaths -= files(testFixturesJar)
-                    }
+            fixturesCompilation {
+                associateWith(sharedTestFixtures)
+                tasks.named<BaseKotlinCompile>(compileKotlinTaskName) {
+                    // Remove testFixtures jar from friendPaths to avoid circular dependency error
+                    friendPaths -= files(testFixturesJar)
                 }
             }
-            val fixturesCompilation = fixtures.flatMap { it.compilation }
-            test { compilation { associateWith(fixturesCompilation.get()) } }
+            testCompilation { associateWith(fixturesCompilation.get()) }
         }
 
-        testAgainst.configureEach { test { compilation { associateWith(sharedTestCompilation) } } }
+        testAgainst.configureEach { testCompilation { associateWith(sharedTest) } }
         testAgainst.configureEach {
             testTask {
                 // associateWith adds runtime dependencies on shared modules classes
@@ -947,12 +959,7 @@ internal constructor(override val project: Project) : HasProject {
                 // so we remove them explicitly
                 classpath -=
                     project.files(
-                        listOf(
-                                sharedMainCompilation,
-                                sharedTestCompilation,
-                                sharedTestFixturesCompilation,
-                            )
-                            .map { it.output.allOutputs }
+                        listOf(sharedMain, sharedTest, sharedTestFixtures).map { it.output }
                     )
             }
         }
