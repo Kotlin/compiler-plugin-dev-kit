@@ -6,10 +6,10 @@ import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.attributes.LibraryElements
-import org.gradle.api.tasks.SourceSet
 import org.gradle.kotlin.dsl.named
 import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion.Companion.noVersion
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 private val KotlinToolingVersion.capitalizedVersionName
@@ -60,13 +60,13 @@ internal fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion
     if (requested.group == "org.jetbrains.kotlin") useVersion(version.versionString)
 }
 
-context(_: HasProject)
-internal fun SourceSet.forceKotlinVersion(version: KotlinToolingVersion) {
-    configurations.named(compileClasspathConfigurationName) {
+internal fun KotlinCompilation<*>.forceKotlinVersion(version: KotlinToolingVersion) {
+    configurations.named(compileDependencyConfigurationName) {
         resolutionStrategy.forceKotlinVersion(version)
         withCompilerVersionAttribute(version)
     }
-    configurations.named(runtimeClasspathConfigurationName) {
+    val runtimeDependencyConfigurationName = runtimeDependencyConfigurationName ?: return
+    configurations.named(runtimeDependencyConfigurationName) {
         resolutionStrategy.forceKotlinVersion(version)
         withCompilerVersionAttribute(version)
     }
