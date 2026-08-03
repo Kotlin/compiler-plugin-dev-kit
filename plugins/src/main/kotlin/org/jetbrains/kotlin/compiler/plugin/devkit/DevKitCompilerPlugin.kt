@@ -554,7 +554,7 @@ internal constructor(override val project: Project) : HasProject {
             returns() implies (this@withFixtures is DevKitTestFixturesTarget)
         }
         @Suppress("UNCHECKED_CAST")
-        if (!withFixtures.add(this as DevKitTestFixturesTarget)) {
+        if (withFixtures.add(this as DevKitTestFixturesTarget)) {
             // Stop it from automatically using the closest version's fixtures
             fixturesFrom.unsetConvention()
         }
