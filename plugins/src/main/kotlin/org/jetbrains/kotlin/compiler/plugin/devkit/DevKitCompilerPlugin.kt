@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalContracts::class)
+@file:Suppress("FINAL_UPPER_BOUND")
 
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
@@ -10,7 +11,6 @@ import java.io.File
 import javax.inject.Inject
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
-import org.gradle.api.Action
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.ExtensiblePolymorphicDomainObjectContainer
 import org.gradle.api.Named
@@ -64,42 +64,50 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 
-public sealed class DevKitTestTargetT<
-    out Fixtures : NamedDomainObjectProvider<SourceSet>?,
-    out Main : NamedDomainObjectProvider<SourceSet>?,
-> : Named {
+public typealias SourceSetProvider = NamedDomainObjectProvider<out SourceSet>
+
+@Suppress("FINAL_UPPER_BOUND", "unused")
+public class DevKitTestTargetT<out Fixtures : Unit, out Main : Unit>
+internal constructor(
+    public val version: KotlinToolingVersion,
+    public val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    internal val fixtures: SourceSetProvider,
+    internal val fixturesFrom: Property<DevKitTestFixturesTarget>,
+    makeMain: () -> SourceSetProvider,
+) : Named {
     override fun getName(): String = version.versionString
 
     public val versionName: String
         get() = version.versionName
 
-    public abstract val version: KotlinToolingVersion
-    public abstract val testSuite: NamedDomainObjectProvider<JvmTestSuite>
-
     /**
-     * Every target compiles test fixtures, so that they are compiled against its own compiler;
-     * [nullableTestFixtures] is the view of this that opting in via `withFixtures` hands out.
+     * Compiles this target's testFixtures from [other]'s overlay, for versions whose test framework
+     * APIs are pretty similar, so one can use another's overlay.
+     *
+     * A target sources from exactly one other target: calling this again replaces which one, and
+     * [other] may not be this target itself. Only needed when the target either owns an overlay
+     * (see [DevKitCompilerPluginConfigExtension.withFixtures]) or is closest to the wrong one.
      */
-    internal abstract val fixtures: NamedDomainObjectProvider<SourceSet>
+    public fun DevKitTestTarget.sourceFixturesFrom(other: DevKitTestFixturesTarget) {
+        require(this != other) { "$name cannot source its testFixtures from itself" }
+        fixturesFrom.set(other)
+    }
 
-    /**
-     * The target whose fixture overlay this one reuses. Conventionally the closest compatible
-     * target that owns an overlay, absent once this target opts into owning one.
-     */
-    internal abstract val fixturesFrom: Property<DevKitTestFixturesTarget>
-    internal abstract val nullableTestFixtures: Fixtures
-    internal abstract val nullableMain: Main
+    internal val lazyMain: SourceSetProvider by lazy(makeMain)
+
+    override fun equals(other: Any?): Boolean =
+        other is DevKitTestTarget && other.version == version
+
+    override fun hashCode(): Int = version.hashCode()
 }
 
 public typealias DevKitTestTarget = DevKitTestTargetT<*, *>
 
-public typealias DevKitMainTarget = DevKitTestTargetT<*, NamedDomainObjectProvider<SourceSet>>
+public typealias DevKitMainTarget = DevKitTestTargetT<*, Nothing>
 
-public typealias DevKitTestFixturesTarget =
-    DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, *>
+public typealias DevKitTestFixturesTarget = DevKitTestTargetT<Nothing, *>
 
-public typealias DevKitTarget =
-    DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, NamedDomainObjectProvider<SourceSet>>
+public typealias DevKitTarget = DevKitTestTargetT<Nothing, Nothing>
 
 public interface DevKitTestDataLibrary : GradleDependencies {
     /** Dependency collector for all platforms */
@@ -134,25 +142,6 @@ public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
         addToBuildConfig: Boolean = true,
         block: DevKitTestDataLibrary.() -> Unit = {},
     ): DevKitTestDataLibrary
-}
-
-@Suppress("UNCHECKED_CAST")
-private class DevKitTestTargetImpl<
-    out Fixtures : NamedDomainObjectProvider<SourceSet>?,
-    out Main : NamedDomainObjectProvider<SourceSet>?,
->(
-    override val version: KotlinToolingVersion,
-    override val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
-    override val fixtures: NamedDomainObjectProvider<SourceSet>,
-    override val fixturesFrom: Property<DevKitTestFixturesTarget>,
-) : DevKitTestTargetT<Fixtures, Main>() {
-    override fun equals(other: Any?): Boolean =
-        other is DevKitTestTarget && other.version == version
-
-    override fun hashCode(): Int = version.hashCode()
-
-    override var nullableTestFixtures: @UnsafeVariance Fixtures = null as Fixtures
-    override var nullableMain: @UnsafeVariance Main = null as Main
 }
 
 private abstract class DevKitTestDataLibrariesImpl
@@ -248,10 +237,7 @@ internal constructor(override val project: Project) : HasProject {
         objects.polymorphicDomainObjectContainer(DevKitTestTarget::class.java).apply {
             registerFactory(DevKitTestTarget::class.java) { versionString ->
                 val version = KotlinToolingVersion(versionString)
-                DevKitTestTargetImpl<
-                    NamedDomainObjectProvider<SourceSet>?,
-                    NamedDomainObjectProvider<SourceSet>?,
-                >(
+                DevKitTestTargetT<Nothing, Nothing>(
                     version,
                     testing.suites.register<JvmTestSuite>("${version.versionName}Test"),
                     sourceSets.register("${version.versionName}TestFixtures"),
@@ -262,7 +248,9 @@ internal constructor(override val project: Project) : HasProject {
                             candidates.firstOrNull { it.version == resolved }
                         }
                     ),
-                )
+                ) {
+                    sourceSets.register(version.versionName)
+                }
             }
         }
 
@@ -328,33 +316,12 @@ internal constructor(override val project: Project) : HasProject {
         objects.namedDomainObjectSet(DevKitTestFixturesTarget::class.java)
 
     /** The (lazily configured) testFixtures source set for this target. */
-    public val <
-        Fixtures : NamedDomainObjectProvider<SourceSet>?,
-        Main : NamedDomainObjectProvider<SourceSet>?,
-    > DevKitTestTargetT<Fixtures, Main>.testFixtures: Fixtures
-        get() {
-            @Suppress("KotlinConstantConditions") // KTIJ-39636
-            contract {
-                returnsNotNull() implies
-                    (this@testFixtures
-                        is DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, Main>)
-            }
-            return nullableTestFixtures
-        }
+    public val DevKitTestFixturesTarget.testFixtures: SourceSetProvider
+        get() = fixtures
 
     /** The (lazily configured) main source set for this target. */
-    public val <
-        Fixtures : NamedDomainObjectProvider<SourceSet>?,
-        Main : NamedDomainObjectProvider<SourceSet>?,
-    > DevKitTestTargetT<Fixtures, Main>.main: Main
-        get() {
-            @Suppress("KotlinConstantConditions") // KTIJ-39636
-            contract {
-                returnsNotNull() implies
-                    (this@main is DevKitTestTargetT<Fixtures, NamedDomainObjectProvider<SourceSet>>)
-            }
-            return nullableMain
-        }
+    public val DevKitMainTarget.main: SourceSetProvider
+        get() = lazyMain
 
     /** Creates a JS Repl for use by the testing framework */
     public val createJsRepl: TaskProvider<JsReplGeneratorTask> =
@@ -579,64 +546,35 @@ internal constructor(override val project: Project) : HasProject {
      * @see [sourceFixturesFrom] if you want to reuse some other version's overlay, but add a little
      *   of your own on top
      */
-    public fun <Main : NamedDomainObjectProvider<SourceSet>?> DevKitTestTargetT<*, Main>
-        .withFixtures(
+    public fun <Main : Unit> DevKitTestTargetT<*, Main>.withFixtures(
         action: SourceSet.() -> Unit = {}
-    ): DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, Main> {
+    ): DevKitTestTargetT<Nothing, Main> {
         @Suppress("KotlinConstantConditions") // KTIJ-39636
         contract {
-            returns() implies
-                (this@withFixtures is DevKitTestTargetT<NamedDomainObjectProvider<SourceSet>, Main>)
+            returns() implies (this@withFixtures is DevKitTestFixturesTarget)
         }
-        when (this) {
-            is DevKitTestTargetImpl -> {}
-        }
-        if (testFixtures == null) {
-            nullableTestFixtures = fixtures
-            check(testFixtures != null) // smart cast!
-            withFixtures.add(this)
+        @Suppress("UNCHECKED_CAST")
+        if (!withFixtures.add(this as DevKitTestFixturesTarget)) {
             // Stop it from automatically using the closest version's fixtures
             fixturesFrom.unsetConvention()
         }
-        fixtures(action)
+        testFixtures(action)
         return this
-    }
-
-    /**
-     * Compiles this target's testFixtures from [other]'s overlay, for versions whose test framework
-     * APIs are pretty similar, so one can use another's overlay.
-     *
-     * A target sources from exactly one other target: calling this again replaces which one, and
-     * [other] may not be this target itself. Only needed when the target either owns an overlay
-     * (see [withFixtures]) or is closest to the wrong one.
-     */
-    public fun DevKitTestTarget.sourceFixturesFrom(other: DevKitTestFixturesTarget) {
-        require(this != other) { "$name cannot source its testFixtures from itself" }
-        fixturesFrom.set(other)
     }
 
     /**
      * Declares that this version owns a `main` overlay. This is the same as having declared the
      * target using [developFor] or [developForWithFixtures]
      */
-    public fun <Fixtures : NamedDomainObjectProvider<SourceSet>?> DevKitTestTargetT<Fixtures, *>
-        .withMain(
-        action: Action<in SourceSet> = Action {}
-    ): DevKitTestTargetT<Fixtures, NamedDomainObjectProvider<SourceSet>> {
+    public fun <Fixtures : Unit> DevKitTestTargetT<Fixtures, *>.withMain(
+        action: SourceSet.() -> Unit = {}
+    ): DevKitTestTargetT<Fixtures, Nothing> {
         @Suppress("KotlinConstantConditions") // KTIJ-39636
         contract {
-            returns() implies
-                (this@withMain is DevKitTestTargetT<Fixtures, NamedDomainObjectProvider<SourceSet>>)
+            returns() implies (this@withMain is DevKitMainTarget)
         }
-        when (this) {
-            is DevKitTestTargetImpl -> {}
-        }
-        if (main != null) main.configure(action)
-        else {
-            nullableMain = sourceSets.register(version.versionName, action)
-            check(main != null) // smart cast!
-            developFor.add(this)
-        }
+        @Suppress("UNCHECKED_CAST") developFor.add(this as DevKitMainTarget)
+        main(action)
         return this
     }
 
