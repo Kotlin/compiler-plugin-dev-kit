@@ -27,8 +27,8 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
-import org.gradle.api.plugins.JvmTestSuitePlugin
-import org.gradle.api.plugins.jvm.JvmTestSuite
+import org.gradle.api.plugins.JavaBasePlugin
+import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
@@ -48,7 +48,6 @@ import org.gradle.kotlin.dsl.withType
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
-import org.gradle.testing.base.TestingExtension
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
@@ -74,7 +73,8 @@ internal typealias CompilationProvider = NamedDomainObjectProvider<out JvmCompil
 public class DevKitTestTargetT<out Fixtures : Unit, out Main : Unit>
 internal constructor(
     public val version: KotlinToolingVersion,
-    public val testSuite: NamedDomainObjectProvider<JvmTestSuite>,
+    internal val testCompilation: CompilationProvider,
+    public val testTask: TaskProvider<out Test>,
     internal val fixturesCompilation: CompilationProvider,
     internal val fixturesFrom: Property<DevKitTestFixturesTarget>,
     makeMain: () -> CompilationProvider,
@@ -164,20 +164,6 @@ constructor(private val pluginDevKit: DevKitCompilerPluginConfigExtension) :
         }
 }
 
-private fun DevKitTestTarget.testTask(action: Test.() -> Unit) = testSuite {
-    targets.all { this.testTask(action) }
-}
-
-context(kotlinExtension: KotlinJvmProjectExtension)
-private fun DevKitTestTarget.test(action: KotlinSourceSet.() -> Unit) = testCompilation {
-    defaultSourceSet(action)
-}
-
-context(kotlinExtension: KotlinJvmProjectExtension)
-private fun DevKitTestTarget.testCompilation(action: JvmCompilation.() -> Unit) = testSuite {
-    sources { kotlinExtension.target.compilations.getByName(this@sources.name).action() }
-}
-
 /** Adds every source directory of [other] to this source set, or none if [other] has no value. */
 private fun JvmCompilation.srcDirsFrom(other: Provider<out JvmCompilation>) {
     val empty = files()
@@ -196,7 +182,6 @@ private fun JvmCompilation.srcDirsFrom(other: JvmCompilation) = srcDirsFrom(prov
 public open class DevKitCompilerPluginConfigExtension
 internal constructor(override val project: Project) : HasProject {
     private val buildConfig: BuildConfigExtension = project.the()
-    private val testing: TestingExtension = project.the()
     private val kotlinExtension: KotlinJvmProjectExtension = project.the()
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
@@ -249,9 +234,20 @@ internal constructor(override val project: Project) : HasProject {
         objects.polymorphicDomainObjectContainer(DevKitTestTarget::class.java).apply {
             registerFactory(DevKitTestTarget::class.java) { versionString ->
                 val version = KotlinToolingVersion(versionString)
+                val compilation = compilations.register("${version.versionName}Test")
                 DevKitTestTargetT<Nothing, Nothing>(
                     version,
-                    testing.suites.register<JvmTestSuite>("${version.versionName}Test"),
+                    compilation,
+                    tasks.register<Test>("${version.versionName}Test") {
+                        description = "Runs tests against Kotlin ${version.versionString}"
+                        group = JavaBasePlugin.VERIFICATION_GROUP
+                        testClassesDirs = files(compilation.map { it.output.classesDirs })
+                        classpath =
+                            files(
+                                compilation.map { it.runtimeDependencyFiles },
+                                compilation.map { it.output.allOutputs },
+                            )
+                    },
                     compilations.register("${version.versionName}TestFixtures"),
                     objects.property(
                         provider {
@@ -331,6 +327,9 @@ internal constructor(override val project: Project) : HasProject {
     public val DevKitTestFixturesTarget.testFixtures: SourceSetProvider
         get() = kotlinExtension.run { fixturesCompilation.defaultSourceSet }
 
+    public val DevKitTestTarget.test: SourceSetProvider
+        get() = kotlinExtension.run { testCompilation.defaultSourceSet }
+
     private val DevKitMainTarget.mainCompilation: CompilationProvider
         get() = lazyMain
 
@@ -354,7 +353,7 @@ internal constructor(override val project: Project) : HasProject {
             description = "Generate compiler plugin tests"
             generatedTestsDir.set(this@DevKitCompilerPluginConfigExtension.generatedTestsDir)
 
-            classpath(sharedTestFixtures.runtimeDependencyFiles, sharedTestFixtures.output)
+            classpath(sharedTestFixtures.runtimeDependencyFiles, sharedTestFixtures.output.allOutputs)
             mainClass.set(generateTestsClass)
             workingDir = rootDir
 
@@ -647,13 +646,10 @@ internal constructor(override val project: Project) : HasProject {
                 signatures += project.files(signatureGenTask.map { it.outputFiles })
             }
         }
-        testing.suites.named<JvmTestSuite>(JvmTestSuitePlugin.DEFAULT_TEST_SUITE_NAME) {
-            targets.all {
-                testTask {
-                    enabled = false
-                    dependsOn(defaultTestTarget.map { it.testSuite })
-                }
-            }
+        // configure default test task
+        tasks.named<Test>(JavaPlugin.TEST_TASK_NAME) {
+            enabled = false
+            dependsOn(defaultTestTarget.map { it.testTask })
         }
         project.pluginManager.withPlugin("com.gradleup.shadow") {
             tasks.shadowJar {
@@ -785,9 +781,7 @@ internal constructor(override val project: Project) : HasProject {
                 description = "Run all versioned tests."
                 group = "verification"
                 enabled = false
-                testAgainst.configureEach {
-                    testSuite { targets.all { this@register.dependsOn(testTask) } }
-                }
+                testAgainst.configureEach { this@register.dependsOn(testTask) }
             }
             .also {
                 tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) { dependsOn(it) }
@@ -896,7 +890,9 @@ internal constructor(override val project: Project) : HasProject {
 
             testAgainst.configureEach {
                 fixturesCompilation.defaultSourceSet { apiConfigurationName(files(mainJar)) }
-                testSuite { dependencies { implementation(testFixtures(project())) } }
+                testCompilation.defaultSourceSet {
+                    implementationConfigurationName(testFixtures(project()))
+                }
             }
 
             sharedMain.defaultSourceSet.compileOnlyConfigurationName(kotlin("compiler"))
@@ -959,7 +955,7 @@ internal constructor(override val project: Project) : HasProject {
                 // so we remove them explicitly
                 classpath -=
                     project.files(
-                        listOf(sharedMain, sharedTest, sharedTestFixtures).map { it.output }
+                        listOf(sharedMain, sharedTest, sharedTestFixtures).map { it.output.allOutputs }
                     )
             }
         }
@@ -993,7 +989,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         project.pluginManager.apply {
             apply("org.jetbrains.kotlin.jvm")
-            apply("jvm-test-suite")
             apply("com.github.gmazzo.buildconfig")
             apply("ru.vyarus.animalsniffer")
             apply("java-test-fixtures")
