@@ -236,10 +236,8 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
         main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
         functionalTestProjectsClasspath(compilerPlugin.map { project(it.isolated.path) })
 
-        addIf(
-            addRuntimeDependency,
-            main.implementationConfigurationName,
-            "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION",
+        main.implementationConfigurationName(
+            addRuntimeDependency.ifTrue { "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION" }
         )
         functionalTest.implementationConfigurationName(
             testFixtures("$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION")
