@@ -1,9 +1,11 @@
+import org.gradle.api.plugins.internal.JavaConfigurationVariantMapping
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform")
     kotlin("compiler.plugin.devkit.compiler-plugin")
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
@@ -17,18 +19,20 @@ java {
 }
 
 kotlin {
-    compilerOptions.jvmTarget = JvmTarget.JVM_17
     explicitApi()
-    target.compilations.named("testFixtures") {
-        tasks.named<KotlinCompile>(compileKotlinTaskName) {
-            explicitApiMode = ExplicitApiMode.Strict
+    jvm {
+        compilerOptions.jvmTarget = JvmTarget.JVM_17
+        compilations.named("testFixtures") {
+            tasks.named<KotlinCompile>(compileKotlinTaskName) {
+                explicitApiMode = ExplicitApiMode.Strict
+            }
         }
     }
-}
 
-dependencies {
-    api(pluginDevKit("version-resolution"))
-    testFixturesApi(pluginDevKit("version-resolution"))
+    sourceSets {
+        jvmMain.dependencies { api(pluginDevKit("version-resolution")) }
+        jvmTestFixtures.dependencies { api(pluginDevKit("version-resolution")) }
+    }
 }
 
 pluginDevKit {
@@ -47,6 +51,27 @@ pluginDevKit {
 }
 
 tasks.generateTests { enabled = false }
+
+@OptIn(ExperimentalKotlinGradlePluginApi::class)
+kotlin.publishing.adhocSoftwareComponent {
+    val testFixtures = java.sourceSets.testFixtures.get()
+    this.addVariantsFromConfiguration(
+        configurations.getByName(testFixtures.apiElementsConfigurationName),
+        JavaConfigurationVariantMapping(
+            "compile",
+            true,
+            configurations.getByName(testFixtures.compileClasspathConfigurationName),
+        ),
+    )
+    this.addVariantsFromConfiguration(
+        configurations.getByName(testFixtures.runtimeElementsConfigurationName),
+        JavaConfigurationVariantMapping(
+            "runtime",
+            true,
+            configurations.getByName(testFixtures.runtimeClasspathConfigurationName),
+        ),
+    )
+}
 
 publishing {
     repositories {

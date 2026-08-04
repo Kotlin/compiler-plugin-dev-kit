@@ -21,6 +21,7 @@ dependencies {
             requireCapability("org.gradle.experimental:gradle-public-api-internal")
         }
     }
+    compileOnly(kotlin("gradle-plugin"))
     implementation(libs.testkit.plugin)
 }
 
