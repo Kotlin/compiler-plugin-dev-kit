@@ -1,8 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.gradle.api.Action
-import org.gradle.api.NamedDomainObjectProvider
-import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
@@ -11,9 +8,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
-import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -76,25 +71,16 @@ internal fun DependencyHandler.setupCompilerVersionAttribute() {
     }
 }
 
-internal fun DependencyHandler.addIf(
-    condition: Provider<out Boolean>,
-    configurationName: String,
-    dependencyNotation: Any,
-    action: Action<in ExternalModuleDependency> = Action {},
-) = addProvider(configurationName, condition.filter { it }.map { dependencyNotation }, action)
+context(_: HasProject)
+internal fun <T> Provider<out Boolean>.ifTrue(value: ProviderFlatMap.() -> T?) = provider {
+    if (orNull == true) value() else null
+}
 
 internal inline fun <reified T : Any> ObjectFactory.property(convention: T) =
     property<T>().convention(convention)
 
 internal inline fun <reified T : Any> ObjectFactory.property(convention: Provider<T>) =
     property<T>().convention(convention)
-
-context(kotlinExtension: KotlinJvmProjectExtension)
-internal val NamedDomainObjectProvider<out KotlinCompilation<*>>.defaultSourceSet
-    get() = kotlinExtension.sourceSets.named(name)
-
-internal val Provider<out KotlinCompilation<*>>.defaultSourceSet
-    get() = map { it.defaultSourceSet }
 
 context(hp: HasProject)
 internal val project
