@@ -27,7 +27,6 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
 import org.gradle.api.plugins.JavaBasePlugin
-import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
@@ -48,13 +47,14 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaCompilation
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.gradle.tasks.BaseKotlinCompile
@@ -62,7 +62,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import ru.vyarus.gradle.plugin.animalsniffer.signature.BuildSignatureTask
 
-internal typealias JvmCompilation = KotlinWithJavaCompilation<*, *>
+internal typealias JvmCompilation = KotlinJvmCompilation
 
 @Suppress("FINAL_UPPER_BOUND", "unused")
 public class DevKitTestTargetT<out Fixtures : Unit, out Main : Unit>
@@ -168,7 +168,7 @@ private fun JvmCompilation.srcDirsFrom(other: Provider<out JvmCompilation>) {
             other.map { it.defaultSourceSet.resources.sourceDirectories }.orElse(empty)
         )
     }
-    javaSourceSet.java.srcDir(other.map { it.javaSourceSet.java.sourceDirectories }.orElse(empty))
+    java.srcDir(other.map { it.java.sourceDirectories }.orElse(empty))
 }
 
 private fun JvmCompilation.srcDirsFrom(other: JvmCompilation) = srcDirsFrom(provider { other })
@@ -177,19 +177,20 @@ private fun JvmCompilation.srcDirsFrom(other: JvmCompilation) = srcDirsFrom(prov
 public open class DevKitCompilerPluginConfigExtension
 internal constructor(override val project: Project) : HasProject {
     private val buildConfig: BuildConfigExtension = project.the()
-    private val kotlinExtension: KotlinJvmProjectExtension = project.the()
+    private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
 
-    private val compilations = kotlinExtension.target.compilations
+    private val target = kotlinExtension.jvm()
+    private val compilations = target.compilations
     private val sharedMain = compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
     private val sharedTest = compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
 
     private val sharedTestFixtures =
         compilations.getByName(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME)
 
-    private val mainJar = tasks.named<Jar>(kotlinExtension.target.artifactsTaskName)
-    private val testFixturesJar = tasks.named<Jar>(sharedTestFixtures.javaSourceSet.jarTaskName)
+    private val mainJar = tasks.named<Jar>(target.artifactsTaskName)
+    private val testFixturesJar = tasks.named<Jar>("testFixturesJar")
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -369,14 +370,14 @@ internal constructor(override val project: Project) : HasProject {
 
             testAgainst.configureEach {
                 test {
-                    argFiles(resources.sourceDirectories, generatedTestsDir.dir(name))
+                    argFiles(resources.sourceDirectories, generatedTestsDir.dir(versionName))
                 }
             }
         }
 
     init {
         testAgainst.configureEach {
-            testCompilation.compileJavaTaskProvider { dependsOn(generateTests) }
+            testCompilation.compileJavaTaskProvider!! { dependsOn(generateTests) }
         }
     }
 
@@ -435,7 +436,7 @@ internal constructor(override val project: Project) : HasProject {
                 setClasspathProperty(jsClasspath, jsConfiguration)
             }
         }
-        buildConfig.sourceSets.named(TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME) {
+        buildConfig.sourceSets.named(sharedTestFixtures.defaultSourceSet.name) {
             if (!addToBuildConfig) return@named
             forClass("TestDataLibraries") {
                 buildConfigField(
@@ -616,6 +617,11 @@ internal constructor(override val project: Project) : HasProject {
             configurations.named(compilation.compileDependencyConfigurationName) {
                 withCompilerVersionAttribute(kotlinToolingVersion)
             }
+            compilation.defaultSourceSet.kotlin.setSrcDirs(listOf("src/${compilation.name}/kotlin"))
+            compilation.defaultSourceSet.resources.setSrcDirs(
+                listOf("src/${compilation.name}/resources")
+            )
+            compilation.java.setSrcDirs(listOf("src/${compilation.name}/java"))
         }
         sharedTest.defaultSourceSet.resources.setSrcDirs(listOf("src/test/data"))
         buildConfig {
@@ -654,9 +660,11 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
         // configure default test task
-        tasks.named<Test>(JavaPlugin.TEST_TASK_NAME) {
-            enabled = false
-            dependsOn(defaultTestTarget.map { it.testTask })
+        target.testRuns.named(KotlinTargetWithTests.DEFAULT_TEST_RUN_NAME) {
+            executionTask {
+                enabled = false
+                dependsOn(defaultTestTarget.map { it.testTask })
+            }
         }
         project.pluginManager.withPlugin("com.gradleup.shadow") {
             tasks.shadowJar {
@@ -687,8 +695,8 @@ internal constructor(override val project: Project) : HasProject {
                         attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.SHADOWED))
                     }
                 }
-                named("apiElements") { useShadowJar() }
-                named("runtimeElements") { useShadowJar() }
+                named(target.apiElementsConfigurationName) { useShadowJar() }
+                named(target.runtimeElementsConfigurationName) { useShadowJar() }
             }
         }
     }
@@ -843,7 +851,7 @@ internal constructor(override val project: Project) : HasProject {
                     kotlin.setSrcDirs(listOf("$versionName/src/main/kotlin"))
                     resources.setSrcDirs(listOf("${versionName}/src/main/resources"))
                 }
-                javaSourceSet.java.setSrcDirs(listOf("$versionName/src/main/java"))
+                java.setSrcDirs(listOf("$versionName/src/main/java"))
             }
         }
         testAgainst.configureEach {
@@ -852,7 +860,7 @@ internal constructor(override val project: Project) : HasProject {
                     kotlin.setSrcDirs(listOf("$versionName/src/testFixtures/kotlin"))
                     resources.setSrcDirs(listOf("${versionName}/src/testFixtures/resources"))
                 }
-                javaSourceSet.java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
+                java.setSrcDirs(listOf("$versionName/src/testFixtures/java"))
 
                 srcDirsFrom(fixturesFrom.map { it.fixturesCompilation })
                 srcDirsFrom(sharedTestFixtures)
@@ -864,10 +872,10 @@ internal constructor(override val project: Project) : HasProject {
                     kotlin.setSrcDirs(listOf("$versionName/src/test/kotlin"))
                     resources.setSrcDirs(listOf("${versionName}/src/test/data"))
                 }
-                javaSourceSet.apply {
-                    java.setSrcDirs(listOf("$versionName/src/test/java"))
-                    val directory = generatedTestsDir.dir(this.name)
-                    java.srcDir(directory)
+                java.apply {
+                    setSrcDirs(listOf("$versionName/src/test/java"))
+                    val directory = generatedTestsDir.dir(versionName)
+                    srcDir(directory)
                     // This is needed until IDEA fixes IDEA-339729.
                     idea.module
                         .getOrCreateLazyGeneratedSourcesDirs()
@@ -898,13 +906,15 @@ internal constructor(override val project: Project) : HasProject {
             }
         }
 
-        sharedMain.defaultSourceSet.dependencies {
-            compileOnly(kotlin("compiler"))
-            implementation(
-                addRuntimeDependency.ifTrue {
-                    "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"
-                }
-            )
+        kotlinExtension.apply {
+            sourceSets.commonMain.dependencies {
+                compileOnly(kotlin("compiler"))
+                implementation(
+                    addRuntimeDependency.ifTrue {
+                        "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"
+                    }
+                )
+            }
         }
         sharedTestFixtures.defaultSourceSet.dependencies {
             api(files(mainJar))
@@ -994,7 +1004,7 @@ private fun Test.setLibraryProperty(
 public class DevKitCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         project.pluginManager.apply {
-            apply("org.jetbrains.kotlin.jvm")
+            apply("org.jetbrains.kotlin.multiplatform")
             apply("com.github.gmazzo.buildconfig")
             apply("ru.vyarus.animalsniffer")
             apply("java-test-fixtures")

@@ -5,11 +5,14 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
+import org.gradle.kotlin.dsl.the
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 /**
@@ -122,3 +125,6 @@ internal fun files(vararg paths: Any?) = project.files(*paths)
 context(_: HasProject)
 internal operator fun ConfigurableFileCollection.minusAssign(collection: FileCollection) =
     setFrom((files(from) - collection).toList())
+
+internal val KotlinJvmCompilation.java
+    get() = project.the<SourceSetContainer>().getByName(defaultSourceSet.name).java
