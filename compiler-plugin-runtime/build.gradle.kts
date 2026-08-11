@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
     kotlin("multiplatform")
@@ -30,24 +31,31 @@ kotlin {
     }
 
     sourceSets {
-        jvmMain.dependencies { api(pluginDevKit("version-resolution")) }
-        jvmTestFixtures.dependencies { api(pluginDevKit("version-resolution")) }
+        commonMain.dependencies { api(pluginDevKit("version-resolution")) }
+        commonTestFixtures.dependencies { api(pluginDevKit("version-resolution")) }
     }
 }
 
+@OptIn(ExperimentalKotlinGradlePluginApi::class)
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    // Plain versions live in gradle.properties; only the ones needing fixtures are named here.
-    testAgainstWithFixtures("2.3.20")
+    fun supportsDumpClassifier(version: KotlinToolingVersion) =
+        version >= KotlinToolingVersion("2.4.20-dev-7600") &&
+            version != KotlinToolingVersion("2.4.20-Beta1")
 
-    // lowest 2.4.20 dev version we support
-    val k2420Target = testAgainstWithFixtures("2.4.20-dev-3583")
-    testAgainst("2.4.20-Beta1") { sourceFixturesFrom(k2420Target) }
-    // version where DUMP_CLASSIFIER was added
-    val testDumpDirectiveTarget = testAgainstWithFixtures("2.4.20-dev-7885")
-    testAgainst("2.4.20-Beta2") { sourceFixturesFrom(testDumpDirectiveTarget) }
+    kotlin.applyPluginDevKitHierarchyTemplate {
+        groupVersions("nonJvm", { true }) {
+            groupVersions("pre2420Dev7600", { !supportsDumpClassifier(it) }) {
+                preDev(2, 4, 20, "pre2420Dev")
+            }
+
+            postDev(2, 4, 20, "post2420Dev") {
+                groupVersions("post2420Dev7600", ::supportsDumpClassifier)
+            }
+        }
+    }
 }
 
 tasks.generateTests { enabled = false }
