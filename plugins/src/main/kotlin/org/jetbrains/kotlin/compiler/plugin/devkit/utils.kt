@@ -5,14 +5,11 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
-import org.gradle.kotlin.dsl.the
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 /**
@@ -66,6 +63,7 @@ public val KotlinToolingVersion.baseVersionName: String
 public val KotlinToolingVersion.versionName: String
     get() = "k$baseVersionName"
 
+context(_: HasProject)
 internal fun DependencyHandler.setupCompilerVersionAttribute() {
     artifactTypes {
         all {
@@ -126,5 +124,27 @@ context(_: HasProject)
 internal operator fun ConfigurableFileCollection.minusAssign(collection: FileCollection) =
     setFrom((files(from) - collection).toList())
 
-internal val KotlinJvmCompilation.java
-    get() = project.the<SourceSetContainer>().getByName(defaultSourceSet.name).java
+internal val DevKitCompilation.java
+    get() = javaSourceSet.java
+
+internal fun lowerCamelCaseName(vararg nameParts: String?): String {
+    val nonEmptyParts = nameParts.mapNotNull { it?.takeIf(String::isNotEmpty) }
+    return nonEmptyParts
+        .drop(1)
+        .joinToString(
+            separator = "",
+            prefix = nonEmptyParts.firstOrNull().orEmpty(),
+            transform = String::capitalizeAsciiOnly,
+        )
+}
+
+private fun String.capitalizeAsciiOnly(): String {
+    if (isEmpty()) return this
+    val c = this[0]
+    return if (c in 'a'..'z')
+        buildString(length) {
+            append(c.uppercaseChar())
+            append(this@capitalizeAsciiOnly, 1, this@capitalizeAsciiOnly.length)
+        }
+    else this
+}
