@@ -1,6 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.test.Constructor
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
@@ -22,3 +23,7 @@ public expect fun TestConfigurationBuilder.useFailureSuppressorsCompat(
     vararg checkers: Constructor<ServicesAndDirectivesContainer>,
     insertAtFirst: Boolean = false,
 )
+
+public expect fun RegisteredDirectivesBuilder.firIdenticalCompat()
+
+public expect fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser)
