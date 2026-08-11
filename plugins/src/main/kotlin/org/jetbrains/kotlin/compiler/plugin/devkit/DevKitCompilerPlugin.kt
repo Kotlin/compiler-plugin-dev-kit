@@ -48,6 +48,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
+import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -219,17 +220,21 @@ internal constructor(override val project: Project) : HasProject {
             generatedTestsDir.set(this@DevKitCompilerPluginConfigExtension.generatedTestsDir)
 
             classpath(
-                defaultTestTarget.map { it.testFixturesCompilation.runtimeDependencyFiles },
-                defaultTestTarget.map { it.testFixturesCompilation.output.allOutputs },
+                provider {
+                    val testFixtures = testAgainst.maxBy { it.version }.testFixturesCompilation
+                    testFixtures.runtimeDependencyFiles + testFixtures.output.allOutputs
+                }
             )
             mainClass.set(generateTestsClass)
             workingDir = rootDir
 
             testAgainst.configureEach {
                 test {
-                    // TODO allow shared tests between versions too
+                    this as AbstractKotlinSourceSet
                     argFiles(
-                        commonTest.resources.sourceDirectories + resources.sourceDirectories,
+                        files(
+                            provider { withDependsOnClosure.map { it.resources.sourceDirectories } }
+                        ),
                         generatedTestsDir.dir(targetName),
                     )
                 }
@@ -511,7 +516,6 @@ internal constructor(override val project: Project) : HasProject {
                 withCompilerVersionAttribute(kotlinToolingVersion)
             }
         }
-        commonTest.resources.setSrcDirs(listOf("src/commonTest/data"))
         buildConfig {
             packageName.set(pluginPackage)
             forClass("PluginInfo") {
@@ -695,11 +699,14 @@ internal constructor(override val project: Project) : HasProject {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     internal fun configureSourceSets() {
         kotlinExtension.applyPluginDevKitHierarchyTemplate {}
+        // TODO find a less ad-hoc way to identify test source sets
+        kotlinExtension.sourceSets
+            .named { it.endsWith("Test") }
+            .configureEach {
+                resources.setSrcDirs(listOf("src/$name/data"))
+            }
         testAgainst.configureEach {
             testCompilation.apply {
-                defaultSourceSet {
-                    resources.setSrcDirs(listOf("src/$name/data"))
-                }
                 java.apply {
                     val directory = generatedTestsDir.dir(this@configureEach.targetName)
                     srcDir(directory)
