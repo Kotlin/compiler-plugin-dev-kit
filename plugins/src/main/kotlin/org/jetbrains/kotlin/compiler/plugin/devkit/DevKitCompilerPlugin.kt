@@ -25,7 +25,6 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
-import org.gradle.internal.component.external.model.TestFixturesSupport
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.invoke
@@ -121,7 +120,6 @@ internal constructor(override val project: Project) : HasProject {
     private val commonTest = kotlinExtension.run { sourceSets.commonTest.get() }
 
     private val mainJar = tasks.named<Jar>(mainTarget.artifactsTaskName)
-    private val testFixturesJar = tasks.named<Jar>("testFixturesJar")
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -507,7 +505,6 @@ internal constructor(override val project: Project) : HasProject {
         for (compilation in
             listOf(
                 KotlinCompilation.MAIN_COMPILATION_NAME,
-                TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME,
                 KotlinCompilation.TEST_COMPILATION_NAME,
             )) {
             configurations.named(
@@ -691,9 +688,6 @@ internal constructor(override val project: Project) : HasProject {
                 tasks.shadowJar { copyVersionFiles(mainCompilation) }
             }
         }
-        testAgainst.configureEach {
-            testFixturesJar { copyVersionFiles(testFixturesCompilation) }
-        }
     }
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -752,9 +746,7 @@ internal constructor(override val project: Project) : HasProject {
             )
             api(
                 addRuntimeDependency.ifTrue {
-                    dependencies.testFixtures(
-                        "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"
-                    )
+                    "$DEV_KIT_GROUP:compiler-plugin-test:$DEV_KIT_VERSION"
                 }
             )
         }
@@ -789,7 +781,6 @@ public class DevKitCompilerPlugin : Plugin<Project> {
         project.pluginManager.apply {
             apply("org.jetbrains.kotlin.multiplatform")
             apply("com.github.gmazzo.buildconfig")
-            apply("java-test-fixtures")
             apply("com.github.node-gradle.node")
             apply("idea")
             apply("maven-publish")
