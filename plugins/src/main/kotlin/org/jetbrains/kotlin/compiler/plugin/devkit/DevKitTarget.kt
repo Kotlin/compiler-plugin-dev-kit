@@ -40,7 +40,6 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetComponent
-import org.jetbrains.kotlin.gradle.plugin.KotlinTargetTestRun
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests.Companion.DEFAULT_TEST_RUN_NAME
 import org.jetbrains.kotlin.gradle.plugin.ide.IdeMultiplatformImport
@@ -254,7 +253,11 @@ internal class SingleDevKitCompilationTestRunSource(override val compilation: De
     DevKitCompilationsTestRunSource(listOf(compilation), listOf(compilation)),
     CompilationExecutionSource<DevKitCompilation>
 
-public class DevKitTestRun(testRunName: String, override val target: DevKitTarget) :
+public class DevKitTestRun(
+    testRunName: String,
+    override val target: DevKitTarget,
+    override var executionTask: TaskProvider<KotlinJvmTest>,
+) :
     KotlinTaskTestRun<JvmClasspathTestRunSource, KotlinJvmTest>(testRunName, target),
     ClasspathTestRunSourceSupport {
     override fun setExecutionSourceFrom(
@@ -300,18 +303,19 @@ public class DevKitTestRun(testRunName: String, override val target: DevKitTarge
 internal class DevKitTestRunFactory(private val target: DevKitTarget) :
     NamedDomainObjectFactory<DevKitTestRun> {
     override fun create(name: String): DevKitTestRun {
-        return DevKitTestRun(name, target).apply {
-            val testTaskOrProvider =
-                target.project.registerTask<KotlinJvmTest>(testTaskName) { testTask ->
-                    testTask.targetName = target.disambiguationClassifier
-                    testTask.description = "Runs tests against Kotlin ${target.version}"
-                    testTask.group = JavaBasePlugin.VERIFICATION_GROUP
-                }
-
-            // TODO hacky, maybe we should forego DevKitTestRun entirely
-            @Suppress("INVISIBLE_SETTER")
-            executionTask = testTaskOrProvider
-
+        val testTaskName =
+            lowerCamelCaseName(
+                target.disambiguationClassifier,
+                name.takeIf { it != DEFAULT_TEST_RUN_NAME }?.removeSuffix("Test"),
+                AbstractKotlinTargetConfigurator.testTaskNameSuffix,
+            )
+        val testTaskOrProvider =
+            target.project.registerTask<KotlinJvmTest>(testTaskName) { testTask ->
+                testTask.targetName = target.disambiguationClassifier
+                testTask.description = "Runs tests against Kotlin ${target.version}"
+                testTask.group = JavaBasePlugin.VERIFICATION_GROUP
+            }
+        return DevKitTestRun(name, target, testTaskOrProvider).apply {
             setExecutionSourceFrom(target.testCompilation)
 
             target.project.extensions
@@ -327,14 +331,6 @@ private fun requireCompilationOfTarget(compilation: KotlinCompilation<*>, target
             "got the compilation ${compilation.name} of target ${compilation.target.name}"
     }
 }
-
-internal val KotlinTargetTestRun<*>.testTaskName: String
-    get() =
-        lowerCamelCaseName(
-            target.disambiguationClassifier,
-            name.takeIf { it != DEFAULT_TEST_RUN_NAME }?.removeSuffix("Test"),
-            AbstractKotlinTargetConfigurator.testTaskNameSuffix,
-        )
 
 internal fun DevKitTarget.configureArtifactsTask() {
     val apiElements = configurations.getByName(apiElementsConfigurationName)
