@@ -59,6 +59,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public const val TEST_FIXTURES_COMPILATION_NAME: String =
     TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME
+public const val ENTRY_POINT_COMPILATION_NAME: String = "entryPoint"
 
 public class DevKitTarget(
     delegate: Delegate,
@@ -232,7 +233,9 @@ internal class DevKitCompilationFactory(override val target: DevKitTarget) :
         get() = DevKitCompilation::class.java
 
     override fun create(name: String): DevKitCompilation {
-        val sourceSetName = defaultSourceSetName(name)
+        // there's only a single entry point, so name its source set the same
+        val sourceSetName =
+            if (name == ENTRY_POINT_COMPILATION_NAME) name else defaultSourceSetName(name)
 
         val javaSourceSet = javaSourceSets.maybeCreate(sourceSetName)
 

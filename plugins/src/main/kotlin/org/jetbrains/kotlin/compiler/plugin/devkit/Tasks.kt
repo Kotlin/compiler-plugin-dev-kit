@@ -1,12 +1,16 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.io.File
+import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.plugins.ide.api.GeneratorTask
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 
@@ -36,5 +40,22 @@ public abstract class GenerateTestsTask : JavaExec() {
     override fun exec() {
         generatedTestsDir.asFile.get().deleteRecursively()
         super.exec()
+    }
+}
+
+internal abstract class GenerateServices : DefaultTask() {
+    @get:OutputDirectory abstract val generatedServicesDir: DirectoryProperty
+    @get:Input val services: MapProperty<String, String> = project.objects.mapProperty()
+
+    @TaskAction
+    fun generateServices() {
+        val generatedServicesDir = generatedServicesDir.asFile.get()
+        generatedServicesDir.deleteRecursively()
+        val servicesDir = generatedServicesDir.resolve("META-INF/services")
+        servicesDir.mkdirs()
+        services.get().forEach { (service, implementation) ->
+            val serviceFile = servicesDir.resolve(service)
+            serviceFile.writeText(implementation)
+        }
     }
 }
