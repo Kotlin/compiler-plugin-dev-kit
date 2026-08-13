@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     kotlin("multiplatform")
     kotlin("compiler.plugin.devkit.compiler-plugin")
@@ -16,8 +14,6 @@ java {
 
 kotlin {
     explicitApi()
-    jvm { compilerOptions.jvmTarget = JvmTarget.JVM_17 }
-
     sourceSets.commonMain.dependencies { api(pluginDevKit("version-resolution")) }
 }
 

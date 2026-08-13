@@ -6,7 +6,6 @@ import kotlin.properties.Delegates
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.NamedDomainObjectFactory
-import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.PublishArtifact
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
@@ -50,6 +49,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.external.ExternalKotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.external.ExternalKotlinTargetDescriptor
 import org.jetbrains.kotlin.gradle.plugin.mpp.external.createCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.external.createExternalKotlinTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.external.publishSources
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
@@ -60,7 +60,11 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 public const val TEST_FIXTURES_COMPILATION_NAME: String =
     TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME
 
-public class DevKitTarget(delegate: Delegate, public val version: KotlinToolingVersion) :
+public class DevKitTarget(
+    delegate: Delegate,
+    public val version: KotlinToolingVersion,
+    private val isSurrogate: Boolean,
+) :
     DecoratedExternalKotlinTarget(delegate),
     HasConfigurableKotlinCompilerOptions<KotlinJvmCompilerOptions>,
     Named,
@@ -121,7 +125,7 @@ public class DevKitTarget(delegate: Delegate, public val version: KotlinToolingV
         get() = super.compilerOptions as KotlinJvmCompilerOptions
 
     override val publishable: Boolean
-        get() = false
+        get() = isSurrogate
 
     override fun equals(other: Any?): Boolean = other is DevKitTarget && other.version == version
 
@@ -129,20 +133,24 @@ public class DevKitTarget(delegate: Delegate, public val version: KotlinToolingV
 
     init {
         configureArtifactsTask()
+        if (isSurrogate) publishSources(mainCompilation)
     }
 
     override val kotlinComponents: Set<KotlinTargetComponent>
-        get() = emptySet()
+        get() = if (isSurrogate) super.kotlinComponents else emptySet()
 }
 
-internal fun KotlinMultiplatformExtension.createDevKitTarget(version: KotlinToolingVersion) =
-    createExternalKotlinTarget {
-        targetName = version.versionName
-        platformType = KotlinPlatformType.jvm
-        targetFactory = ExternalKotlinTargetDescriptor.TargetFactory {
-            DevKitTarget(it, version)
-        }
+internal fun KotlinMultiplatformExtension.createDevKitTarget(
+    version: KotlinToolingVersion,
+    isSurrogate: Boolean = false,
+) = createExternalKotlinTarget {
+    targetName = version.versionName
+    platformType = KotlinPlatformType.jvm
+    targetFactory = ExternalKotlinTargetDescriptor.TargetFactory {
+        DevKitTarget(it, version, isSurrogate)
+    }
 
+    if (!isSurrogate)
         // Deprioritize them compared to the main jar
         for (configurable in
             listOf(
@@ -161,19 +169,34 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(version: KotlinTool
                 )
             }
         }
-        configureIdeImport {
-            registerDependencyResolver(
-                resolver = IdeMultiVersionCompilationBinaryDependencyResolver(),
-                constraint = { sourceSet ->
-                    (sourceSet as? AbstractKotlinSourceSet)?.compilations?.any {
-                        it.target is DevKitTarget
-                    } == true
-                },
-                phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
-                priority = IdeMultiplatformImport.Priority.high,
+    listOf(apiElements, apiElementsPublished).forEach {
+        it.configure { target, configuration ->
+            configuration.extendsFrom(
+                configurations.named(target.mainCompilation.apiConfigurationName)
             )
         }
     }
+    listOf(runtimeElements, runtimeElementsPublished).forEach {
+        it.configure { target, configuration ->
+            configuration.extendsFrom(
+                configurations.named(target.mainCompilation.implementationConfigurationName),
+                configurations.named(target.mainCompilation.runtimeOnlyConfigurationName),
+            )
+        }
+    }
+    configureIdeImport {
+        registerDependencyResolver(
+            resolver = IdeMultiVersionCompilationBinaryDependencyResolver(),
+            constraint = { sourceSet ->
+                (sourceSet as? AbstractKotlinSourceSet)?.compilations?.any {
+                    it.target is DevKitTarget
+                } == true
+            },
+            phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
+            priority = IdeMultiplatformImport.Priority.high,
+        )
+    }
+}
 
 public class DevKitCompilation(delegate: Delegate, public val javaSourceSet: SourceSet) :
     DecoratedExternalKotlinCompilation(delegate) {
@@ -333,35 +356,45 @@ private fun requireCompilationOfTarget(compilation: KotlinCompilation<*>, target
 }
 
 internal fun DevKitTarget.configureArtifactsTask() {
-    val apiElements = configurations.getByName(apiElementsConfigurationName)
-    val runtimeElements = configurations.findByName(runtimeElementsConfigurationName)
-    createArtifact(apiElements, runtimeElements)
+    createArtifact(
+        artifactsTaskName,
+        disambiguationClassifier,
+        apiElementsConfiguration,
+        runtimeElementsConfiguration,
+        apiElementsPublishedConfiguration,
+        runtimeElementsPublishedConfiguration,
+    )
 }
 
-internal fun DevKitTarget.createArtifact(
-    apiElements: Configuration,
-    runtimeElements: Configuration?,
+context(_: HasProject)
+internal fun createArtifact(
+    artifactsTaskName: String,
+    disambiguationClassifier: String?,
+    vararg elementsConfiguration: Configuration,
 ) {
-    val mainCompilation = compilations.getByName(MAIN_COMPILATION_NAME)
-    val jvmJarTask = createArtifactsTask { jar -> jar.from(mainCompilation.output.allOutputs) }
-
-    createPublishArtifact(jvmJarTask, JAR_TYPE, apiElements, runtimeElements)
+    createPublishArtifact(
+        createArtifactsTask(artifactsTaskName, disambiguationClassifier),
+        JAR_TYPE,
+        *elementsConfiguration,
+    )
 }
 
-internal fun KotlinTarget.createArtifactsTask(configure: (Jar) -> Unit = {}): TaskProvider<Jar> {
-    return tasks.named<Jar>(artifactsTaskName) {
+context(_: HasProject)
+internal fun createArtifactsTask(
+    artifactsTaskName: String,
+    disambiguationClassifier: String?,
+    configure: (Jar) -> Unit = {},
+): TaskProvider<Jar> =
+    tasks.named<Jar>(artifactsTaskName) {
         description = "Assembles an archive containing the main classes."
         group = BasePlugin.BUILD_GROUP
         isPreserveFileTimestamps = false
         isReproducibleFileOrder = true
 
-        disambiguationClassifier?.let { classifier ->
-            archiveAppendix.set(classifier.toLowerCaseAsciiOnly())
-        }
+        disambiguationClassifier?.toLowerCaseAsciiOnly()?.let(archiveAppendix::set)
 
         configure(this)
     }
-}
 
 private fun String.toLowerCaseAsciiOnly(): String {
     val builder = StringBuilder(length)
@@ -379,16 +412,18 @@ private fun String.toLowerCaseAsciiOnly(): String {
  *
  * @param task The provider of the task to be added to the assemble lifecycle.
  */
-internal fun Project.addToAssemble(task: TaskProvider<*>) {
+context(_: HasProject)
+internal fun addToAssemble(task: TaskProvider<*>) {
     tasks.named(LifecycleBasePlugin.ASSEMBLE_TASK_NAME).configure { dependsOn(task) }
 }
 
-internal fun KotlinTarget.createPublishArtifact(
+context(_: HasProject)
+internal fun createPublishArtifact(
     artifactTask: TaskProvider<*>,
     artifactType: String,
-    vararg elementsConfiguration: Configuration?,
+    vararg elementsConfiguration: Configuration,
 ): PublishArtifact {
-    project.addToAssemble(artifactTask)
+    addToAssemble(artifactTask)
 
     val primaryConfig =
         elementsConfiguration.firstOrNull() ?: project.configurations.detachedConfiguration()
@@ -399,7 +434,7 @@ internal fun KotlinTarget.createPublishArtifact(
             type = artifactType
         }
 
-    elementsConfiguration.filterNotNull().forEach { configuration ->
+    elementsConfiguration.forEach { configuration ->
         configuration.outgoing.artifacts.add(artifact)
         configuration.outgoing.attributes.attribute(
             ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE,
