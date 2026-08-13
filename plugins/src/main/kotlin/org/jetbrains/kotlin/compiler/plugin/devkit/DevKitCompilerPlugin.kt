@@ -5,6 +5,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.jengelman.gradle.plugins.shadow.ShadowBasePlugin.Companion.shadow
 import com.github.jengelman.gradle.plugins.shadow.relocation.SimpleRelocator
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.SHADOW_JAR_TASK_NAME
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 import java.io.File
 import javax.inject.Inject
@@ -41,11 +43,9 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinHierarchyDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
-import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinHierarchyBuilder
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
-import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
@@ -112,14 +112,8 @@ internal constructor(override val project: Project) : HasProject {
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
 
-    // TODO get rid of jvm target entirely!
-    private val mainTarget = kotlinExtension.jvm()
-
     private val commonMain = kotlinExtension.run { sourceSets.commonMain.get() }
     private val commonTestFixtures = kotlinExtension.sourceSets.create("commonTestFixtures")
-    private val commonTest = kotlinExtension.run { sourceSets.commonTest.get() }
-
-    private val mainJar = tasks.named<Jar>(mainTarget.artifactsTaskName)
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -156,10 +150,11 @@ internal constructor(override val project: Project) : HasProject {
     public val testAgainst: NamedDomainObjectCollection<DevKitTarget> =
         kotlinExtension.targets.withType<DevKitTarget>()
 
+    private val surrogateTarget =
+        kotlinExtension.createDevKitTarget(kotlinToolingVersion, isSurrogate = true)
+    private val mainJar = tasks.named<Jar>(surrogateTarget.artifactsTaskName)
+
     init {
-        // The shared source sets compile against the build's own Kotlin version, so that version
-        // always needs a target, whatever the default test target ends up being.
-        testAgainst(kotlinToolingVersion)
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
     }
 
@@ -502,17 +497,6 @@ internal constructor(override val project: Project) : HasProject {
     }
 
     internal fun configurePlugins() {
-        for (compilation in
-            listOf(
-                KotlinCompilation.MAIN_COMPILATION_NAME,
-                KotlinCompilation.TEST_COMPILATION_NAME,
-            )) {
-            configurations.named(
-                mainTarget.compilations.getByName(compilation).compileDependencyConfigurationName
-            ) {
-                withCompilerVersionAttribute(kotlinToolingVersion)
-            }
-        }
         buildConfig {
             packageName.set(pluginPackage)
             forClass("PluginInfo") {
@@ -527,18 +511,35 @@ internal constructor(override val project: Project) : HasProject {
             optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
             optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
         }
-        // configure default test task
-        mainTarget.testRuns.named(KotlinTargetWithTests.DEFAULT_TEST_RUN_NAME) {
-            executionTask {
-                enabled = false
-                dependsOn(defaultTestTarget.map { it.testTask })
-            }
-        }
         project.pluginManager.withPlugin("com.gradleup.shadow") {
+            registerShadowJarCommon().configure {
+                configurations.convention(
+                    project.configurations
+                        .resolvable("shadowRuntimeElements") {
+                            val from =
+                                project.configurations.getByName(
+                                    surrogateTarget.mainCompilation
+                                        .runtimeDependencyConfigurationName
+                                )
+                            extendsFrom(from)
+                            attributes.addAllLater(from.attributes)
+
+                            // ensure it sees the pre-transformed artifacts
+                            attributes {
+                                attribute(
+                                    KotlinCompilerVersion.attribute,
+                                    KotlinCompilerVersion.noVersion,
+                                )
+                            }
+                        }
+                        .map(::listOf)
+                )
+            }
             tasks.shadowJar {
                 enableAutoRelocation.set(true)
                 relocationPrefix.set(pluginPackage)
                 archiveClassifier.set("")
+                archiveAppendix.set(mainJar.flatMap { it.archiveAppendix })
                 // relocate plugin package to itself, so it isn't accidentally auto-relocated
                 relocators.add(provider { SimpleRelocator(pluginPackage(), pluginPackage()) })
                 duplicatesStrategy = DuplicatesStrategy.INCLUDE
@@ -552,19 +553,41 @@ internal constructor(override val project: Project) : HasProject {
             mainJar { archiveClassifier.set("unshaded") }
 
             // https://github.com/GradleUp/shadow/blob/ec0900ee6ef6f6965e568e32e51bbd34ab299635/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/ShadowJavaPlugin.kt#L58
-            configurations {
-                fun Configuration.useShadowJar() {
-                    setExtendsFrom(emptyList())
-                    extendsFrom(shadow)
-                    outgoing.artifacts.clear()
-                    outgoing.variants.clear()
-                    outgoing.artifact(tasks.shadowJar)
-                }
-                named(mainTarget.apiElementsConfigurationName) { useShadowJar() }
-                named(mainTarget.runtimeElementsConfigurationName) { useShadowJar() }
+
+            fun Configuration.useShadowJar() {
+                setExtendsFrom(emptyList())
+                extendsFrom(configurations.shadow)
+                outgoing.artifacts.clear()
+                outgoing.variants.clear()
+                outgoing.artifact(tasks.shadowJar)
             }
+            for (configuration in
+                listOf(
+                    surrogateTarget.apiElementsConfiguration,
+                    surrogateTarget.runtimeElementsConfiguration,
+                    surrogateTarget.apiElementsPublishedConfiguration,
+                    surrogateTarget.runtimeElementsPublishedConfiguration,
+                )) configuration.useShadowJar()
         }
     }
+
+    private fun registerShadowJarCommon(): TaskProvider<ShadowJar> =
+        tasks
+            .register(SHADOW_JAR_TASK_NAME, ShadowJar::class.java) {
+                archiveClassifier.set("all")
+                exclude(
+                    "META-INF/INDEX.LIST",
+                    "META-INF/*.SF",
+                    "META-INF/*.DSA",
+                    "META-INF/*.RSA",
+                    // module-info.class in Multi-Release folders.
+                    "META-INF/versions/**/module-info.class",
+                    "module-info.class",
+                )
+
+                manifest.from(mainJar.get().manifest)
+            }
+            .also { addToAssemble(it) }
 
     internal fun configureTestTasks() {
         val testArtifacts = configurations.dependencyScope("testArtifacts")

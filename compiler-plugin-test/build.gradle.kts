@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -18,7 +17,6 @@ java {
 
 kotlin {
     explicitApi()
-    jvm { compilerOptions.jvmTarget = JvmTarget.JVM_17 }
 
     sourceSets.commonMain.dependencies {
         api(pluginDevKit("version-resolution"))
@@ -39,14 +37,12 @@ pluginDevKit {
             version != KotlinToolingVersion("2.4.20-Beta1")
 
     kotlin.applyPluginDevKitHierarchyTemplate {
-        groupVersions("nonJvm", { true }) {
-            groupVersions("pre2420Dev7600", { !supportsDumpClassifier(it) }) {
-                preDev(2, 4, 20, "pre2420Dev")
-            }
+        groupVersions("pre2420Dev7600", { !supportsDumpClassifier(it) }) {
+            preDev(2, 4, 20, "pre2420Dev")
+        }
 
-            postDev(2, 4, 20, "post2420Dev") {
-                groupVersions("post2420Dev7600", ::supportsDumpClassifier)
-            }
+        postDev(2, 4, 20, "post2420Dev") {
+            groupVersions("post2420Dev7600", ::supportsDumpClassifier)
         }
     }
 }
