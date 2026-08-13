@@ -16,12 +16,15 @@ internal fun createResourcesTask(compilation: DevKitCompilation) {
     val project = compilation.project
     val resourceSet = project.files({ compilation.allKotlinSourceSets.map { it.resources } })
     val resourcesDestinationDir = project.file(compilation.output.resourcesDir)
-    project.locateOrRegisterTask<ProcessResources>(compilation.processResourcesTaskName) {
-        resourcesTask ->
-        resourcesTask.description = "Processes ${resourceSet}."
-        resourcesTask.from(resourceSet)
-        resourcesTask.into(resourcesDestinationDir)
-    }
+    val resourcesTask =
+        project.locateOrRegisterTask<ProcessResources>(compilation.processResourcesTaskName) {
+            resourcesTask ->
+            resourcesTask.description = "Processes ${resourceSet}."
+            resourcesTask.from(resourceSet)
+            resourcesTask.into(resourcesDestinationDir)
+        }
+    @Suppress("DEPRECATION_ERROR")
+    compilation.output.resourcesDirProvider = resourcesTask.map { resourcesDestinationDir }
 }
 
 internal fun wireJavaSources(compilation: DevKitCompilation) {
@@ -46,7 +49,9 @@ internal fun wireJavaSources(compilation: DevKitCompilation) {
     )
 
     javaSourceSet.output.setResourcesDir(
-        java.util.concurrent.Callable { compilation.output.resourcesDir }
+        java.util.concurrent.Callable {
+            @Suppress("DEPRECATION_ERROR") compilation.output.resourcesDirProvider
+        }
     )
 }
 

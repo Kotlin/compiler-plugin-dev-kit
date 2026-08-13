@@ -1,17 +1,14 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import kotlin.reflect.KClass
-import kotlin.reflect.jvm.jvmName
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-public abstract class DevKitCompilerPluginRegistrar(
-    registrarClass: KClass<out DevKitComponentRegistrar>
-) : CompilerPluginRegistrar() {
+public abstract class DevKitCompilerPluginRegistrar(registrarClass: String) :
+    CompilerPluginRegistrar() {
     private val versionedRegistrar by lazy {
-        val loader = VersionedPluginClassLoading.resolve(registrarClass.java)
-        val registrar =
-            loader.loadClass(registrarClass.jvmName).getDeclaredConstructor().newInstance()
+        val loader =
+            VersionedPluginClassLoading.resolve(this@DevKitCompilerPluginRegistrar.javaClass)
+        val registrar = loader.loadClass(registrarClass).getDeclaredConstructor().newInstance()
         val method =
             registrar.javaClass.getMethod(
                 "registerExtensions",
@@ -26,10 +23,7 @@ public abstract class DevKitCompilerPluginRegistrar(
     final override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         versionedRegistrar(this, configuration)
     }
-}
 
-public interface DevKitComponentRegistrar {
-    public fun CompilerPluginRegistrar.ExtensionStorage.registerExtensions(
-        configuration: CompilerConfiguration
-    )
+    override val supportsK2: Boolean
+        get() = true
 }

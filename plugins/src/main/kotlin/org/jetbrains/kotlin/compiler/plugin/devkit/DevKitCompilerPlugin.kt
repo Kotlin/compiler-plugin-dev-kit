@@ -9,14 +9,11 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.SHADOW_JAR_TASK_NAME
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 import java.io.File
-import javax.inject.Inject
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.dsl.DependencyCollector
-import org.gradle.api.artifacts.dsl.GradleDependencies
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
@@ -40,73 +37,18 @@ import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.KotlinHierarchyDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.HasProject
-import org.jetbrains.kotlin.gradle.plugin.KotlinHierarchyBuilder
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.toKotlinVersion
-
-public interface DevKitTestDataLibrary : GradleDependencies {
-    /** Dependency collector for all platforms */
-    public val common: DependencyCollector
-
-    /** Dependency collector for JVM */
-    public val jvm: DependencyCollector
-
-    /** Dependency collector for JS */
-    public val js: DependencyCollector
-}
-
-public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
-    /**
-     * Registers a library for test data.
-     *
-     * You should use [DevKitCompilerPluginConfigExtension.testDataLibraries].[common], or one of
-     * its platform-specific collectors, if you want to register a library for all test data.
-     *
-     * This provides a convenient way of registering a conditionally available library for test
-     * data. You should use `configureTestDataLibrary` in your `testFixtures`, providing the
-     * `condition` for the library to be available.
-     *
-     * The library will be passed to tests under the property "[name].[jvm|js].classpath". if
-     * [addToBuildConfig], it'll also be available under TestDataLibraries.[name].
-     *
-     * This is *not* idempotent.
-     */
-    public fun register(
-        name: String,
-        isTransitive: Boolean = false,
-        addToBuildConfig: Boolean = true,
-        block: DevKitTestDataLibrary.() -> Unit = {},
-    ): DevKitTestDataLibrary
-}
-
-private abstract class DevKitTestDataLibrariesImpl
-@Inject
-constructor(private val pluginDevKit: DevKitCompilerPluginConfigExtension) :
-    DevKitTestDataLibraries {
-    override fun register(
-        name: String,
-        isTransitive: Boolean,
-        addToBuildConfig: Boolean,
-        block: DevKitTestDataLibrary.() -> Unit,
-    ): DevKitTestDataLibrary =
-        pluginDevKit.project.objects.newInstance<DevKitTestDataLibrary>().apply {
-            pluginDevKit.register(this, name, isTransitive, addToBuildConfig)
-            block()
-        }
-}
 
 @OptIn(ExperimentalWasmDsl::class)
 public open class DevKitCompilerPluginConfigExtension
-internal constructor(override val project: Project) : HasProject {
+internal constructor(override val project: Project) : HasProject, DevKitHierarchyDsl {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
@@ -125,6 +67,22 @@ internal constructor(override val project: Project) : HasProject {
             providers
                 .gradleProperty(PLUGIN_PACKAGE_PROPERTY)
                 .orElse(provider { project.group.toString() })
+        )
+
+    /** The fq-name of the class that implements `DevKitComponentRegistrar` */
+    public val componentRegistrar: Property<String> =
+        objects.property(
+            provider {
+                error("componentRegistrar must be set")
+            }
+        )
+
+    /** The fq-name of the class that implements `DevKitCommandLineProcessor` */
+    public val commandLineProcessor: Property<String> =
+        objects.property(
+            provider {
+                error("commandLineProcessor must be set")
+            }
         )
 
     /**
@@ -152,7 +110,39 @@ internal constructor(override val project: Project) : HasProject {
 
     private val surrogateTarget =
         kotlinExtension.createDevKitTarget(kotlinToolingVersion, isSurrogate = true)
-    private val mainJar = tasks.named<Jar>(surrogateTarget.artifactsTaskName)
+
+    private val genServicesDir =
+        layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
+    private val generateServices =
+        tasks.register<GenerateServices>("generateServices") {
+            generatedServicesDir.set(genServicesDir)
+            services.putAll(
+                provider {
+                    buildMap {
+                        if (componentRegistrar.isPresent)
+                            put(
+                                "org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar",
+                                $$"$${pluginPackage.get()}.PluginInfo$REGISTRAR_CLASS$1$Plugin",
+                            )
+                        if (commandLineProcessor.isPresent)
+                            put(
+                                "org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor",
+                                $$"$${pluginPackage.get()}.PluginInfo$PROCESSOR_CLASS$1$Plugin",
+                            )
+                    }
+                }
+            )
+        }
+    private val entryPointCompilation =
+        surrogateTarget.compilations.create("entryPoint") {
+            defaultSourceSet.kotlin.setSrcDirs(emptyList<Any>())
+            defaultSourceSet.resources.setSrcDirs(listOf(genServicesDir.get()))
+            tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
+        }
+    private val mainJar =
+        tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
+            from(entryPointCompilation.output.allOutputs)
+        }
 
     init {
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
@@ -299,6 +289,7 @@ internal constructor(override val project: Project) : HasProject {
         buildConfig.sourceSets.named(commonTestFixtures.name) {
             if (!addToBuildConfig) return@named
             forClass("TestDataLibraries") {
+                packageName.set(pluginPackage)
                 buildConfigField(
                     "org.jetbrains.kotlin.compiler.plugin.devkit.services.TestDataLibrary",
                     name,
@@ -325,169 +316,6 @@ internal constructor(override val project: Project) : HasProject {
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget = testAgainst(KotlinToolingVersion(version), action)
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyDsl.applyPluginDevKitHierarchyTemplate(
-        template: KotlinHierarchyBuilder.() -> Unit
-    ) {
-        applyHierarchyTemplate {
-            withSourceSetTree(
-                KotlinSourceSetTree.main,
-                KotlinSourceSetTree(TEST_FIXTURES_COMPILATION_NAME),
-                KotlinSourceSetTree.test,
-            )
-
-            common {
-                withCompilations { true }
-                template()
-            }
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.withVersions(condition: (KotlinToolingVersion) -> Boolean) {
-        withCompilations {
-            val target = it.target
-            target is DevKitTarget && condition(target.version)
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.withVersions(range: ClosedRange<KotlinToolingVersion>) {
-        withVersions { it in range }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.groupVersions(
-        name: String,
-        condition: (KotlinToolingVersion) -> Boolean,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions(condition)
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.groupVersions(
-        name: String,
-        range: ClosedRange<KotlinToolingVersion>,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions(range)
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.pre(
-        version: KotlinToolingVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions { it < version }
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
-        version: KotlinVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions { it.toKotlinVersion() < version }
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.post(
-        version: KotlinToolingVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions { it >= version }
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
-        version: KotlinVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions { it.toKotlinVersion() >= version }
-            build()
-        }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.pre(
-        version: String,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        pre(KotlinToolingVersion(version), name, build)
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
-        major: Int,
-        minor: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        preDev(KotlinVersion(major, minor), name, build)
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
-        major: Int,
-        minor: Int,
-        patch: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        preDev(KotlinVersion(major, minor, patch), name, build)
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.post(
-        version: String,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        post(KotlinToolingVersion(version), name, build)
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
-        major: Int,
-        minor: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        postDev(KotlinVersion(major, minor), name, build)
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
-        major: Int,
-        minor: Int,
-        patch: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        postDev(KotlinVersion(major, minor, patch), name, build)
-    }
-
     internal fun configure() {
         configurePlugins()
         configureTestTasks()
@@ -497,13 +325,45 @@ internal constructor(override val project: Project) : HasProject {
     }
 
     internal fun configurePlugins() {
-        buildConfig {
+        buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
             packageName.set(pluginPackage)
             forClass("PluginInfo") {
                 useKotlinOutput { internalVisibility = true }
                 buildConfigField("PLUGIN_ID") {
                     type(String::class)
                     expression(pluginPackage.map { "\"$it\"" })
+                }
+                buildConfigField("REGISTRAR_CLASS") {
+                    type("kotlin.reflect.KClass<*>")
+                    expression(
+                        componentRegistrar.map {
+                            """
+                            run {
+                               class Plugin: org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPluginRegistrar("$it") {
+                                 override val pluginId: String = PLUGIN_ID
+                               }
+                               Plugin::class
+                            }
+                        """
+                                .trimIndent()
+                        }
+                    )
+                }
+                buildConfigField("PROCESSOR_CLASS") {
+                    type("kotlin.reflect.KClass<*>")
+                    expression(
+                        commandLineProcessor.map {
+                            """
+                            run {
+                               class Plugin: org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCommandLineProcessor("$it") {
+                                 override val pluginId: String = PLUGIN_ID
+                               }
+                               Plugin::class
+                            }
+                        """
+                                .trimIndent()
+                        }
+                    )
                 }
             }
         }
@@ -536,12 +396,14 @@ internal constructor(override val project: Project) : HasProject {
                 )
             }
             tasks.shadowJar {
+                from(entryPointCompilation.output.allOutputs)
                 enableAutoRelocation.set(true)
                 relocationPrefix.set(pluginPackage)
                 archiveClassifier.set("")
                 archiveAppendix.set(mainJar.flatMap { it.archiveAppendix })
                 // relocate plugin package to itself, so it isn't accidentally auto-relocated
                 relocators.add(provider { SimpleRelocator(pluginPackage(), pluginPackage()) })
+                relocators.add(provider { SimpleRelocator(DEV_KIT_GROUP, DEV_KIT_GROUP) })
                 duplicatesStrategy = DuplicatesStrategy.INCLUDE
                 mergeServiceFiles()
                 dependencies {
@@ -738,9 +600,7 @@ internal constructor(override val project: Project) : HasProject {
 
     internal fun configureDependencies() {
         testAgainst.configureEach {
-            for (compilation in listOf(mainCompilation, testFixturesCompilation, testCompilation)) {
-                compilation.forceKotlinVersion(version)
-            }
+            compilations.all { forceKotlinVersion(this@configureEach.version) }
         }
         dependencies {
             setupCompilerVersionAttribute()
@@ -770,6 +630,15 @@ internal constructor(override val project: Project) : HasProject {
             api(
                 addRuntimeDependency.ifTrue {
                     "$DEV_KIT_GROUP:compiler-plugin-test:$DEV_KIT_VERSION"
+                }
+            )
+        }
+
+        entryPointCompilation.defaultSourceSet.dependencies {
+            compileOnly(kotlin("compiler"))
+            compileOnly(
+                addRuntimeDependency.ifTrue {
+                    "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"
                 }
             )
         }

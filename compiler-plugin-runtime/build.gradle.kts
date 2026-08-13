@@ -15,11 +15,19 @@ java {
 kotlin {
     explicitApi()
     sourceSets.commonMain.dependencies { api(pluginDevKit("version-resolution")) }
+    sourceSets {
+        entryPoint {
+            dependencies { api(pluginDevKit("version-resolution")) }
+            kotlin.srcDir("src/entryPoint/kotlin")
+        }
+    }
 }
 
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
+    componentRegistrar.unsetConvention()
+    commandLineProcessor.unsetConvention()
 }
 
 tasks.generateTests { enabled = false }
