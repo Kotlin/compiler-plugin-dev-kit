@@ -2,7 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import java.nio.file.FileSystems.newFileSystem
+import java.nio.file.Path
+import java.util.jar.Manifest
+import kotlin.io.path.div
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.forEachDirectoryEntry
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+
 public object VersionResolution {
+    public const val PLUGIN_PATH: String = "META-INF/kotlin/plugin"
+    public const val VERSIONS_PATH: String = "versions"
+    public const val DEPENDENCIES_PATH: String = "dependencies"
+
     /**
      * Pick the highest compatible version.
      *
@@ -20,7 +36,7 @@ public object VersionResolution {
      * This ensures that a dev build like 2.3.20-dev-7791 doesn't incorrectly match 2.3.20-Beta1
      * just because beta > dev in maturity ordering.
      */
-    public fun resolveVersion(
+    private fun resolveVersion(
         currentVersion: KotlinToolingVersion,
         versions: List<KotlinToolingVersion>,
     ): KotlinToolingVersion? {
@@ -74,4 +90,75 @@ public object VersionResolution {
         currentVersion: KotlinToolingVersion,
         versions: List<KotlinToolingVersion>,
     ) = versions.filter { it.hasSameBaseVersionAs(currentVersion) }.minOrNull()
+
+    public fun MutableList<in Path>.addOverlayAndDependencies(
+        id: String?,
+        path: Path,
+        currentVersion: KotlinToolingVersion,
+    ): KotlinToolingVersion? {
+        path.openDirectory { root ->
+            // find ID as the unique directory here
+            val id =
+                id
+                    ?: (root / PLUGIN_PATH)
+                        .takeIf { it.isDirectory() }
+                        ?.listDirectoryEntries()
+                        ?.singleOrNull()
+                        ?.name
+                    ?: return@openDirectory
+            return findVersion(root, id, currentVersion)?.also {
+                val dependenciesDir = root / PLUGIN_PATH / id / DEPENDENCIES_PATH
+                if (dependenciesDir.isDirectory()) {
+                    dependenciesDir.forEachDirectoryEntry {
+                        addOverlayAndDependencies(null, it, currentVersion)
+                    }
+                }
+
+                add(root / PLUGIN_PATH / id / VERSIONS_PATH / it.toString())
+                add(path)
+            }
+        }
+        // we ignore entryPoint and other dependencies from irrelevant jars
+        // importantly, id == null means this is a dependency, so
+        // for dependencies, we'll add them to the classpath
+        if (id == null) add(path)
+        return null
+    }
+
+    private fun findVersion(
+        inputRoot: Path,
+        id: String,
+        version: KotlinToolingVersion,
+    ): KotlinToolingVersion? {
+        val manifestPath = inputRoot / "META-INF" / "MANIFEST.MF"
+        if (!manifestPath.exists()) return null
+
+        val manifest = manifestPath.inputStream().use(::Manifest)
+        if (manifest.mainAttributes.getValue("Kotlin-Compiler-Plugin-Multi-Release") != "true")
+            return null
+
+        val versionsDir = inputRoot / PLUGIN_PATH / id / VERSIONS_PATH
+        if (!versionsDir.isDirectory()) return null
+
+        return resolveVersion(
+            version,
+            versionsDir.listDirectoryEntries().map { KotlinToolingVersion(it.name) },
+        )
+    }
+
+    public inline fun Path.openDirectory(block: (Path) -> Unit): Boolean =
+        when {
+            !exists() -> false
+            extension == "jar" ->
+                newFileSystem(this).use {
+                    block(it.rootDirectories.single())
+                    true
+                }
+
+            isDirectory() -> {
+                block(this)
+                true
+            }
+            else -> false
+        }
 }

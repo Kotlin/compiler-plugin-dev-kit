@@ -24,7 +24,9 @@ internal fun createResourcesTask(compilation: DevKitCompilation) {
             resourcesTask.into(resourcesDestinationDir)
         }
     @Suppress("DEPRECATION_ERROR")
-    compilation.output.resourcesDirProvider = resourcesTask.map { resourcesDestinationDir }
+    compilation.output.resourcesDirProvider = resourcesTask.map {
+        resourcesDestinationDir
+    }
 }
 
 internal fun wireJavaSources(compilation: DevKitCompilation) {

@@ -116,7 +116,7 @@ public class DevKitTarget(
     init {
         testRuns.create(DEFAULT_TEST_RUN_NAME)
         // ensure task is of type org.gradle.api.tasks.bundling.Jar
-        project.locateOrRegisterTask<Jar>(lowerCamelCaseName(targetName, "jar")) {}
+        project.locateOrRegisterTask<DevKitJar>(lowerCamelCaseName(targetName, "jar")) {}
     }
 
     public val testTask: TaskProvider<KotlinJvmTest> =
@@ -143,6 +143,7 @@ public class DevKitTarget(
 
 internal fun KotlinMultiplatformExtension.createDevKitTarget(
     version: KotlinToolingVersion,
+    areDependenciesEmbedded: Boolean,
     isSurrogate: Boolean = false,
 ) = createExternalKotlinTarget {
     targetName = version.versionName
@@ -170,19 +171,21 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
                 )
             }
         }
-    listOf(apiElements, apiElementsPublished).forEach {
-        it.configure { target, configuration ->
-            configuration.extendsFrom(
-                configurations.named(target.mainCompilation.apiConfigurationName)
-            )
+    if (!areDependenciesEmbedded) {
+        listOf(apiElements, apiElementsPublished).forEach {
+            it.configure { target, configuration ->
+                configuration.extendsFrom(
+                    configurations.named(target.mainCompilation.apiConfigurationName)
+                )
+            }
         }
-    }
-    listOf(runtimeElements, runtimeElementsPublished).forEach {
-        it.configure { target, configuration ->
-            configuration.extendsFrom(
-                configurations.named(target.mainCompilation.implementationConfigurationName),
-                configurations.named(target.mainCompilation.runtimeOnlyConfigurationName),
-            )
+        listOf(runtimeElements, runtimeElementsPublished).forEach {
+            it.configure { target, configuration ->
+                configuration.extendsFrom(
+                    configurations.named(target.mainCompilation.implementationConfigurationName),
+                    configurations.named(target.mainCompilation.runtimeOnlyConfigurationName),
+                )
+            }
         }
     }
     configureIdeImport {

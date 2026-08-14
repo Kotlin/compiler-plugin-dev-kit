@@ -4,16 +4,13 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import java.io.File
-import javax.inject.Inject
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.attributes.Usage
-import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
@@ -44,8 +41,9 @@ import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 @OptIn(ExperimentalWasmDsl::class)
-public open class DevKitCompilerPluginConfigExtension
-internal constructor(override val project: Project) : HasProject, DevKitHierarchyDsl {
+public open class DevKitCompilerConfigExtension
+internal constructor(override val project: Project, private val isPlugin: Boolean) :
+    HasProject, DevKitHierarchyDsl {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
@@ -70,7 +68,7 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     public val componentRegistrar: Property<String> =
         objects.property(
             provider {
-                error("componentRegistrar must be set")
+                if (isPlugin) error("componentRegistrar must be set") else null
             }
         )
 
@@ -78,7 +76,7 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     public val commandLineProcessor: Property<String> =
         objects.property(
             provider {
-                error("commandLineProcessor must be set")
+                if (isPlugin) error("commandLineProcessor must be set") else null
             }
         )
 
@@ -106,7 +104,11 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
         kotlinExtension.targets.withType<DevKitTarget>()
 
     private val surrogateTarget =
-        kotlinExtension.createDevKitTarget(kotlinToolingVersion, isSurrogate = true)
+        kotlinExtension.createDevKitTarget(
+            kotlinToolingVersion,
+            areDependenciesEmbedded = isPlugin,
+            isSurrogate = true,
+        )
 
     private val genServicesDir =
         layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
@@ -137,13 +139,13 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
             tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
         }
     private val mainJar =
-        tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
+        tasks.named<DevKitJar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
-            duplicatesStrategy = DuplicatesStrategy.WARN
         }
 
     init {
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
+        tasks.withType<DevKitJar> { pluginId.set(pluginPackage) }
     }
 
     /**
@@ -198,7 +200,7 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     public val generateTests: TaskProvider<GenerateTestsTask> =
         tasks.register("generateTests", GenerateTestsTask::class) {
             description = "Generate compiler plugin tests"
-            generatedTestsDir.set(this@DevKitCompilerPluginConfigExtension.generatedTestsDir)
+            generatedTestsDir.set(this@DevKitCompilerConfigExtension.generatedTestsDir)
 
             classpath(
                 provider {
@@ -304,7 +306,7 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     ): DevKitTarget {
         val target =
             testAgainst.findByName(version.versionName)
-                ?: kotlinExtension.createDevKitTarget(version)
+                ?: kotlinExtension.createDevKitTarget(version, areDependenciesEmbedded = isPlugin)
         return target.apply(action)
     }
 
@@ -323,6 +325,11 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     }
 
     internal fun configurePlugins() {
+        kotlinExtension.compilerOptions {
+            optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
+            optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
+        }
+        if (!isPlugin) return
         buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
             packageName.set(pluginPackage)
             forClass("PluginInfo") {
@@ -365,47 +372,52 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
                 }
             }
         }
-        kotlinExtension.compilerOptions {
-            optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
-            optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
-        }
-        project.pluginManager.withPlugin("com.gradleup.shadow") {
-            mainJar {
-                val shadowRuntimeElements =
-                    project.configurations.resolvable("shadowRuntimeElements") {
-                        val from =
-                            project.configurations.getByName(
-                                surrogateTarget.mainCompilation.runtimeDependencyConfigurationName
-                            )
-                        extendsFrom(from)
-                        attributes.addAllLater(from.attributes)
+        mainJar {
+            val includedDependencies =
+                project.configurations.resolvable("includedDependencies") {
+                    val from =
+                        project.configurations.getByName(
+                            surrogateTarget.mainCompilation.runtimeDependencyConfigurationName
+                        )
+                    extendsFrom(from)
+                    attributes.addAllLater(from.attributes)
 
-                        // ensure it sees the pre-transformed artifacts
-                        attributes {
-                            attribute(
-                                KotlinCompilerVersion.attribute,
-                                KotlinCompilerVersion.noVersion,
-                            )
-                        }
-                        exclude(module = "kotlin-stdlib")
+                    // ensure it sees the pre-transformed artifacts
+                    attributes {
+                        attribute(
+                            KotlinCompilerVersion.attribute,
+                            KotlinCompilerVersion.noVersion,
+                        )
                     }
-
-                // The following is required for CC compatibility (Project.zipTree(Object) cannot be
-                // used).
-                val archiveOperations = run {
-                    abstract class InjectionTarget {
-                        @get:Inject abstract val archiveOperations: ArchiveOperations
-                    }
-                    project.objects.newInstance(InjectionTarget::class.java).archiveOperations
+                    exclude(module = "kotlin-stdlib")
                 }
-                // Include the compiler plugin's embedded dependency classes, unzipping JARs.
-                from(
-                    provider {
-                        shadowRuntimeElements().elements().map {
-                            archiveOperations.zipTree(it.asFile)
-                        }
+            val includedEntryPoint =
+                project.configurations.create("includedEntryPoint") {
+                    val from =
+                        project.configurations.getByName(
+                            surrogateTarget.mainCompilation.runtimeDependencyConfigurationName
+                        )
+                    attributes.addAllLater(from.attributes)
+
+                    // ensure it sees the pre-transformed artifacts
+                    attributes {
+                        attribute(
+                            KotlinCompilerVersion.attribute,
+                            KotlinCompilerVersion.noVersion,
+                        )
                     }
-                )
+                    exclude(module = "kotlin-stdlib")
+                }
+            dependencies {
+                includedEntryPoint("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION")
+            }
+            this.includedDependencies.from(includedDependencies)
+            from(
+                provider {
+                    includedEntryPoint.elements().map { archiveOperations.zipTree(it.asFile) }
+                }
+            ) {
+                exclude("META-INF/")
             }
         }
     }
@@ -505,16 +517,8 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
         tasks.withType<Jar> {
             manifest { attributes("Kotlin-Compiler-Plugin-Multi-Release" to true) }
         }
-        context(target: DevKitTarget)
-        fun Jar.copyVersionFiles(compilation: DevKitCompilation) = metaInf {
-            into("kotlin/plugin/versions/${target.version}") {
-                from(compilation.output.allOutputs) {
-                    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-                }
-            }
-        }
         testAgainst.configureEach {
-            mainJar { copyVersionFiles(mainCompilation) }
+            mainJar { versioned(version) { from(mainCompilation.output.allOutputs) } }
         }
     }
 
@@ -543,7 +547,9 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
 
     internal fun configureDependencies() {
         testAgainst.configureEach {
-            compilations.all { forceKotlinVersion(this@configureEach.version) }
+            for (compilation in listOf(mainCompilation, testFixturesCompilation, testCompilation)) {
+                compilation.forceKotlinVersion(this@configureEach.version)
+            }
         }
         dependencies {
             setupCompilerVersionAttribute()
@@ -611,19 +617,32 @@ private fun Test.setLibraryProperty(
 }
 
 @OptIn(ExperimentalWasmDsl::class)
+private fun Project.applyNeededPlugins() {
+    pluginManager.apply {
+        apply("org.jetbrains.kotlin.multiplatform")
+        apply("com.github.gmazzo.buildconfig")
+        apply("com.github.node-gradle.node")
+        apply("idea")
+        apply("maven-publish")
+        apply("$DEV_KIT_GROUP.functional-test-publishing")
+        apply(D8Plugin::class.java)
+    }
+}
+
 public class DevKitCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        project.pluginManager.apply {
-            apply("org.jetbrains.kotlin.multiplatform")
-            apply("com.github.gmazzo.buildconfig")
-            apply("com.github.node-gradle.node")
-            apply("idea")
-            apply("maven-publish")
-            apply("$DEV_KIT_GROUP.functional-test-publishing")
-            apply(D8Plugin::class.java)
-        }
+        project.applyNeededPlugins()
         val pluginDevKit =
-            project.extensions.create<DevKitCompilerPluginConfigExtension>("pluginDevKit", project)
+            project.extensions.create<DevKitCompilerConfigExtension>("pluginDevKit", project, true)
+        pluginDevKit.configure()
+    }
+}
+
+public class DevKitCompilerLibrary : Plugin<Project> {
+    override fun apply(project: Project) {
+        project.applyNeededPlugins()
+        val pluginDevKit =
+            project.extensions.create<DevKitCompilerConfigExtension>("pluginDevKit", project, false)
         pluginDevKit.configure()
     }
 }

@@ -7,7 +7,10 @@ public abstract class DevKitCompilerPluginRegistrar(registrarClass: String) :
     CompilerPluginRegistrar() {
     private val versionedRegistrar by lazy {
         val loader =
-            VersionedPluginClassLoading.resolve(this@DevKitCompilerPluginRegistrar.javaClass)
+            VersionedPluginClassLoading.resolve(
+                this@DevKitCompilerPluginRegistrar.javaClass,
+                pluginId,
+            )
         val registrar = loader.loadClass(registrarClass).getDeclaredConstructor().newInstance()
         val method =
             registrar.javaClass.getMethod(

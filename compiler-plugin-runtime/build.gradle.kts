@@ -1,6 +1,6 @@
 plugins {
     kotlin("multiplatform")
-    kotlin("compiler.plugin.devkit.compiler-plugin")
+    pluginDevKit("compiler-library")
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
@@ -26,8 +26,6 @@ kotlin {
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
-    componentRegistrar.unsetConvention()
-    commandLineProcessor.unsetConvention()
 }
 
 tasks.generateTests { enabled = false }
