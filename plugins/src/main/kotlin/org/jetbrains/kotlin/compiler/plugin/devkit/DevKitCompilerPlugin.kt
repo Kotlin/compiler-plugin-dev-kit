@@ -3,18 +3,14 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
-import com.github.jengelman.gradle.plugins.shadow.ShadowBasePlugin.Companion.shadow
-import com.github.jengelman.gradle.plugins.shadow.relocation.SimpleRelocator
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.SHADOW_JAR_TASK_NAME
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 import java.io.File
+import javax.inject.Inject
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Usage
+import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
@@ -26,6 +22,7 @@ import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
@@ -142,6 +139,7 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
     private val mainJar =
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
+            duplicatesStrategy = DuplicatesStrategy.WARN
         }
 
     init {
@@ -372,84 +370,45 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
             optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
         }
         project.pluginManager.withPlugin("com.gradleup.shadow") {
-            registerShadowJarCommon().configure {
-                configurations.convention(
-                    project.configurations
-                        .resolvable("shadowRuntimeElements") {
-                            val from =
-                                project.configurations.getByName(
-                                    surrogateTarget.mainCompilation
-                                        .runtimeDependencyConfigurationName
-                                )
-                            extendsFrom(from)
-                            attributes.addAllLater(from.attributes)
+            mainJar {
+                val shadowRuntimeElements =
+                    project.configurations.resolvable("shadowRuntimeElements") {
+                        val from =
+                            project.configurations.getByName(
+                                surrogateTarget.mainCompilation.runtimeDependencyConfigurationName
+                            )
+                        extendsFrom(from)
+                        attributes.addAllLater(from.attributes)
 
-                            // ensure it sees the pre-transformed artifacts
-                            attributes {
-                                attribute(
-                                    KotlinCompilerVersion.attribute,
-                                    KotlinCompilerVersion.noVersion,
-                                )
-                            }
+                        // ensure it sees the pre-transformed artifacts
+                        attributes {
+                            attribute(
+                                KotlinCompilerVersion.attribute,
+                                KotlinCompilerVersion.noVersion,
+                            )
                         }
-                        .map(::listOf)
+                        exclude(module = "kotlin-stdlib")
+                    }
+
+                // The following is required for CC compatibility (Project.zipTree(Object) cannot be
+                // used).
+                val archiveOperations = run {
+                    abstract class InjectionTarget {
+                        @get:Inject abstract val archiveOperations: ArchiveOperations
+                    }
+                    project.objects.newInstance(InjectionTarget::class.java).archiveOperations
+                }
+                // Include the compiler plugin's embedded dependency classes, unzipping JARs.
+                from(
+                    provider {
+                        shadowRuntimeElements().elements().map {
+                            archiveOperations.zipTree(it.asFile)
+                        }
+                    }
                 )
             }
-            tasks.shadowJar {
-                from(entryPointCompilation.output.allOutputs)
-                enableAutoRelocation.set(true)
-                relocationPrefix.set(pluginPackage)
-                archiveClassifier.set("")
-                archiveAppendix.set(mainJar.flatMap { it.archiveAppendix })
-                // relocate plugin package to itself, so it isn't accidentally auto-relocated
-                relocators.add(provider { SimpleRelocator(pluginPackage(), pluginPackage()) })
-                relocators.add(provider { SimpleRelocator(DEV_KIT_GROUP, DEV_KIT_GROUP) })
-                duplicatesStrategy = DuplicatesStrategy.INCLUDE
-                mergeServiceFiles()
-                dependencies {
-                    exclude(dependency("org.jetbrains:.*"))
-                    exclude(dependency("org.intellij:.*"))
-                    exclude(dependency("org.jetbrains.kotlin:.*"))
-                }
-            }
-            mainJar { archiveClassifier.set("unshaded") }
-
-            // https://github.com/GradleUp/shadow/blob/ec0900ee6ef6f6965e568e32e51bbd34ab299635/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/ShadowJavaPlugin.kt#L58
-
-            fun Configuration.useShadowJar() {
-                setExtendsFrom(emptyList())
-                extendsFrom(configurations.shadow)
-                outgoing.artifacts.clear()
-                outgoing.variants.clear()
-                outgoing.artifact(tasks.shadowJar)
-            }
-            for (configuration in
-                listOf(
-                    surrogateTarget.apiElementsConfiguration,
-                    surrogateTarget.runtimeElementsConfiguration,
-                    surrogateTarget.apiElementsPublishedConfiguration,
-                    surrogateTarget.runtimeElementsPublishedConfiguration,
-                )) configuration.useShadowJar()
         }
     }
-
-    private fun registerShadowJarCommon(): TaskProvider<ShadowJar> =
-        tasks
-            .register(SHADOW_JAR_TASK_NAME, ShadowJar::class.java) {
-                archiveClassifier.set("all")
-                exclude(
-                    "META-INF/INDEX.LIST",
-                    "META-INF/*.SF",
-                    "META-INF/*.DSA",
-                    "META-INF/*.RSA",
-                    // module-info.class in Multi-Release folders.
-                    "META-INF/versions/**/module-info.class",
-                    "module-info.class",
-                )
-
-                manifest.from(mainJar.get().manifest)
-            }
-            .also { addToAssemble(it) }
 
     internal fun configureTestTasks() {
         val testArtifacts = configurations.dependencyScope("testArtifacts")
@@ -546,22 +505,9 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
         tasks.withType<Jar> {
             manifest { attributes("Kotlin-Compiler-Plugin-Multi-Release" to true) }
         }
-        val versionMarker =
-            tasks.register("versionMarker") {
-                val markerFile = layout.buildDirectory.file("compiler-plugin-devkit/.marker")
-                outputs.file(markerFile).withPropertyName("versionMarker")
-                doLast {
-                    markerFile.get().asFile.apply {
-                        parentFile.mkdirs()
-                        writeText("")
-                    }
-                }
-            }
         context(target: DevKitTarget)
         fun Jar.copyVersionFiles(compilation: DevKitCompilation) = metaInf {
             into("kotlin/plugin/versions/${target.version}") {
-                // Ensures the directory exists in the jar even if `main` has no output.
-                from(versionMarker)
                 from(compilation.output.allOutputs) {
                     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                 }
@@ -569,9 +515,6 @@ internal constructor(override val project: Project) : HasProject, DevKitHierarch
         }
         testAgainst.configureEach {
             mainJar { copyVersionFiles(mainCompilation) }
-            project.pluginManager.withPlugin("com.gradleup.shadow") {
-                tasks.shadowJar { copyVersionFiles(mainCompilation) }
-            }
         }
     }
 
