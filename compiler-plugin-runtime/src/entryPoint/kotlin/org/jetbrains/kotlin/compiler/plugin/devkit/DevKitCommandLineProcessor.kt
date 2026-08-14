@@ -6,7 +6,8 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 
 public abstract class DevKitCommandLineProcessor(processorClass: String) : CommandLineProcessor {
     private val versionedProcessor by lazy {
-        val loader = VersionedPluginClassLoading.resolve(this@DevKitCommandLineProcessor.javaClass)
+        val loader =
+            VersionedPluginClassLoading.resolve(this@DevKitCommandLineProcessor.javaClass, pluginId)
         val clp = loader.loadClass(processorClass).getDeclaredConstructor().newInstance()
         val processOption =
             clp.javaClass.getMethod(

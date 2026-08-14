@@ -41,6 +41,11 @@ gradlePlugin {
             id = "$group.compiler-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPlugin"
         }
+        create("compilerLibrary") {
+            id = "$group.compiler-library"
+            implementationClass =
+                "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerLibrary"
+        }
         create("gradlePlugin") {
             id = "$group.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"

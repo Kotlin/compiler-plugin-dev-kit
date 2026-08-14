@@ -20,7 +20,7 @@ public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
     /**
      * Registers a library for test data.
      *
-     * You should use [DevKitCompilerPluginConfigExtension.testDataLibraries].[common], or one of its
+     * You should use [DevKitCompilerConfigExtension.testDataLibraries].[common], or one of its
      * platform-specific collectors, if you want to register a library for all test data.
      *
      * This provides a convenient way of registering a conditionally available library for test
@@ -42,7 +42,7 @@ public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
 
 internal abstract class DevKitTestDataLibrariesImpl
 @Inject
-constructor(private val pluginDevKit: DevKitCompilerPluginConfigExtension) : DevKitTestDataLibraries {
+constructor(private val pluginDevKit: DevKitCompilerConfigExtension) : DevKitTestDataLibraries {
     override fun register(
         name: String,
         isTransitive: Boolean,

@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 }
 
 include("compiler-plugin-runtime")
+
 include("compiler-plugin-test")
 
 include("gradle-plugin-runtime")

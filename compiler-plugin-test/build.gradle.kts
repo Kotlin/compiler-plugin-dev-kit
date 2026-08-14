@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
     kotlin("multiplatform")
-    kotlin("compiler.plugin.devkit.compiler-plugin")
+    pluginDevKit("compiler-library")
     id("com.vanniktech.maven.publish") version libs.versions.publish
 }
 
@@ -31,8 +31,6 @@ kotlin {
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
-    componentRegistrar.unsetConvention()
-    commandLineProcessor.unsetConvention()
 
     fun supportsDumpClassifier(version: KotlinToolingVersion) =
         version >= KotlinToolingVersion("2.4.20-dev-7600") &&
