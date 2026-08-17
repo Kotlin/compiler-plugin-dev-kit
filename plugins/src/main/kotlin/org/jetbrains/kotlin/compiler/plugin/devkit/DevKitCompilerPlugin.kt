@@ -335,7 +335,7 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
             optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
             optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
         }
-        tasks.register("defaultTest") {
+        tasks.register<DefaultTestTask>("defaultTest") {
             enabled = false
             dependsOn(defaultTestTarget.map { it.testTask })
         }
