@@ -10,7 +10,10 @@ import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.options.Option
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.mapProperty
+import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.api.GeneratorTask
 import org.gradle.plugins.ide.internal.generator.generator.Generator
 
@@ -57,5 +60,16 @@ internal abstract class GenerateServices : DefaultTask() {
             val serviceFile = servicesDir.resolve(service)
             serviceFile.writeText(implementation)
         }
+    }
+}
+
+internal open class DefaultTestTask : DefaultTask() {
+    @Option(
+        option = "tests",
+        description = "Sets test class or method name to be included, '*' is supported.",
+    )
+    open fun setTestNameIncludePatterns(testNamePattern: List<String>): DefaultTestTask {
+        project.tasks.withType<Test> { setTestNameIncludePatterns(testNamePattern) }
+        return this
     }
 }
