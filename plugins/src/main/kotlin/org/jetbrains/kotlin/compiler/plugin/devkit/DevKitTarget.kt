@@ -106,12 +106,11 @@ public class DevKitTarget(
         test.action()
     }
 
-    override val testRuns: NamedDomainObjectContainer<DevKitTestRun> by lazy {
+    override val testRuns: NamedDomainObjectContainer<DevKitTestRun> =
         project.objects.domainObjectContainer(
             DevKitTestRun::class.java,
             DevKitTestRunFactory(this),
         )
-    }
 
     init {
         testRuns.create(DEFAULT_TEST_RUN_NAME)

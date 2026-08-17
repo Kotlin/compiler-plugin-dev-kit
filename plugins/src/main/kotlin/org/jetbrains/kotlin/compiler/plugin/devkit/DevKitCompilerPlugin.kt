@@ -335,6 +335,10 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
             optIn.add("org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
             optIn.add("org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI")
         }
+        tasks.register("defaultTest") {
+            enabled = false
+            dependsOn(defaultTestTarget.map { it.testTask })
+        }
         if (!isPlugin) return
         buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
             packageName.set(pluginPackage)
