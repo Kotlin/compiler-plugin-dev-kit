@@ -10,7 +10,6 @@ gradle = "9.2.0"
 ktfmt = "0.64"
 node-gradle = "7.0.2"
 publish = "0.37.0"
-shadow = "9.6.0"
 spotless = "8.8.0"
 tapmoc = "0.4.2"
 testkit-plugin = "0.19"
@@ -29,7 +28,6 @@ tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
 gradle-public-api = { group = "org.gradle.experimental", name = "gradle-public-api", version.ref = "gradle" }
-gradleup-shadow = { group = "com.gradleup.shadow", name = "shadow-gradle-plugin", version.ref = "shadow" }
 node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }
 testkit-plugin = { group = "com.autonomousapps", name = "gradle-testkit-plugin", version.ref = "testkit-plugin" }
 testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support" }
