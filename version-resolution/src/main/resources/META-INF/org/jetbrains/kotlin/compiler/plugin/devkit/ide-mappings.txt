@@ -29,6 +29,8 @@
 253.33813.14=2.3.0-dev-9992
 # IntelliJ IDEA 2025.3.6 (stable)
 253.33813.25=2.3.0-dev-9992
+# IntelliJ IDEA 2025.3.6.1 (stable)
+253.33813.55=2.3.0-dev-9992
 # IntelliJ IDEA 2026.1 (eap)
 261.17801.55=2.4.0-dev-2633
 # IntelliJ IDEA 2026.1 (eap)
@@ -62,10 +64,30 @@
 # Android Studio Quail 3 | 2026.1.3 Canary 2 (canary)
 # Android Studio Quail 3 | 2026.1.3 Canary 1 (canary)
 # Android Studio Quail 2 | 2026.1.2 Canary 7 (canary)
+# Android Studio Quail 2 | 2026.1.2 Patch 1 (stable)
 261.25134.95=2.4.0-dev-2633
 # IntelliJ IDEA 2026.1.4 (rc)
 261.26222.22=2.4.0-dev-2633
 # IntelliJ IDEA 2026.1.4 (stable)
 # Android Studio Quail 3 | 2026.1.3 RC 1 (beta)
 # Android Studio Quail 3 | 2026.1.3 Canary 4 (canary)
+# Android Studio Quail 3 | 2026.1.3 Patch 1 (stable)
+# Android Studio Quail 3 | 2026.1.3 (stable)
+# Android Studio Quail 4 | 2026.1.4 RC 1 (beta)
+# Android Studio Quail 3 | 2026.1.3 RC 2 (beta)
+# Android Studio Quail 4 | 2026.1.4 Canary 4 (canary)
+# Android Studio Quail 4 | 2026.1.4 Canary 3 (canary)
+# Android Studio Quail 4 | 2026.1.4 Canary 2 (canary)
+# Android Studio Quail 4 | 2026.1.4 Canary 1 (canary)
 261.26222.65=2.4.0-dev-2633
+# IntelliJ IDEA 2026.1.5 (rc)
+261.27258.27=2.4.0-dev-2633
+# IntelliJ IDEA 2026.1.5 (stable)
+261.27258.48=2.4.0-dev-2633
+# IntelliJ IDEA 2026.2.1 (stable)
+# Android Studio Rabbit 1 | 2026.2.1 Canary 1 (canary)
+262.9437.185=2.4.20-dev-6725
+# IntelliJ IDEA 2026.2.1 (eap)
+262.9437.22=2.4.20-dev-6725
+# IntelliJ IDEA 2026.2.1 (rc)
+262.9437.65=2.4.20-dev-6725
