@@ -3,6 +3,26 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 public object CompilerVersionAliases {
+    // Known tags-to-real version mappings for IDE builds.
+    // Android Studio canary builds report a fake version like "2.3.255-dev-255".
+    // The real version can be found by checking the IntelliJ tag for the studio build number:
+    // https://github.com/JetBrains/intellij-community/blob/idea/<intellij-version>/.idea/libraries/kotlinc_kotlin_compiler_common.xml
+    // We handle multiple `ide-mappings` on the classpath by merging them together
+    private val BUILT_IN_COMPILER_VERSION_ALIASES: Map<String, String> =
+        javaClass.classLoader
+            .getResources("META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt")
+            .asSequence()
+            .map { text ->
+                buildMap {
+                    text.openStream().reader().forEachLine {
+                        if (it.isNotBlank() && !it.startsWith("#")) {
+                            val (from, to) = it.split('=', limit = 2)
+                            put(from, to)
+                        }
+                    }
+                }
+            }
+            .reduce { a, b -> a + b }
     /**
      * Sentinel value in alias mappings indicating a version that only works in CLI (Gradle) builds,
      * not in IDE (IntelliJ/Android Studio) FIR integration. When [map] encounters this value, it

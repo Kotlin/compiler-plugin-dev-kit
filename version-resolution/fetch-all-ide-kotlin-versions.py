@@ -477,7 +477,7 @@ def main():
 
     # Read existing entries to preserve them (additive mode)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_file = os.path.join(script_dir, "ide-mappings.txt")
+    output_file = os.path.join(script_dir, "/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt")
     existing_entries, existing_comments = read_all_existing_entries(output_file)
     if existing_entries:
         print(f"Loaded {len(existing_entries)} existing entries from ide-mappings.txt")
