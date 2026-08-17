@@ -116,7 +116,7 @@ public class DevKitTarget(
     init {
         testRuns.create(DEFAULT_TEST_RUN_NAME)
         // ensure task is of type org.gradle.api.tasks.bundling.Jar
-        project.locateOrRegisterTask<DevKitJar>(lowerCamelCaseName(targetName, "jar")) {}
+        project.locateOrRegisterTask<Jar>(lowerCamelCaseName(targetName, "jar")) {}
     }
 
     public val testTask: TaskProvider<KotlinJvmTest> =

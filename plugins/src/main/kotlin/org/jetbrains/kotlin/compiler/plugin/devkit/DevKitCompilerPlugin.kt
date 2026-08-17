@@ -4,11 +4,13 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import java.io.File
+import javax.inject.Inject
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.attributes.Usage
+import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
@@ -29,6 +31,9 @@ import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
+import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.DEPENDENCIES_PATH
+import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.PLUGIN_PATH
+import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.VERSIONS_PATH
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -41,13 +46,15 @@ import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 @OptIn(ExperimentalWasmDsl::class)
-public open class DevKitCompilerConfigExtension
+public abstract class DevKitCompilerConfigExtension
 internal constructor(override val project: Project, private val isPlugin: Boolean) :
     HasProject, DevKitHierarchyDsl {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
+
+    @get:Inject internal abstract val archiveOperations: ArchiveOperations
 
     private val commonMain = kotlinExtension.run { sourceSets.commonMain.get() }
     private val commonTestFixtures = kotlinExtension.sourceSets.create("commonTestFixtures")
@@ -138,14 +145,13 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
             defaultSourceSet.resources.setSrcDirs(listOf(genServicesDir.get()))
             tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
         }
-    private val mainJar =
-        tasks.named<DevKitJar>(surrogateTarget.artifactsTaskName) {
+    private val mainJar: TaskProvider<Jar> =
+        tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
         }
 
     init {
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
-        tasks.withType<DevKitJar> { pluginId.set(pluginPackage) }
     }
 
     /**
@@ -411,13 +417,47 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
             dependencies {
                 includedEntryPoint("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION")
             }
-            this.includedDependencies.from(includedDependencies)
+
+            into(pluginPackage.map { "$PLUGIN_PATH/$it/$DEPENDENCIES_PATH" }) {
+                from(
+                    provider {
+                        includedDependencies().elements().map {
+                            archiveOperations.zipTree(it.asFile)
+                        }
+                    }
+                ) {
+                    eachFile {
+                        // find the "expandedDir" that the fileTree uses (of the form zip-<hash>)
+                        // and prepend it to the relative path so that each jar gets its own
+                        // directory
+                        var expandedDir = file
+                        for (segment in this.relativeSourcePath.segments.asList().asReversed()) {
+                            check(expandedDir.name == segment) {
+                                "Expected $expandedDir to have name $segment from $relativeSourcePath"
+                            }
+                            expandedDir = expandedDir.parentFile
+                        }
+                        // relativePath is of the form someDestinationDir/relativeSourcePath/file
+                        var destinationPath = relativePath
+                        for (segment in this.relativeSourcePath.segments.asList().asReversed()) {
+                            check(destinationPath.lastName == segment) {
+                                "Expected $destinationPath to have name $segment from $relativeSourcePath"
+                            }
+                            destinationPath = destinationPath.parent!!
+                        }
+                        relativePath =
+                            destinationPath
+                                .append(false, expandedDir.name)
+                                .append(relativeSourcePath)
+                    }
+                }
+            }
             from(
                 provider {
                     includedEntryPoint.elements().map { archiveOperations.zipTree(it.asFile) }
                 }
             ) {
-                exclude("META-INF/")
+                exclude("$PLUGIN_PATH/")
             }
         }
     }
@@ -518,7 +558,11 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
             manifest { attributes("Kotlin-Compiler-Plugin-Multi-Release" to true) }
         }
         testAgainst.configureEach {
-            mainJar { versioned(version) { from(mainCompilation.output.allOutputs) } }
+            mainJar {
+                into(pluginPackage.map { "$PLUGIN_PATH/$it/$VERSIONS_PATH/$version" }) {
+                    from(mainCompilation.output.allOutputs)
+                }
+            }
         }
     }
 
