@@ -2,12 +2,14 @@
 
 ## What this is
 
-A dev kit for building **Kotlin compiler plugins that support many Kotlin compiler versions from one source tree**. It
-publishes Gradle plugins and runtime/test-fixture libraries under `org.jetbrains.kotlin.compiler.plugin.devkit:*`.
+A dev kit for building **Kotlin compiler plugins that support many Kotlin compiler versions from one source tree**,
+published as Gradle plugins plus runtime/test libraries under `org.jetbrains.kotlin.compiler.plugin.devkit:*`.
 
-Kotlin compiler internals are unstable across versions, so the dev kit lets a plugin keep one shared
-`src/main` plus small per-version overlay source sets, then compiles/tests/packages all of them and picks the right one
-at compile time (for tests) and at runtime (in the compiler).
+Compiler internals are unstable across versions, so a supported Kotlin version is modelled as a **KMP target**:
+`commonMain` is shared by every version and *recompiled* against that version's compiler, with `expect`/`actual` only
+where declarations genuinely differ. A breaking change therefore surfaces as a compile error, along with that version's
+deprecations and opt-ins. The matching version is then picked out of one multi-release jar at Gradle build time (for
+test fixtures and tests) and again at compiler/IDE runtime.
 
 ## The working tree moves between turns
 
@@ -22,95 +24,124 @@ Re-read this file at the **end** of a change, once the work is done and verified
 stale, say so in your final response and propose the concrete edit. Don't rewrite this file mid-task.
 
 Keep the bar for *adding* high. This file is for what a reader can't recover on their own: intent, cross-build wiring,
-rules they'd unknowingly break. Leave out anything the toolchain surfaces by itself, e.g. compiler errors.
+rules they'd unknowingly break. Leave out anything a quick look at the files already tells you.
 
-## Build layout: three separate Gradle builds
+## Build layout
 
-This is a composite build. Nothing is a plain subproject of everything else.
+Three separate Gradle builds, none a subproject of another: the root build, `plugins/` (`includeBuild` in root
+`pluginManagement`) and `version-resolution/` (`includeBuild` in root `dependencyResolutionManagement`, because it is
+consumed as a *dependency* rather than as a plugin). Edits in either included build are picked up with no publishing
+step; consumers outside this repo need a publish.
 
-| Build                        | Contents                                                                | Wired in via                                            |
-|------------------------------|-------------------------------------------------------------------------|---------------------------------------------------------|
-| root (`settings.gradle.kts`) | `compiler-plugin-runtime`, `gradle-plugin-runtime`                      | —                                                       |
-| `plugins/`                   | the Gradle plugins; `plugins/settings/` holds the settings plugin       | `includeBuild` in root `pluginManagement`               |
-| `version-resolution/`        | version parsing/resolution, shared by build time *and* compiler runtime | `includeBuild` in root `dependencyResolutionManagement` |
+## The central mechanism
 
-Because of `includeBuild`, edits in `plugins/` or `version-resolution/` are picked up by the root build with no
-publishing step. Consumers *outside* this repo need a publish.
+1. **Target naming.** `k` + version with `.` removed and `-` → `_`, lowercased: `2.4.20-dev-7885` → `k2420_dev_7885`.
+   Every target has `main`, `testFixtures` and `test` compilations.
+2. **Sharing.** `DevKitHierarchyDsl`, mixed into the `pluginDevKit { }` extension, wraps KMP's hierarchy-template API so
+   an intermediate source set's membership is a predicate over `KotlinToolingVersion`. Because a given breaking change
+   usually lands once, the idiomatic shape is a `pre…`/`post…` split around one version, with `expect` in the shared
+   parent and an `actual` on each side. `withSourceSetTree(main, testFixtures, test)` gives the *same* grouping in all
+   three trees, so fixtures and tests are shared exactly like main code. `compiler-plugin-test/build.gradle.kts` is the
+   worked example.
+3. **Per-version dependencies.** `forceKotlinVersion` rewrites every `org.jetbrains.kotlin` dependency of a compilation
+   to that target's version. For a `dev` version it forces the *range* `[<classifier minus build number>, <version>]`
+   (`2.4.20-dev-7885` → `[2.4.20-dev, 2.4.20-dev-7885]`), because not every dev build publishes every artifact.
+   `kotlin("compiler-tests")` is a fake coordinate the same hook rewrites to
+   `kotlin-compiler-internal-test-framework`, or to `kotlin-compiler-tests-for-ide` on dev versions.
+4. **Packaging.** Every `Jar` gets manifest attribute `Kotlin-Compiler-Plugin-Multi-Release: true`. The jar root holds
+   only the entry point; everything else lives under `META-INF/kotlin/plugin/<pluginId>/` (`<pluginId>` being
+   `pluginPackage`), in `versions/<version>/` per target and `dependencies/<jar-name>/` per runtime dependency, unzipped
+   into its own directory. Burying it all there is what makes a dev-kit plugin immune to — and invisible to — the rest
+   of the compiler-plugin classpath, with no shadowing involved.
+5. **Selection at Gradle build time.** `MultiReleasePluginTransform`, an artifact transform keyed on the
+   `org.jetbrains.kotlin.compiler.version` attribute (`KotlinCompilerVersion`), flattens the matching
+   `versions/<version>/` plus the embedded `dependencies/` into the artifact root and drops `META-INF/kotlin/plugin`;
+   non-matching artifacts pass through untouched. Only test fixtures and tests use it, and it is deliberately skipped
+   for local project dependencies during IDE import, because rewriting the artifact loses the project identity IDEA
+   needs.
+6. **Selection at compiler runtime.** The entry point is *generated* per plugin: buildconfig emits
+   `<pluginPackage>.PluginInfo`, whose `REGISTRAR_CLASS`/`PROCESSOR_CLASS` initializers declare local subclasses of
+   `DevKitCompilerPluginRegistrar` / `DevKitCommandLineProcessor`, and `GenerateServices` writes `META-INF/services`
+   files that name them by synthetic binary name (`PluginInfo$REGISTRAR_CLASS$1$Plugin`) — so that generated shape is
+   load-bearing. At runtime those classes ask `VersionedPluginClassLoading` for a `URLClassLoader` over the resolved
+   `versions/<version>/` and `dependencies/` dirs, parented to the plugin classloader's **parent**, and reflectively
+   delegate into it. The plugin therefore sees a classpath of only itself and its dependencies while the compiler sees
+   an ordinary plugin, needing no cooperation from the compiler or the IDE. A consumer only implements
+   `DevKitComponentRegistrar` / `DevKitCLP` and names those classes via `componentRegistrar` / `commandLineProcessor`.
 
-## The central mechanism: multi-release compiler-plugin jars
+   Caveat: plugins built against different dev kit versions still share those ~6 entry-point classes on the real plugin
+   classpath. Renaming the entry-point package is the escape hatch if it ever changes.
+7. **Which version matches.** `VersionResolution.resolveVersion` picks the highest compatible version, special-casing
+   the
+   `dev` track so `2.3.20-dev-7791` doesn't match `2.3.20-Beta1`. `CompilerVersionAliases` maps an IDE build number
+   through `ide-mappings.txt`, which `fetch-all-ide-kotlin-versions.py` regenerates.
 
-1. **Naming.** A Kotlin version maps to a source-set name: `k` + version with `.` removed and `-` → `_`, lowercased.
-   `2.4.20-dev-7885` → `k2420_dev_7885`. (Convention borrowed from Metro.)
-2. **Layout.** Version overlays live in `<versionName>/src/main/kotlin` and
-   `<versionName>/src/testFixtures/kotlin` at the module root. They are
-   `associateWith` the shared compilation and (for testFixtures and tests) additionally source the shared dirs, so
-   shared code is recompiled per version against that version's compiler.
-3. **Packaging.** Each overlay's output is copied into `META-INF/kotlin/plugin/versions/<version>/`
-   in the jar, and every `Jar` gets manifest attribute `Kotlin-Compiler-Plugin-Multi-Release: true`.
-4. **Selection at Gradle build time.** `MultiReleasePluginTransform` is an artifact transform keyed on the
-   `org.jetbrains.kotlin.compiler.version` attribute (`KotlinCompilerVersion`). It flattens the matching version
-   directory into the jar root. This is used only for test fixtures and tests.
-5. **Selection at compiler runtime.** `VersionedPluginClassLoading` builds a `URLClassLoader` that prepends the matching
-   version directory, and `DevKitCompilerPluginRegistrar` / `DevKitCommandLineProcessor` reflectively delegate the real
-   work into it. This is why plugin entry points subclass those and implement `DevKitComponentRegistrar` / `DevKitCLP`.
-6. **Which version matches.** `VersionResolution.resolveVersion` picks the highest compatible version, special-casing
-   the `dev` track so `2.3.20-dev-7791` doesn't match `2.3.20-Beta1`.
-   `CompilerVersionAliases` finds the IDE version based on the IDE build number using
-   `version-resolution/ide-mappings.txt`, regenerated by `fetch-all-ide-kotlin-versions.py`.
+## Module notes
 
-## Module reference
+### `pluginDevKit { }` — `compiler-plugin` and `compiler-library`
 
-### `plugins/` — `DevKitCompilerPlugin` (`pluginDevKit { }`)
+One extension either way; the flag decides whether the module gets the generated entry point and its runtime
+dependencies embedded in the jar (a *plugin*, which must set `componentRegistrar`/`commandLineProcessor`) or publishes
+those dependencies normally (a *library*, like `compiler-plugin-runtime` and `compiler-plugin-test`).
 
-For the compiler-plugin module.
+- **Resources of every source set whose name ends in `Test` are remapped to `src/<sourceSetName>/data`** — the test data
+  root kotlin-compiler-internal-test-framework expects.
+- The build's own Kotlin version is always registered, and is the **surrogate** target: the only publishable one, and
+  the one whose jar aggregates every version, so a consumer resolves a single artifact and lets the dev kit pick from
+  it. Every other target's elements configurations carry a `FakeKotlinCompilerVersion` attribute purely to lose against
+  the surrogate during resolution.
+- `generateTests` runs **once, against the highest registered version's** test fixtures, and every version's
+  `compileJava`/`compileKotlin` depends on it. Per target it receives that target's dir under `generatedTestsDir` plus
+  the data dirs of the test source set's whole `dependsOn` closure; `DevKitTestGenerator` derives a package suffix from
+  the output dir name, which is how one shared test data tree yields one generated suite per version.
+- The internal test framework's JS/Wasm half wants a pile of `-D` paths — hence the per-version
+  `testArtifacts`/`testArtifactsWasm` resolution, the d8 executable and the generated `repl.js`.
+- `testDataLibraries { }` entries reach test data as `<name>.jvm.classpath` / `<name>.js.classpath` system properties
+  and, optionally, as a `TestDataLibraries` buildconfig object in `commonTestFixtures`.
 
-- Shared source sets are `src/main`, `src/testFixtures`, `src/test`; **test resources are remapped to
-  `src/test/data`** (used by kotlin-compiler-internal-test-framework).
-- Every source set forces all `org.jetbrains.kotlin` dependencies to its target version.
-- Versions come from the `…devkit.testAgainst` Gradle property (comma- or whitespace-separated) plus whatever the
-  `pluginDevKit { }` block declares; the build's own Kotlin version is always registered, since the shared source sets
-  compile against it.
-- Each registered version gets its own test suite. `test` itself is **disabled** and just depends on
-  `defaultTestTarget` (default: the `…devkit.defaultTestVersion` property, else the build's own Kotlin version);
-  `allVersionedTests` aggregates all of them and is wired into `check`.
-- `generateTests` runs `generateTestsClass` (default `<pluginPackage>.GenerateTestsKt`) into
-  `build/test-gen`, and every version's `compileJava` depends on it.
-- If `com.gradleup.shadow` is applied, the main jar becomes `-unshaded` and `shadowJar` takes the empty classifier;
-  `apiElements`/`runtimeElements` are repointed at the shadow jar. Tests and test fixtures depend directly on the main
-  jar task so they see the unshaded output.
+### `pluginDevKit("gradle-plugin")` and `gradle-plugin-runtime`
 
-### `plugins/` — `DevKitGradlePlugin` (`pluginDevKit { }`)
+For a plugin's *Gradle* plugin module, which stays a plain `kotlin("jvm")` project. Its single `functionalTest` source
+set is compiled once and *run* per version, by a `<versionName>FunctionalTest` task that only varies the Kotlin version
+it passes to the build under test. Its buildconfig-generated `PluginInfo` feeds
+`DevKitSupportPlugin`, the `KotlinCompilerPluginSupportPlugin` base class the consumer extends;
+`gradle-plugin-runtime`'s `testFixtures` holds the TestKit harness those functional tests run on.
 
-For a plugin's *Gradle* plugin module. Mirrors the above for functional tests: `testAgainst(version)` creates
-`<versionName>FunctionalTest`, plain `functionalTest` is disabled and delegates to `defaultTestTarget`, and
-`allVersionedFunctionalTests` feeds `check`. Forwards `…devkit.gradle.test.kotlin-version` and the `kmpTarget` property
-to each test task.
+### `plugins/settings/`
+
+The settings plugin's id is the group itself, so a settings script applies it as `kotlin("compiler.plugin.devkit")`.
+This project also carries the `pluginDevKit(...)` accessors in package `org.gradle.kotlin.dsl` — that is why build
+scripts can write `pluginDevKit("compiler-library")` inside `plugins { }` and `pluginDevKit("version-resolution")` as a
+dependency.
 
 ### `compiler-plugin-runtime`
 
-`main` has the versioned-classloading entry points; `testFixtures` has the test runners.
+`src/entryPoint/kotlin` is the one compilation deliberately *not* versioned, since it runs before a version is known.
 
-`DevKitTestCompat` is a `ServiceLoader` SPI for per-version differences in the Kotlin test framework; its impls live in
-the `k*/src/testFixtures` overlays with matching `META-INF/services/...DevKitTestCompat` resources. This module dogfoods
-`DevKitCompilerPlugin`; `generateTests` is disabled.
+### `compiler-plugin-test`
 
-### `gradle-plugin-runtime`
-
-`DevKitSupportPlugin` — the `KotlinCompilerPluginSupportPlugin` base class a consumer's Gradle plugin extends, fed by
-the generated `DevKitPluginInfo`. `testFixtures` has the TestKit functional-test harness.
+`DevKitTestCompat.kt` is the `expect` compatibility surface, with `actual`s per version group (`pre2420Dev7600Main`,
+`post2420DevMain`, …).
 
 ### `version-resolution`
 
-`KotlinToolingVersion` is vendored from Metro so it has **no** KGP dependency and works at compiler runtime.
-`BUILT_IN_COMPILER_VERSION_ALIASES` is generated from `ide-mappings.txt`.
+Must keep **no** KGP dependency, since it also runs inside the compiler — that is why `KotlinToolingVersion` is vendored
+here rather than imported, and `VersionResolution` is shared verbatim by the artifact transform and the runtime
+classloader. `CompilerVersionAliases` reads `ide-mappings.txt` off the classpath at runtime and **merges every copy it
+finds**, to ensure that different versions of the devkit can co-exist.
 
 ## Commands
 
+There is no `test` task. Each version gets `<target>Test`, registered with `KotlinTestsRegistry` so `allTests`
+aggregates them and `check` picks that up.
+
 ```bash
-./gradlew test                       # delegates to the default version target
-./gradlew allVersionedTests          # every registered Kotlin version
-./gradlew k2420_dev_7885Test         # one version; see `./gradlew tasks` for the list
-./gradlew spotlessApply              # format the whole repo
+./gradlew defaultTest                    # `…devkit.defaultTestVersion`, else the build's own Kotlin version
+./gradlew defaultTest --tests 'Foo*'     # forwards the filter to every Test task in the project
+./gradlew allTests                       # every registered Kotlin version
+./gradlew k2420_dev_7885Test             # one version; see `./gradlew tasks` for the list
+./gradlew k2420_dev_7885Test -PupdateTestData   # ...regenerating golden files
+./gradlew spotlessApply                  # format the whole repo
 ```
 
 ## Conventions
@@ -121,42 +152,42 @@ the generated `DevKitPluginInfo`. `testFixtures` has the TestKit functional-test
   build-script blocks. A comment earns its place by explaining a workaround, a constraint, or a *why* that isn't
   recoverable from the code.
 - **Gradle/Kotlin compatibility is set by `tapmoc`**, not by hand: every Gradle-side module calls
-  `gradle(libs.versions.gradle.get())`, deriving `--release`, `languageVersion`/`apiVersion` and
-  `coreLibrariesVersion` from the oldest supported Gradle (catalog `gradle`). Don't re-add `jvmTarget` /
-  `targetCompatibility`.
+  `gradle(libs.versions.gradle.get())`, deriving `--release`, `languageVersion`/`apiVersion` and `coreLibrariesVersion`
+  from the oldest supported Gradle (catalog `gradle`). Don't re-add `jvmTarget` / `targetCompatibility`.
 - `plugins/src/main/kotlin/.../utils.kt` defines `context(_: HasProject)` accessors — that is why plugin code writes
   bare `tasks`, `configurations`, `objects`, `layout` with no `project.` prefix.
-- **Gradle properties cover the boilerplate cases**, all prefixed `org.jetbrains.kotlin.compiler.plugin.devkit.` and all
-  read by **both** plugins, except `compilerPlugin` which is the Gradle plugin's alone.
+- **`DevKitTarget` is a real KMP target**, built on `ExternalKotlinTargetApi`. `DevKitTarget.kt` and
+  `DevKitWireJavaSources.kt` are largely adapted from KGP's own JVM target (hence the JetBrains license headers) so the
+  targets behave like first-class ones in Gradle *and* in IDE import; `IdeMultiVersionDependencyResolver` picks the
+  highest version's compilation for each shared source set. Prefer fixing these in KGP's idiom over inventing a parallel
+  one.
 - **Isolated Projects should not be violated** unless absolutely necessary.
 - **Gradle APIs come from `compileOnly(libs.gradle.public.api)`, never `gradleApi()`**, so the compile classpath is the
-  oldest supported Gradle's rather than the building one's. This needs
-  `org.gradle.unsafe.suppress-gradle-api=true` to stop `java-gradle-plugin` re-adding `gradleApi()`.
-- **The Kotlin plugin is declared once per build**: versioned in the root build script (`apply false`
-  in this repo's root, applied in `plugins/`) and unversioned as `kotlin("jvm")` in subprojects.
-- **One version catalog for the whole repo**, `gradle/libs.versions.toml`. `plugins/` and
-  `version-resolution/` are separate builds, so the conventional lookup doesn't reach them — each opts in explicitly
-  with `versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }` in its
+  oldest supported Gradle's rather than the building one's. This needs `org.gradle.unsafe.suppress-gradle-api=true` to
+  stop `java-gradle-plugin` re-adding `gradleApi()`.
+- **The Kotlin plugin is declared once per build**, versioned in that build's root script and unversioned in its
+  subprojects.
+- **One version catalog for the whole repo**, `gradle/libs.versions.toml`. `plugins/` and `version-resolution/` are
+  separate builds, so the conventional lookup doesn't reach them — each opts in explicitly with
+  `versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }` in its
   `dependencyResolutionManagement`. Don't re-add per-build catalogs.
 - **Build cache and configuration cache are enabled** (root `gradle.properties`). Gradle code must be
   configuration-cache safe: lazy `Provider`s, no `Project` access at execution time, no eager configuration resolution.
   Laziness has a limit, though: a `map { }` that touches an extension member captures the whole extension, so a provider
   that ends up serialized (buildconfig fields do) must instead close over plain values.
-- **The dev kit's own coordinates live only in `gradle/libs.versions.toml`** (`devkit-group`,
-  `devkit-version`). Every publishing project sets `group`/`version` from there — don't put them back in a
-  `gradle.properties`, which included builds can't share. The Kotlin-side `DEV_KIT_GROUP` / `DEV_KIT_VERSION` are
-  generated by buildconfig from the project's own `group`/`version`, separately in `plugins` and `plugins:settings`
-  (the latter must not depend on the former for Gradle classloading reasons). All three buildconfig outputs land in the
-  same package, so each needs a distinct `className`.
+- **The dev kit's own coordinates live only in `gradle/libs.versions.toml`** (`devkit-group`, `devkit-version`). Every
+  publishing project sets `group`/`version` from there — don't put them back in a `gradle.properties`, which included
+  builds can't share. The Kotlin-side `DEV_KIT_GROUP` / `DEV_KIT_VERSION` are generated by buildconfig from the
+  project's own `group`/`version`, separately in `plugins` and `plugins:settings` (the latter must not depend on the
+  former for Gradle classloading reasons). Both land in the same package, so each needs a distinct `className`.
 
 ## Recipe: support a new Kotlin version
 
-1. Add the version to `org.jetbrains.kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`. Only
-   reach for `testAgainstWithFixtures` in the `pluginDevKit { }` block of `compiler-plugin-runtime/build.gradle.kts` if
-   it needs its own overlay.
-2. If the Kotlin test-framework API changed, add
-   `k<name>/src/testFixtures/kotlin/.../DevKitTestCompatImpl.kt` plus its
-   `META-INF/services/org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestCompat` resource. If it didn't, point the
-   new target's `testFixtures` `srcDirs` at an existing target's — the existing file shows both patterns.
+1. Add the version to `org.jetbrains.kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`.
+2. Build it. Because the shared sources are recompiled per version, most versions need nothing else.
+3. If something *does* break, decide where the split belongs in the hierarchy template (the
+   `kotlin.applyPluginDevKitHierarchyTemplate { }` block inside `pluginDevKit { }` in
+   `compiler-plugin-test/build.gradle.kts`), then move the differing declaration to an `expect` in the shared parent
+   with an `actual` on each side. The `DevKitTestCompat.*.kt` files show the pattern.
 
-Version *removal* works the same way in reverse; see commit `52b654a17` for a worked example.
+Version *removal* works the same way in reverse.
