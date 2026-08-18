@@ -38,11 +38,15 @@ pluginDevKit {
 
     kotlin.applyPluginDevKitHierarchyTemplate {
         groupVersions("pre2420Dev7600", { !supportsDumpClassifier(it) }) {
-            preDev(2, 4, 20, "pre2420Dev")
+            preDev(2, 4, 20, "pre2420Dev") {
+                preDev(2, 4, "pre24Dev")
+            }
         }
 
-        postDev(2, 4, 20, "post2420Dev") {
-            groupVersions("post2420Dev7600", ::supportsDumpClassifier)
+        postDev(2, 4, "post24Dev") {
+            postDev(2, 4, 20, "post2420Dev") {
+                groupVersions("post2420Dev7600", ::supportsDumpClassifier)
+            }
         }
     }
 }

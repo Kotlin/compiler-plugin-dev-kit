@@ -1,0 +1,3 @@
+package org.jetbrains.kotlin.test.builders
+
+public typealias NonGroupingStageTestConfigurationBuilder = TestConfigurationBuilder
