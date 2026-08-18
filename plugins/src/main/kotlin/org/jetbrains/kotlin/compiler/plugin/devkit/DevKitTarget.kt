@@ -190,16 +190,21 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
     configureIdeImport {
         registerDependencyResolver(
             resolver = IdeMultiVersionCompilationBinaryDependencyResolver(),
-            constraint = { sourceSet ->
-                (sourceSet as? AbstractKotlinSourceSet)?.compilations?.any {
-                    it.target is DevKitTarget
-                } == true
-            },
+            constraint = KotlinSourceSet::isDevKitSourceSet,
+            phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
+            priority = IdeMultiplatformImport.Priority.high,
+        )
+        registerDependencyResolver(
+            resolver = IdeMultiVersionCompilationProjectDependencyResolver(),
+            constraint = KotlinSourceSet::isDevKitSourceSet,
             phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
             priority = IdeMultiplatformImport.Priority.high,
         )
     }
 }
+
+private fun KotlinSourceSet.isDevKitSourceSet() =
+    this is AbstractKotlinSourceSet && compilations.any { it.target is DevKitTarget }
 
 public class DevKitCompilation(delegate: Delegate, public val javaSourceSet: SourceSet) :
     DecoratedExternalKotlinCompilation(delegate) {
