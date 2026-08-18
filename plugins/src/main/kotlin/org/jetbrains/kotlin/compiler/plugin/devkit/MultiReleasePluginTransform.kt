@@ -46,7 +46,7 @@ public abstract class MultiReleasePluginTransform :
                     version =
                         addOverlayAndDependencies(null, inputRoot, currentVersion) ?: return@default
                 }
-                if (input.isDirectory())
+                return if (input.isDirectory())
                     outputs.dir(input.name + "-$version").toPath().copyFrom(paths)
                 else {
                     val output =
