@@ -615,6 +615,7 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
         commonTestFixtures.dependencies {
             api(kotlin("stdlib"))
             api(kotlin("test-junit5"))
+            api(kotlin("compiler-tests")) // fake; gets resolved by forceKotlinVersion
             api(kotlin("compiler-internal-test-framework"))
             api(kotlin("compiler"))
             runtimeOnly("junit:junit:4.13.2")
@@ -638,6 +639,15 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
                     "$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION"
                 }
             )
+        }
+        // kotlin-compiler-tests-for-ide
+        configurations.all {
+            exclude(group = "org.jetbrains.kotlin", module = "tests-spec")
+            exclude(group = "org.jetbrains.kotlin", module = "tests-compiler-utils")
+            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure-utils.common")
+            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure-utils")
+            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure")
+            exclude(group = "org.jetbrains.kotlin", module = "tests-common-new")
         }
     }
 }
