@@ -17,8 +17,6 @@ public expect fun afterAnalysisChecker(
 
 public expect fun RegisteredDirectivesBuilder.versionDumpClassifier()
 
-// TODO red in IDE because TestConfigurationBuilder is different across versions
-// maybe add an `expect class TestConfigurationBuilderCompat`
 public expect fun TestConfigurationBuilder.useFailureSuppressorsCompat(
     vararg checkers: Constructor<ServicesAndDirectivesContainer>,
     insertAtFirst: Boolean = false,
