@@ -50,7 +50,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
 
                     else -> false
                 }
-            if (included) registerVersion(version, forIde = false)
+            if (included) registerVersion(version)
         }
     }
 
@@ -97,7 +97,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
             .mapNotNull {
                 CompilerVersionAliases.forIdeBuild(it)?.toString()?.let(::KotlinToolingVersion)
             }
-            .forEach { registerVersion(it, forIde = true) }
+            .forEach { registerVersion(it) }
     }
 
     /**
@@ -118,7 +118,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
     /** Adds the latest Kotlin dev version. This is useful for reacting early to breaking changes */
     public fun useLatestDev() {
         val latestDev = providers.of(LatestDevVersion::class.java) {}.get()
-        registerVersion(KotlinToolingVersion(latestDev), forIde = false)
+        registerVersion(KotlinToolingVersion(latestDev))
     }
 
     /**
@@ -126,7 +126,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * to be idempotent: a version can be discovered twice, and named in [TEST_AGAINST_PROPERTY] on
      * top of that.
      */
-    protected abstract fun registerVersion(version: KotlinToolingVersion, forIde: Boolean)
+    protected abstract fun registerVersion(version: KotlinToolingVersion)
 
     /**
      * Registers everything the properties ask for, and freezes the ranges. Called once the module

@@ -146,8 +146,8 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         registerSupportedVersions()
     }
 
-    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
-        if (!forIde) testAgainst(version)
+    override fun registerVersion(version: KotlinToolingVersion) {
+        if (version !in ideVersions) testAgainst(version)
     }
 
     /**

@@ -144,9 +144,9 @@ public class DevKitTarget(
 internal fun KotlinMultiplatformExtension.createDevKitTarget(
     version: KotlinToolingVersion,
     areDependenciesEmbedded: Boolean,
-    forIde: Boolean,
     isSurrogate: Boolean = false,
 ) = createExternalKotlinTarget {
+    val forIde = version in ideVersions
     targetName = version.versionName
     platformType = KotlinPlatformType.jvm
     targetFactory = ExternalKotlinTargetDescriptor.TargetFactory {

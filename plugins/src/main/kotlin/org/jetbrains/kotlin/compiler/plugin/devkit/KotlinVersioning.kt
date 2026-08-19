@@ -31,17 +31,17 @@ private val KotlinToolingVersion.capitalizedVersionName
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
     version: KotlinToolingVersion,
-    forIde: Boolean,
     action: ResolvableConfiguration.() -> Unit = {},
 ) =
     configurations.resolvable("$name${version.capitalizedVersionName}") {
         extendsFrom(this@withKotlinVersion)
+        val forIde = version in ideVersions
         resolutionStrategy.forceKotlinVersion(version, forIde)
         action()
     }
 
 context(_: HasProject)
-internal fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVersion) {
+private fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVersion) {
     attributes.attribute(
         LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
         project.objects.named(LibraryElements.JAR),
@@ -52,7 +52,7 @@ internal fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVe
     )
 }
 
-internal fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
+private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
     eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
             when (requested.name) {
@@ -71,8 +71,8 @@ internal fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion
 
 internal fun KotlinCompilation<*>.forceKotlinVersion(
     version: KotlinToolingVersion,
-    forIde: Boolean,
 ) {
+    val forIde = version in ideVersions
     configurations.named(compileDependencyConfigurationName) {
         resolutionStrategy.forceKotlinVersion(version, forIde)
         withCompilerVersionAttribute(version)

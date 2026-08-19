@@ -172,3 +172,8 @@ private fun String.capitalizeAsciiOnly(): String {
         }
     else this
 }
+
+internal val ideVersions =
+    CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES.values
+        .map { KotlinToolingVersion(it.toString()) }
+        .toSet()

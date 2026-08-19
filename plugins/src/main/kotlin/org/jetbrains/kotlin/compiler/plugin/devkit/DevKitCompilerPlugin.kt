@@ -113,7 +113,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         kotlinExtension.createDevKitTarget(
             kotlinToolingVersion,
             areDependenciesEmbedded = isPlugin,
-            forIde = false,
             isSurrogate = true,
         )
 
@@ -155,8 +154,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
     }
 
-    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
-        testAgainst(version, forIde = forIde)
+    override fun registerVersion(version: KotlinToolingVersion) {
+        testAgainst(version)
     }
 
     /**
@@ -313,14 +312,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: KotlinToolingVersion,
-        forIde: Boolean = false,
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget {
         val target =
             testAgainst.findByName(version.versionName)
                 ?: kotlinExtension.createDevKitTarget(
                     version,
-                    forIde = forIde,
                     areDependenciesEmbedded = isPlugin,
                 )
         return target.apply(action)
@@ -329,9 +326,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: String,
-        forIde: Boolean = false,
         action: DevKitTarget.() -> Unit = {},
-    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), forIde = forIde, action)
+    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), action)
 
     internal fun configure() {
         configurePlugins()
@@ -482,9 +478,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         val testArtifactsWasm = configurations.dependencyScope("testArtifactsWasm")
         testAgainst.configureEach {
             testTask {
-                val testArtifacts = testArtifacts.withKotlinVersion(version, forIde)
+                val testArtifacts = testArtifacts.withKotlinVersion(version)
                 val testArtifactsWasm =
-                    testArtifactsWasm.withKotlinVersion(version, forIde) {
+                    testArtifactsWasm.withKotlinVersion(version) {
                         isTransitive = false
                         attributes {
                             attribute(
@@ -607,7 +603,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     internal fun configureDependencies() {
         testAgainst.configureEach {
             for (compilation in listOf(mainCompilation, testFixturesCompilation, testCompilation)) {
-                compilation.forceKotlinVersion(this@configureEach.version, forIde = forIde)
+                compilation.forceKotlinVersion(this@configureEach.version)
             }
         }
         dependencies {
