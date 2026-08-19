@@ -6,6 +6,7 @@ import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.attributes.LibraryElements
+import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.named
 import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion.Companion.noVersion
 import org.jetbrains.kotlin.gradle.plugin.HasProject
@@ -30,11 +31,12 @@ private val KotlinToolingVersion.capitalizedVersionName
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
     version: KotlinToolingVersion,
+    forIde: Boolean,
     action: ResolvableConfiguration.() -> Unit = {},
 ) =
     configurations.resolvable("$name${version.capitalizedVersionName}") {
         extendsFrom(this@withKotlinVersion)
-        resolutionStrategy.forceKotlinVersion(version)
+        resolutionStrategy.forceKotlinVersion(version, forIde)
         action()
     }
 
@@ -50,28 +52,39 @@ internal fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVe
     )
 }
 
-internal fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion) = eachDependency {
-    if (requested.group == "org.jetbrains.kotlin") {
-        val newVersion = if (version.isDev) "[${version.lowestDev}, $version]" else "$version"
-        when (requested.name) {
-            "kotlin-compiler-tests" if version.isDev ->
-                useTarget("${requested.group}:kotlin-compiler-tests-for-ide:$newVersion")
-            "kotlin-compiler-tests" ->
-                useTarget("${requested.group}:kotlin-compiler-internal-test-framework:$newVersion")
-            else -> useVersion(newVersion)
+internal fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
+    eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            when (requested.name) {
+                "kotlin-compiler-tests" if forIde ->
+                    useTarget("${requested.group}:kotlin-compiler-tests-for-ide:$version")
+                "kotlin-compiler-tests" ->
+                    useTarget("${requested.group}:kotlin-compiler-internal-test-framework:$version")
+                "kotlin-compiler-internal-test-framework" if forIde ->
+                    useVersion("[${version.lowestDev}, $version]")
+                "kotlin-compose-compiler-plugin" if forIde ->
+                    useTarget("${requested.group}:compose-compiler-plugin-for-ide:$version")
+                else -> useVersion("$version")
+            }
         }
     }
-}
 
-internal fun KotlinCompilation<*>.forceKotlinVersion(version: KotlinToolingVersion) {
+internal fun KotlinCompilation<*>.forceKotlinVersion(
+    version: KotlinToolingVersion,
+    forIde: Boolean,
+) {
     configurations.named(compileDependencyConfigurationName) {
-        resolutionStrategy.forceKotlinVersion(version)
+        resolutionStrategy.forceKotlinVersion(version, forIde)
         withCompilerVersionAttribute(version)
+        // not released for IDE, but unnecessary anyway
+        if (forIde) exclude("org.jetbrains.kotlin", "kotlin-bom")
     }
     val runtimeDependencyConfigurationName = runtimeDependencyConfigurationName ?: return
     configurations.named(runtimeDependencyConfigurationName) {
-        resolutionStrategy.forceKotlinVersion(version)
+        resolutionStrategy.forceKotlinVersion(version, forIde)
         withCompilerVersionAttribute(version)
+        // not released for IDE, but unnecessary anyway
+        if (forIde) exclude("org.jetbrains.kotlin", "kotlin-bom")
     }
 }
 

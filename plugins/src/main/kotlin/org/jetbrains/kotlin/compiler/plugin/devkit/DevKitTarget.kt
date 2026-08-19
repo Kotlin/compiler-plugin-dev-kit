@@ -65,6 +65,7 @@ public class DevKitTarget(
     delegate: Delegate,
     public val version: KotlinToolingVersion,
     private val isSurrogate: Boolean,
+    public val forIde: Boolean,
 ) :
     DecoratedExternalKotlinTarget(delegate),
     HasConfigurableKotlinCompilerOptions<KotlinJvmCompilerOptions>,
@@ -143,12 +144,13 @@ public class DevKitTarget(
 internal fun KotlinMultiplatformExtension.createDevKitTarget(
     version: KotlinToolingVersion,
     areDependenciesEmbedded: Boolean,
+    forIde: Boolean,
     isSurrogate: Boolean = false,
 ) = createExternalKotlinTarget {
     targetName = version.versionName
     platformType = KotlinPlatformType.jvm
     targetFactory = ExternalKotlinTargetDescriptor.TargetFactory {
-        DevKitTarget(it, version, isSurrogate)
+        DevKitTarget(it, version, isSurrogate, forIde)
     }
 
     if (!isSurrogate)

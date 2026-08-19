@@ -3,8 +3,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
-import org.gradle.api.ExtensiblePolymorphicDomainObjectContainer
 import org.gradle.api.Named
+import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -17,18 +17,17 @@ import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.domainObjectContainer
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.named
-import org.gradle.kotlin.dsl.polymorphicDomainObjectContainer
 import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
 import org.gradle.language.base.plugins.LifecycleBasePlugin
-import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -56,7 +55,7 @@ private const val FUNCTIONAL_TEST = "functionalTest"
 private val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
     setOf("RepoAndVersionArgumentProvider", "IncludeBuildReposArgumentProvider")
 
-public open class GradlePluginConfigExtension(override val project: Project) : HasProject {
+public open class GradlePluginConfigExtension(project: Project) : DevKitVersionsDsl(project) {
     private val buildConfig: BuildConfigExtension = project.the()
     private val gradleTestKitSupport: GradleTestKitSupportExtension = project.the()
     private val sourceSets: SourceSetContainer = project.the()
@@ -135,23 +134,20 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
 
     /**
      * The Kotlin versions to run the `functionalTest` suite against, one task per version. By
-     * default, it includes the Kotlin version applied to this build and everything listed in
-     * [TEST_AGAINST_PROPERTY].
+     * default, it includes the Kotlin version applied to this build, everything listed in
+     * [TEST_AGAINST_PROPERTY], and the [DevKitVersionsDsl] properties.
      */
-    public val testAgainst:
-        ExtensiblePolymorphicDomainObjectContainer<DevKitGradlePluginTestTarget> =
-        objects.polymorphicDomainObjectContainer(DevKitGradlePluginTestTarget::class)
+    public val testAgainst: NamedDomainObjectCollection<DevKitGradlePluginTestTarget> =
+        objects.domainObjectContainer(DevKitGradlePluginTestTarget::class)
 
     init {
-        testAgainst.registerFactory(DevKitGradlePluginTestTarget::class.java) {
-            val version = KotlinToolingVersion(it)
-            DevKitGradlePluginTestTargetImpl(
-                version,
-                tasks.register<Test>("${version.versionName}FunctionalTest"),
-            )
-        }
         testAgainst(kotlinToolingVersion)
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
+        registerSupportedVersions()
+    }
+
+    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
+        if (!forIde) testAgainst(version)
     }
 
     /**
@@ -170,7 +166,18 @@ public open class GradlePluginConfigExtension(override val project: Project) : H
     public fun testAgainst(
         version: String,
         action: DevKitGradlePluginTestTarget.() -> Unit = {},
-    ): DevKitGradlePluginTestTarget = testAgainst.maybeCreate(version).apply(action)
+    ): DevKitGradlePluginTestTarget {
+        val target =
+            testAgainst.findByName(version)
+                ?: DevKitGradlePluginTestTargetImpl(
+                        KotlinToolingVersion(version),
+                        tasks.register<Test>(
+                            "${KotlinToolingVersion(version).versionName}FunctionalTest"
+                        ),
+                    )
+                    .also(testAgainst::add)
+        return target.apply(action)
+    }
 
     /**
      * Which registered [testAgainst] version the generic `functionalTest` task delegates to.

@@ -3,6 +3,9 @@
 """Fetches recent IntelliJ IDEA and Android Studio releases, resolves their
 bundled Kotlin compiler versions, and outputs alias mappings.
 
+Every alias target is snapped onto a dev build that is actually published to
+intellij-dependencies, since git ancestry can name one that never was.
+
 Works entirely via HTTP/API calls - no IDE binaries are downloaded.
 
 Usage:
@@ -23,6 +26,11 @@ from collections import OrderedDict
 
 FILE_PATH = ".idea/libraries/kotlinc_kotlin_compiler_common.xml"
 RAW_GH_BASE = "https://raw.githubusercontent.com/JetBrains/intellij-community"
+
+# The only repository that carries Kotlin `dev` builds. Git ancestry can name a dev
+# build that was never published there, so every alias target is snapped onto this list.
+INTELLIJ_DEPENDENCIES = "https://redirector.kotlinlang.org/maven/intellij-dependencies"
+PUBLISHED_ARTIFACT = "kotlin-compiler"
 
 
 def parse_kotlin_base_version(version_str):
@@ -115,6 +123,66 @@ def gh_api(endpoint, jq_filter=None):
         return json.loads(result.stdout) if result.stdout.strip() else None
     except Exception:
         return None
+
+
+# ─── Published dev builds ────────────────────────────────────────────────────
+
+
+DEV_VERSION_RE = re.compile(r"^(\d+\.\d+\.\d+)-dev-(\d+)$")
+
+# base version -> sorted list of published dev build numbers; None until fetched,
+# and left empty if the repository could not be read (snapping then becomes a no-op).
+_published_dev_builds = None
+
+
+def published_dev_builds():
+    """Dev build numbers published to intellij-dependencies, keyed by base version."""
+    global _published_dev_builds
+    if _published_dev_builds is not None:
+        return _published_dev_builds
+
+    _published_dev_builds = {}
+    url = f"{INTELLIJ_DEPENDENCIES}/org/jetbrains/kotlin/{PUBLISHED_ARTIFACT}/maven-metadata.xml"
+    body, status = fetch_url(url)
+    if status != 200 or not body:
+        print(f"  WARNING: Failed to fetch {PUBLISHED_ARTIFACT} metadata (HTTP {status});"
+              " alias targets will not be snapped to published builds", file=sys.stderr)
+        return _published_dev_builds
+
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as e:
+        print(f"  WARNING: Malformed {PUBLISHED_ARTIFACT} metadata ({e})", file=sys.stderr)
+        return _published_dev_builds
+
+    for elem in root.findall(".//versions/version"):
+        m = DEV_VERSION_RE.match((elem.text or "").strip())
+        if m:
+            _published_dev_builds.setdefault(m.group(1), []).append(int(m.group(2)))
+    for nums in _published_dev_builds.values():
+        nums.sort()
+    total = sum(len(n) for n in _published_dev_builds.values())
+    print(f"  Found {total} published dev builds across {len(_published_dev_builds)} base versions")
+    return _published_dev_builds
+
+
+def snap_to_published_dev_build(version):
+    """Move a dev version onto the closest build actually published to
+    intellij-dependencies, since a build resolved from git ancestry need not exist there.
+
+    Prefers the highest published build below the target — the IDE's compiler is then at
+    least as new as the alias claims — and only reaches upwards when there is none.
+    Non-dev versions, unknown base versions and already-published builds pass through."""
+    m = DEV_VERSION_RE.match(version)
+    if not m:
+        return version
+    base, num = m.group(1), int(m.group(2))
+    nums = published_dev_builds().get(base)
+    if not nums or num in nums:
+        return version
+    below = [n for n in nums if n < num]
+    closest = max(below) if below else min(nums)
+    return f"{base}-dev-{closest}"
 
 
 # ─── Kotlin version resolution ───────────────────────────────────────────────
@@ -626,7 +694,11 @@ def main():
         cache_key = (tag, kotlin_version)
         if cache_key not in dev_build_cache:
             print("  Resolving to dev build...")
-            dev_build_cache[cache_key] = resolve_to_dev_build(tag, kotlin_version)
+            resolved_dev = resolve_to_dev_build(tag, kotlin_version)
+            published = snap_to_published_dev_build(resolved_dev)
+            if published != resolved_dev:
+                print(f"  {resolved_dev} is not in intellij-dependencies, using {published}")
+            dev_build_cache[cache_key] = published
         dev_version = dev_build_cache[cache_key]
         print(f"  Dev build: {dev_version}")
         print()
@@ -671,6 +743,16 @@ def main():
     final_comments = OrderedDict()
     for version in existing_entries:
         final_comments[version] = list(existing_comments.get(version, []))
+
+    # Entries written before snapping existed, or by a run that could not reach the
+    # repository, can still name an unpublished build — fix them in place.
+    for build, target in final_map.items():
+        if target == "CLI_ONLY":
+            continue
+        published = snap_to_published_dev_build(target)
+        if published != target:
+            print(f"  Snapping {build}: {target} -> {published} (not in intellij-dependencies)")
+            final_map[build] = published
 
     additions = 0
     updates = 0

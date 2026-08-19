@@ -39,7 +39,7 @@ public abstract class MultiReleasePluginTransform :
                 parameters.kotlinVersion
                     .get()
                     .let(::KotlinToolingVersion)
-                    .let(CompilerVersionAliases::map) ?: return@default
+                    .let(CompilerVersionAliases::map)
             input.openDirectory { inputRoot ->
                 val version: KotlinToolingVersion
                 val paths = buildList {

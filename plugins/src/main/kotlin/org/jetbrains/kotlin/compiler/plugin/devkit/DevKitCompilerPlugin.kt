@@ -37,7 +37,6 @@ import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.VERSIONS_PA
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
@@ -47,8 +46,8 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 @OptIn(ExperimentalWasmDsl::class)
 public abstract class DevKitCompilerConfigExtension
-internal constructor(override val project: Project, private val isPlugin: Boolean) :
-    HasProject, DevKitHierarchyDsl {
+internal constructor(project: Project, private val isPlugin: Boolean) :
+    DevKitVersionsDsl(project), DevKitHierarchyDsl {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
@@ -114,6 +113,7 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
         kotlinExtension.createDevKitTarget(
             kotlinToolingVersion,
             areDependenciesEmbedded = isPlugin,
+            forIde = false,
             isSurrogate = true,
         )
 
@@ -151,7 +151,12 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
         }
 
     init {
+        registerSupportedVersions()
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
+    }
+
+    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
+        testAgainst(version, forIde = forIde)
     }
 
     /**
@@ -308,19 +313,25 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: KotlinToolingVersion,
+        forIde: Boolean = false,
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget {
         val target =
             testAgainst.findByName(version.versionName)
-                ?: kotlinExtension.createDevKitTarget(version, areDependenciesEmbedded = isPlugin)
+                ?: kotlinExtension.createDevKitTarget(
+                    version,
+                    forIde = forIde,
+                    areDependenciesEmbedded = isPlugin,
+                )
         return target.apply(action)
     }
 
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: String,
+        forIde: Boolean = false,
         action: DevKitTarget.() -> Unit = {},
-    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), action)
+    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), forIde = forIde, action)
 
     internal fun configure() {
         configurePlugins()
@@ -471,9 +482,9 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
         val testArtifactsWasm = configurations.dependencyScope("testArtifactsWasm")
         testAgainst.configureEach {
             testTask {
-                val testArtifacts = testArtifacts.withKotlinVersion(version)
+                val testArtifacts = testArtifacts.withKotlinVersion(version, forIde)
                 val testArtifactsWasm =
-                    testArtifactsWasm.withKotlinVersion(version) {
+                    testArtifactsWasm.withKotlinVersion(version, forIde) {
                         isTransitive = false
                         attributes {
                             attribute(
@@ -596,7 +607,7 @@ internal constructor(override val project: Project, private val isPlugin: Boolea
     internal fun configureDependencies() {
         testAgainst.configureEach {
             for (compilation in listOf(mainCompilation, testFixturesCompilation, testCompilation)) {
-                compilation.forceKotlinVersion(this@configureEach.version)
+                compilation.forceKotlinVersion(this@configureEach.version, forIde = forIde)
             }
         }
         dependencies {
