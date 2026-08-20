@@ -75,7 +75,7 @@ public fun BuildResult.assertOutputContains(text: String) {
  * versioned test task.
  */
 public fun getTestCompilerVersion(): String =
-    System.getProperty("org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kotlin-version")
+    System.getProperty("kotlin.compiler.plugin.devkit.gradle.test.kotlin-version")
 
 public fun getTestCompilerToolingVersion(): KotlinToolingVersion =
     KotlinToolingVersion(getTestCompilerVersion())

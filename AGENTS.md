@@ -183,7 +183,7 @@ aggregates them and `check` picks that up.
 
 ## Recipe: support a new Kotlin version
 
-1. Add the version to `org.jetbrains.kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`.
+1. Add the version to `kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`.
 2. Build it. Because the shared sources are recompiled per version, most versions need nothing else.
 3. If something *does* break, decide where the split belongs in the hierarchy template (the
    `kotlin.applyPluginDevKitHierarchyTemplate { }` block inside `pluginDevKit { }` in

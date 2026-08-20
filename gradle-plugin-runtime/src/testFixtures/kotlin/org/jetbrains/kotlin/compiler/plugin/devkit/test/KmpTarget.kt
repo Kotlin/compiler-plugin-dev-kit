@@ -20,7 +20,7 @@ public enum class KmpTarget(public val gradleTargetName: String) {
     public companion object {
         /** Gradle/system property scoping [selectedTargets], forwarded by `DevKitGradlePlugin`. */
         public const val KMP_TARGET_PROPERTY: String =
-            "org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.kmpTarget"
+            "kotlin.compiler.plugin.devkit.gradle.test.kmpTarget"
 
         /**
          * Targets to iterate, from [KMP_TARGET_PROPERTY]: unset → `[JVM]`; `all` → every entry;

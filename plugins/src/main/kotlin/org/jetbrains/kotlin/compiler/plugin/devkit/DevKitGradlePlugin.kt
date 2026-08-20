@@ -236,7 +236,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
          * Property that's passed to each `functionalTest` to specify which KMP target to run
          * against.
          */
-        public const val KMP_TARGET: String = "$DEV_KIT_GROUP.gradle.test.kmpTarget"
+        public const val KMP_TARGET: String = "$DEV_KIT_PROPERTY_PREFIX.gradle.test.kmpTarget"
     }
 
     private fun configureDependencies() = dependencies {
@@ -264,9 +264,9 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 mustRunAfter("test")
                 maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
-                systemProperty("$DEV_KIT_GROUP.gradle.test.kotlin-version", version.versionString)
+                systemProperty("$DEV_KIT_PROPERTY_PREFIX.gradle.test.kotlin-version", version.versionString)
                 +PropertiesSystemPropertyArgumentProvider(
-                    "$DEV_KIT_GROUP.gradle.test.properties",
+                    "$DEV_KIT_PROPERTY_PREFIX.gradle.test.properties",
                     functionalTestProperties,
                 )
                 +NestedArgumentProvider(

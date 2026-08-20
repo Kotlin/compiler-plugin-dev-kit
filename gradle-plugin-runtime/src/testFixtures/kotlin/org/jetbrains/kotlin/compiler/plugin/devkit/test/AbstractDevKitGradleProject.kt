@@ -253,7 +253,7 @@ public abstract class AbstractDevKitGradleProject(
                 "kotlin.native.ignoreDisabledTargets=true",
             ) +
                 System.getProperty(
-                        "org.jetbrains.kotlin.compiler.plugin.devkit.gradle.test.properties"
+                        "kotlin.compiler.plugin.devkit.gradle.test.properties"
                     )
                     .orEmpty()
                     .split(",")
