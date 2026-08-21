@@ -10,6 +10,16 @@ plugins { kotlin("compiler.plugin.devkit") }
 
 dependencyResolutionManagement {
     includeBuild("version-resolution")
+    versionCatalogs {
+        // Gradle already imported this one from the conventional `gradle/libs.versions.toml`, so
+        // there is no `from` here - a second one is an error.
+        create("libs") {
+            // A release build overrides the checked-in `-SNAPSHOT` version; see AGENTS.md.
+            providers.environmentVariable("DEVKIT_PUBLISH_VERSION").orNull?.let {
+                version("devkit-version", it)
+            }
+        }
+    }
     repositories {
         mavenCentral()
         maven("https://repo.gradle.org/gradle/libs-releases/")

@@ -1,0 +1,81 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Uploads are not cancelled halfway through: a version that is partly in the repository is worse
+# than a queued run.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The runner has 16 GB, and the Kotlin daemon is a second JVM next to Gradle's.
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvmargs=-Xmx4g
+  ORG_GRADLE_PROJECT_devKitSpaceUsername: ${{ secrets.DEVKITSPACEUSERNAME }}
+  ORG_GRADLE_PROJECT_devKitSpacePassword: ${{ secrets.DEVKITSPACEPASSWORD }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      # Writes the dependency and build caches, since `main` is the default branch - without them
+      # every registered version's compiler is downloaded and compiled from scratch each run.
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(sed -nE 's/^[[:space:]]*devkit-version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+            gradle/libs.versions.toml)
+          if [ -z "$base" ]; then
+            echo "::error file=gradle/libs.versions.toml::no devkit-version entry found"
+            exit 1
+          fi
+          base=${base%-SNAPSHOT}
+          if [[ ! $base =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error file=gradle/libs.versions.toml::devkit-version '$base' is not a plain" \
+              "'<major>.<minor>.<patch>' version, optionally followed by '-SNAPSHOT'"
+            exit 1
+          fi
+          echo "version=$base-dev-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        shell: bash
+        env:
+          # Overrides the catalog's `devkit-version` in all three builds; see their settings files.
+          DEVKIT_PUBLISH_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The root build compiles the other two on the way, so it is the one that can still fail
+          # after something has been uploaded. Publishing it first keeps a failed run from leaving
+          # half a version behind.
+          for build in . plugins version-resolution; do
+            ./gradlew --project-dir "$build" publishAllPublicationsToDevKitSpaceRepository
+          done
+
+      - name: Summarize
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Published \`$VERSION\` to"
+            echo "<https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap>."
+          } >> "$GITHUB_STEP_SUMMARY"
