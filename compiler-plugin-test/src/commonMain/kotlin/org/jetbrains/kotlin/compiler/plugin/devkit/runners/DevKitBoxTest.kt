@@ -1,7 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.jsTestBase
 import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
-import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
@@ -33,13 +33,12 @@ public open class DevKitJsBoxTestDumpless(
     public val parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
-        object :
-            AbstractJsTest(
-                "",
-                "box/js",
-                targetBackend,
-                parser,
-            ) {},
+        jsTestBase(
+            "",
+            "box/js",
+            targetBackend,
+            parser,
+        ),
         {
             // give each JS box test its own output directory, so no race conditions happen
             defaultDirectives {

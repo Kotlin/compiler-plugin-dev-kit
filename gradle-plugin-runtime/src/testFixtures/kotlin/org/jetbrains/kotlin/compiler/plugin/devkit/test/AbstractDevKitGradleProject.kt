@@ -252,9 +252,7 @@ public abstract class AbstractDevKitGradleProject(
                 "kotlin.native.enableKlibsCrossCompilation=true",
                 "kotlin.native.ignoreDisabledTargets=true",
             ) +
-                System.getProperty(
-                        "kotlin.compiler.plugin.devkit.gradle.test.properties"
-                    )
+                System.getProperty("kotlin.compiler.plugin.devkit.gradle.test.properties")
                     .orEmpty()
                     .split(",")
         private val KOTLIN_REPOS =

@@ -264,7 +264,10 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 mustRunAfter("test")
                 maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
-                systemProperty("$DEV_KIT_PROPERTY_PREFIX.gradle.test.kotlin-version", version.versionString)
+                systemProperty(
+                    "$DEV_KIT_PROPERTY_PREFIX.gradle.test.kotlin-version",
+                    version.versionString,
+                )
                 +PropertiesSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.gradle.test.properties",
                     functionalTestProperties,

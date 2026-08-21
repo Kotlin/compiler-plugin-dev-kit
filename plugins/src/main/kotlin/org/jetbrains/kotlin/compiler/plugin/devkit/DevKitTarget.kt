@@ -14,6 +14,7 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
@@ -145,6 +146,7 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
     version: KotlinToolingVersion,
     areDependenciesEmbedded: Boolean,
     isSurrogate: Boolean = false,
+    preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
 ) = createExternalKotlinTarget {
     val forIde = version in ideVersions
     targetName = version.versionName
@@ -191,13 +193,15 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
     }
     configureIdeImport {
         registerDependencyResolver(
-            resolver = IdeMultiVersionCompilationBinaryDependencyResolver(),
+            resolver =
+                IdeMultiVersionCompilationBinaryDependencyResolver(preferredVersionForIdeImport),
             constraint = KotlinSourceSet::isDevKitSourceSet,
             phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
             priority = IdeMultiplatformImport.Priority.high,
         )
         registerDependencyResolver(
-            resolver = IdeMultiVersionCompilationProjectDependencyResolver(),
+            resolver =
+                IdeMultiVersionCompilationProjectDependencyResolver(preferredVersionForIdeImport),
             constraint = KotlinSourceSet::isDevKitSourceSet,
             phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
             priority = IdeMultiplatformImport.Priority.high,

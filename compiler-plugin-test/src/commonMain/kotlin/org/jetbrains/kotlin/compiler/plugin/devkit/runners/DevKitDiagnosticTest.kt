@@ -1,7 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.jsDiagnosticWithBackendTestBase
 import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
-import org.jetbrains.kotlin.js.test.runners.AbstractJsDiagnosticWithBackendTestBase
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
@@ -29,7 +29,7 @@ public open class DevKitJsDiagnosticTest(
     parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
-        object : AbstractJsDiagnosticWithBackendTestBase(parser) {},
+        jsDiagnosticWithBackendTestBase(parser),
         {
             defaultDirectives {
                 versionDumpClassifier()

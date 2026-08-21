@@ -2,11 +2,13 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
+import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
+import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.TestServices
 
 public expect fun afterAnalysisChecker(
@@ -25,3 +27,12 @@ public expect fun TestConfigurationBuilder.useFailureSuppressorsCompat(
 public expect fun RegisteredDirectivesBuilder.firIdenticalCompat()
 
 public expect fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser)
+
+public expect fun jsTestBase(
+    pathToTestDir: String,
+    testGroupOutputDirPrefix: String,
+    targetBackend: TargetBackend,
+    parser: FirParser,
+): AbstractKotlinCompilerTest
+
+public expect fun jsDiagnosticWithBackendTestBase(parser: FirParser): AbstractKotlinCompilerTest

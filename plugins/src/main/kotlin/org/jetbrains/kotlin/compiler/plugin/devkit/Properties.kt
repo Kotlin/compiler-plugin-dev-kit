@@ -37,7 +37,8 @@ public const val USE_LATEST_DEV_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.use
  * Gradle property holding the version that the generic `test`/`functionalTest` task delegates to.
  * The version is registered if [TEST_AGAINST_PROPERTY] didn't already list it.
  */
-public const val DEFAULT_TEST_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.defaultTestVersion"
+public const val DEFAULT_TEST_VERSION_PROPERTY: String =
+    "$DEV_KIT_PROPERTY_PREFIX.defaultTestVersion"
 
 /** Gradle property holding the plugin package, and with it the plugin ID. */
 public const val PLUGIN_PACKAGE_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.pluginPackage"
@@ -51,4 +52,5 @@ public const val COMPILER_PLUGIN_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.co
  * project's own `group`, `name` and `version`; anything else is used as-is as a
  * `group:artifact:version` coordinate.
  */
-public const val COMPANION_LIBRARIES_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.companionLibraries"
+public const val COMPANION_LIBRARIES_PROPERTY: String =
+    "$DEV_KIT_PROPERTY_PREFIX.companionLibraries"

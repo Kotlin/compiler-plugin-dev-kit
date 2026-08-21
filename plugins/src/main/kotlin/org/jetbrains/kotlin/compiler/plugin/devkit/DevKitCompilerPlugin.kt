@@ -109,11 +109,20 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     public val testAgainst: NamedDomainObjectCollection<DevKitTarget> =
         kotlinExtension.targets.withType<DevKitTarget>()
 
+    /**
+     * Controls which version the IDE should prefer for shared source sets. This has no impact on
+     * compilation whatsoever. This only impacts the dependencies the IDE sees for shared source
+     * sets. If no version matches, the IDE will use the highest version available.
+     */
+    public val preferredVersionForSharedSourceSetsInIde: Property<KotlinToolingVersion> =
+        objects.property(KotlinToolingVersion::class.java)
+
     private val surrogateTarget =
         kotlinExtension.createDevKitTarget(
             kotlinToolingVersion,
             areDependenciesEmbedded = isPlugin,
             isSurrogate = true,
+            preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
         )
 
     private val genServicesDir =
@@ -319,6 +328,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 ?: kotlinExtension.createDevKitTarget(
                     version,
                     areDependenciesEmbedded = isPlugin,
+                    preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
                 )
         return target.apply(action)
     }

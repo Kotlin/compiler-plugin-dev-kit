@@ -69,9 +69,7 @@ private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion,
         }
     }
 
-internal fun KotlinCompilation<*>.forceKotlinVersion(
-    version: KotlinToolingVersion,
-) {
+internal fun KotlinCompilation<*>.forceKotlinVersion(version: KotlinToolingVersion) {
     val forIde = version in ideVersions
     configurations.named(compileDependencyConfigurationName) {
         resolutionStrategy.forceKotlinVersion(version, forIde)
