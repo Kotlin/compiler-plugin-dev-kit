@@ -22,6 +22,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.exclude
+import org.gradle.kotlin.dsl.extra
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
@@ -386,6 +387,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             enabled = false
             dependsOn(defaultTestTarget.map { it.testTask })
         }
+        // Disable k2xxJar being added as friend path because it forces the task to run
+        // This forces all versions to get compiled
+        project.extra["kotlin.build.archivesTaskOutputAsFriendModule"] = false
         if (!isPlugin) return
         buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
             packageName.set(pluginPackage)
