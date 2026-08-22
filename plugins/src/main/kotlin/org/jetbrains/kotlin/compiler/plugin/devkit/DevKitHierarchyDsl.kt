@@ -1,173 +1,153 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.dsl.KotlinHierarchyDsl
-import org.jetbrains.kotlin.gradle.plugin.KotlinHierarchyBuilder
-import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
-public interface DevKitHierarchyDsl {
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyDsl.applyPluginDevKitHierarchyTemplate(
-        template: KotlinHierarchyBuilder.() -> Unit
-    ) {
-        applyHierarchyTemplate {
-            withSourceSetTree(
-                KotlinSourceSetTree.main,
-                KotlinSourceSetTree(TEST_FIXTURES_COMPILATION_NAME),
-                KotlinSourceSetTree.test,
-            )
+private val String.kotlinToolingVersionGroupName
+    get() = replace(".", "").split("-").joinToString("") { it.capitalizeAsciiOnly() }
+private val KotlinToolingVersion.groupName
+    get() = versionString.kotlinToolingVersionGroupName
 
-            common {
-                withCompilations { true }
-                template()
-            }
-        }
-    }
+private fun kotlinVersionGroupName(major: Int, minor: Int, patch: Int = 0) =
+    "$major$minor${if (patch != 0) patch else ""}Dev"
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.withVersions(condition: (KotlinToolingVersion) -> Boolean) {
-        withCompilations {
-            val target = it.target
-            target is DevKitTarget && condition(target.version)
-        }
-    }
+private val KotlinVersion.groupName
+    get() = kotlinVersionGroupName(major, minor, patch)
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.withVersions(range: ClosedRange<KotlinToolingVersion>) {
-        withVersions { it in range }
-    }
-
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.groupVersions(
+public interface DevKitHierarchyBuilder {
+    public fun groupVersions(
         name: String,
         condition: (KotlinToolingVersion) -> Boolean,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
-    ) {
-        group(name) {
-            withVersions(condition)
-            build()
-        }
-    }
+    )
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.groupVersions(
-        name: String,
+    public fun groupVersions(
         range: ClosedRange<KotlinToolingVersion>,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String,
     ) {
-        group(name) {
-            withVersions(range)
-            build()
-        }
+        groupVersions(name) { it in range }
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.pre(
+    public fun pre(
         version: KotlinToolingVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${version.groupName}",
     ) {
-        group(name) {
-            withVersions { it < version }
-            build()
-        }
+        groupVersions(name) { it < version }
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
+    public fun preDev(
         version: KotlinVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${version.groupName}",
     ) {
-        group(name) {
-            withVersions { it.toKotlinVersion() < version }
-            build()
-        }
+        groupVersions(name) { it.toKotlinVersion() < version }
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.post(
+    public fun post(
         version: KotlinToolingVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "post${version.groupName}",
     ) {
-        group(name) {
-            withVersions { it >= version }
-            build()
-        }
+        groupVersions(name) { it >= version }
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
+    public fun postDev(
         version: KotlinVersion,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "post${version.groupName}",
     ) {
-        group(name) {
-            withVersions { it.toKotlinVersion() >= version }
-            build()
-        }
+        groupVersions(name) { it.toKotlinVersion() >= version }
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.pre(
+    public fun split(
+        name: String,
+        condition: (KotlinToolingVersion) -> Boolean,
+    ) {
+        groupVersions("pre$name", condition)
+        groupVersions("post$name") { !condition(it) }
+    }
+
+    public fun split(
+        version: KotlinToolingVersion,
+        name: String = version.groupName,
+    ) {
+        pre(version, "pre$name")
+        post(version, "post$name")
+    }
+
+    public fun splitDev(
+        version: KotlinVersion,
+        name: String = version.groupName,
+    ) {
+        preDev(version, "pre$name")
+        postDev(version, "post$name")
+    }
+
+    public fun pre(
         version: String,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${version.kotlinToolingVersionGroupName}",
     ) {
-        pre(KotlinToolingVersion(version), name, build)
+        pre(KotlinToolingVersion(version), name)
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
+    public fun preDev(
         major: Int,
         minor: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${kotlinVersionGroupName(major, minor)}",
     ) {
-        preDev(KotlinVersion(major, minor), name, build)
+        preDev(KotlinVersion(major, minor), name)
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.preDev(
+    public fun preDev(
         major: Int,
         minor: Int,
         patch: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${kotlinVersionGroupName(major, minor, patch)}",
     ) {
-        preDev(KotlinVersion(major, minor, patch), name, build)
+        preDev(KotlinVersion(major, minor, patch), name)
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.post(
+    public fun post(
         version: String,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "post${version.kotlinToolingVersionGroupName}",
     ) {
-        post(KotlinToolingVersion(version), name, build)
+        post(KotlinToolingVersion(version), name)
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
+    public fun postDev(
         major: Int,
         minor: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${kotlinVersionGroupName(major, minor)}",
     ) {
-        postDev(KotlinVersion(major, minor), name, build)
+        postDev(KotlinVersion(major, minor), name)
     }
 
-    @ExperimentalKotlinGradlePluginApi
-    public fun KotlinHierarchyBuilder.postDev(
+    public fun postDev(
         major: Int,
         minor: Int,
         patch: Int,
-        name: String,
-        build: KotlinHierarchyBuilder.() -> Unit = {},
+        name: String = "pre${kotlinVersionGroupName(major, minor, patch)}",
     ) {
-        postDev(KotlinVersion(major, minor, patch), name, build)
+        postDev(KotlinVersion(major, minor, patch), name)
+    }
+
+    public fun split(
+        version: String,
+        name: String = version.kotlinToolingVersionGroupName,
+    ) {
+        split(KotlinToolingVersion(version), name)
+    }
+
+    public fun splitDev(
+        major: Int,
+        minor: Int,
+        name: String = kotlinVersionGroupName(major, minor),
+    ) {
+        splitDev(KotlinVersion(major, minor), name)
+    }
+
+    public fun splitDev(
+        major: Int,
+        minor: Int,
+        patch: Int,
+        name: String = kotlinVersionGroupName(major, minor, patch),
+    ) {
+        splitDev(KotlinVersion(major, minor, patch), name)
     }
 }

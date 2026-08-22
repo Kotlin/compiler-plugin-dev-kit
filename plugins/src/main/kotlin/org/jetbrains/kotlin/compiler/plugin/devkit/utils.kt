@@ -111,7 +111,7 @@ internal fun lowerCamelCaseName(vararg nameParts: String?): String {
         )
 }
 
-private fun String.capitalizeAsciiOnly(): String {
+internal fun String.capitalizeAsciiOnly(): String {
     if (isEmpty()) return this
     val c = this[0]
     return if (c in 'a'..'z')

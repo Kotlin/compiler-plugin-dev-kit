@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -27,31 +26,18 @@ kotlin {
     }
 }
 
-@OptIn(ExperimentalKotlinGradlePluginApi::class)
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    fun supportsDumpClassifier(version: KotlinToolingVersion) =
-        version >= KotlinToolingVersion("2.4.20-dev-7600") &&
-            version != KotlinToolingVersion("2.4.20-Beta1")
-
-    kotlin.applyPluginDevKitHierarchyTemplate {
-        groupVersions("pre2420Dev7600", { !supportsDumpClassifier(it) }) {
-            preDev(2, 4, 20, "pre2420Dev") {
-                preDev(2, 4, "pre24Dev") {
-                    preDev(2, 3, 20, "pre2320Dev")
-                }
-            }
+    versionHierarchy {
+        split("2420Dev7600") {
+            it < KotlinToolingVersion("2.4.20-dev-7600") ||
+                it == KotlinToolingVersion("2.4.20-Beta1")
         }
-
-        postDev(2, 3, 20, "post2320Dev") {
-            postDev(2, 4, "post24Dev") {
-                postDev(2, 4, 20, "post2420Dev") {
-                    groupVersions("post2420Dev7600", ::supportsDumpClassifier)
-                }
-            }
-        }
+        splitDev(2, 4, 20)
+        splitDev(2, 4)
+        splitDev(2, 3, 20)
     }
 }
 

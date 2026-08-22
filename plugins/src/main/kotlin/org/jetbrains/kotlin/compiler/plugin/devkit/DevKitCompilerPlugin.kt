@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
@@ -46,8 +47,7 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 @OptIn(ExperimentalWasmDsl::class)
 public abstract class DevKitCompilerConfigExtension
-internal constructor(project: Project, private val isPlugin: Boolean) :
-    DevKitVersionsDsl(project), DevKitHierarchyDsl {
+internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVersionsDsl(project) {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
@@ -339,6 +339,36 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget = testAgainst(KotlinToolingVersion(version), action)
 
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    public fun versionHierarchy(template: DevKitHierarchyBuilder.() -> Unit) {
+        kotlinExtension.applyHierarchyTemplate {
+            withSourceSetTree(
+                KotlinSourceSetTree.main,
+                KotlinSourceSetTree(TEST_FIXTURES_COMPILATION_NAME),
+                KotlinSourceSetTree.test,
+            )
+
+            common {
+                withCompilations { true }
+                template(
+                    object : DevKitHierarchyBuilder {
+                        override fun groupVersions(
+                            name: String,
+                            condition: (KotlinToolingVersion) -> Boolean,
+                        ) {
+                            group(name) {
+                                withCompilations {
+                                    val target = it.target
+                                    target is DevKitTarget && condition(target.version)
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
     internal fun configure() {
         configurePlugins()
         configureTestTasks()
@@ -587,9 +617,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         }
     }
 
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
     internal fun configureSourceSets() {
-        kotlinExtension.applyPluginDevKitHierarchyTemplate {}
+        versionHierarchy {}
         // TODO find a less ad-hoc way to identify test source sets
         kotlinExtension.sourceSets
             .named { it.endsWith("Test") }
