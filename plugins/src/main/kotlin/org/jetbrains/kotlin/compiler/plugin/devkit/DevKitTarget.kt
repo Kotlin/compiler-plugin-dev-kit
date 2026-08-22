@@ -254,7 +254,11 @@ internal class DevKitCompilationFactory(override val target: DevKitTarget) :
 
         return target.createCompilation {
             compilationName = name
-            defaultSourceSet = kotlinExtension.sourceSets.create(sourceSetName)
+            defaultSourceSet =
+                kotlinExtension.sourceSets.create(sourceSetName).apply {
+                    kotlin.setSrcDirs(emptyList<Any?>())
+                    resources.setSrcDirs(emptyList<Any?>())
+                }
             compilationFactory = ExternalKotlinCompilationDescriptor.CompilationFactory {
                 DevKitCompilation(it, javaSourceSet)
             }

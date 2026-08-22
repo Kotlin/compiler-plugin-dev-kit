@@ -62,7 +62,8 @@ internal fun setupJavaSourceSetSourcesAndResources(
     compilation: DevKitCompilation,
 ) {
     val project = compilation.target.project
-    javaSourceSet.java.setSrcDirs(listOf("src/${compilation.defaultSourceSet.name}/java"))
+    // CHANGED: Intentionally remove java directories
+    javaSourceSet.java.setSrcDirs(emptyList<Any?>())
     compilation.defaultSourceSet.kotlin.srcDirs(javaSourceSet.java.sourceDirectories)
 
     // To avoid confusion in the sources layout, remove the default Java source directories
