@@ -12,7 +12,9 @@ public data class SourceSetName(val name: String)
 
 public object DevKitTestGenerator {
     public fun generate(args: Array<String>, block: context(SourceSetName) TestGroup.() -> Unit) {
-        generateTestGroupSuiteWithJUnit5 {
+        generateTestGroupSuiteWithJUnit5(
+            arrayOf("allowGenerationOnTeamCity", "skipTestAllFilesCheck")
+        ) {
             args
                 .toList()
                 .chunked(2) { it.takeIf { it.size == 2 }?.toList().orEmpty() }
