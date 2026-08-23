@@ -1,10 +1,8 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-import org.jetbrains.kotlin.config.KotlinCompilerVersion
-import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
-import org.jetbrains.kotlin.test.directives.TestDumpDirectives
+import org.jetbrains.kotlin.test.TestInfrastructureException
 
-public actual fun RegisteredDirectivesBuilder.versionDumpClassifier() {
-    TestDumpDirectives.DUMP_CLASSIFIER with
-        KotlinCompilerVersion.VERSION.replace(".", "").replace("-", "_").lowercase()
-}
+public actual fun TestInfrastructureException(
+    message: String,
+    cause: Throwable?,
+): RuntimeException = TestInfrastructureException(message, cause)

@@ -23,6 +23,7 @@ kotlin {
         api(kotlin("test-junit5"))
         api(kotlin("compiler-internal-test-framework"))
         api(kotlin("compiler"))
+        implementation(libs.diff.utils)
     }
 }
 
@@ -37,7 +38,6 @@ pluginDevKit {
         }
         splitDev(2, 4, 20)
         splitDev(2, 4)
-        splitDev(2, 3, 20)
     }
 }
 

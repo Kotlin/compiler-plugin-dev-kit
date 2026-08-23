@@ -16,6 +16,7 @@ testkit-plugin = "0.19"
 testkit-support = "0.27"
 testkit-truth = "1.7.1"
 truth = "1.4.5"
+diff-utils = "4.12"
 
 [plugins]
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
@@ -33,3 +34,4 @@ testkit-plugin = { group = "com.autonomousapps", name = "gradle-testkit-plugin",
 testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support" }
 testkit-truth = { group = "com.autonomousapps", name = "gradle-testkit-truth", version.ref = "testkit-truth" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
+diff-utils = { module = "io.github.java-diff-utils:java-diff-utils", version.ref = "diff-utils" }

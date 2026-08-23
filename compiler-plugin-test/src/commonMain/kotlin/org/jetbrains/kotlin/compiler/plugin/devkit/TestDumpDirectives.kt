@@ -1,0 +1,457 @@
+/*
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
+package org.jetbrains.kotlin.compiler.plugin.devkit
+
+import com.github.difflib.DiffUtils
+import com.github.difflib.UnifiedDiffUtils
+import java.io.File
+import kotlin.io.path.forEachDirectoryEntry
+import org.jetbrains.kotlin.test.Assertions
+import org.jetbrains.kotlin.test.TestInfrastructureInternals
+import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
+import org.jetbrains.kotlin.test.directives.model.SimpleDirective
+import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
+import org.jetbrains.kotlin.test.directives.model.ValueDirective
+import org.jetbrains.kotlin.test.model.AnalysisHandler
+import org.jetbrains.kotlin.test.services.TestModuleStructure
+import org.jetbrains.kotlin.test.services.assertions
+import org.jetbrains.kotlin.test.services.moduleStructure
+import org.jetbrains.kotlin.test.util.convertLineSeparators
+import org.jetbrains.kotlin.test.util.trimTrailingWhitespacesAndAddNewlineAtEOF
+import org.jetbrains.kotlin.test.utils.withExtension
+
+public object TestDumpDirectives : SimpleDirectivesContainer() {
+    /**
+     * Sets a "classifier" to be used when calculating the path of dump files. This classifier
+     * should be placed before the dump extension, allowing variants of the same dump file to be
+     * generated. This allows multiple runners to dump the same file but with variations depending
+     * on the runner configuration.
+     */
+    public val DUMP_CLASSIFIER: ValueDirective<TestDumpClassifier<*>> by
+        valueDirective<TestDumpClassifier<*>>(
+            description = "The test runner classifier for dump files."
+        ) {
+            error("DUMP_CLASSIFIER should not be set at the file level")
+        }
+    public val DUMP_AS_DIFF: SimpleDirective by
+        directive(
+            description = "Whether to produce a diff between the expected and actual dump files."
+        )
+}
+
+public abstract class TestDumpRoot<out Self : TestDumpRoot<Self>>(public val uniqueName: String) {
+    override fun toString(): String = uniqueName
+
+    public abstract fun calculateClassifiers(): List<TestDumpClassifier<Self>>
+
+    internal val classifiers by lazy { calculateClassifiers() }
+    internal val classifiersByExtension by lazy { this.classifiers.associateBy { it.extension } }
+
+    /**
+     * Based on [directives], selects a subset of classifiers that are "fixed". If it returns null,
+     * there are no fixed classifiers, and collapse using [TestDumpClassifier.compatibleWith] is
+     * allowed. If not null, then classifiers from this root are forced to collapse to elements from
+     * the returned set, with no fallback otherwise
+     *
+     * For example, consider an OS classifier with Linux and Ubuntu(compatibleWith = Linux), and
+     * only `Ubuntu` is fixed:
+     * - tests with [Ubuntu] classifier must use dump files with [Ubuntu]
+     * - tests with [Linux] classifier must use dump files with no OS classifier
+     */
+    public open fun fixedClassifiers(
+        directives: RegisteredDirectives
+    ): List<TestDumpClassifier<Self>>? = null
+}
+
+public interface TestDumpClassifier<out Root : TestDumpRoot<Root>> {
+    /**
+     * Must *not* be a self-reference! No cycles either! The safest way to ensure both conditions is
+     * to extend this class using an `enum class`, with a constructor overriding [compatibleWith]
+     */
+    public val compatibleWith: TestDumpClassifier<Root>?
+    public val root: Root
+    public val name: String
+    public val extension: String
+        get() = name.replaceFirstChar { it.lowercaseChar() }
+}
+
+/** Shortcut for declaring a classifier hierarchy of just a single classifier. */
+public abstract class SingleTestDumpClassifier<out Self : SingleTestDumpClassifier<Self>>(
+    uniqueName: String
+) : TestDumpRoot<Self>(uniqueName) {
+    public val classifier: TestDumpClassifier<Self> =
+        object : TestDumpClassifier<Self> {
+            override val compatibleWith: TestDumpClassifier<Self>?
+                get() = null
+
+            @Suppress("UNCHECKED_CAST")
+            override val root: Self
+                get() = this@SingleTestDumpClassifier as Self
+
+            override val name: String
+                get() = this@SingleTestDumpClassifier.uniqueName
+
+            override fun toString(): String = name
+        }
+
+    override fun calculateClassifiers(): List<TestDumpClassifier<Self>> = listOf(classifier)
+}
+
+private tailrec fun TestDumpClassifier<*>.isCompatibleWith(other: TestDumpClassifier<*>): Boolean {
+    return this == other ||
+        when (val compatibleWith = compatibleWith) {
+            null -> false
+            else -> compatibleWith.isCompatibleWith(other)
+        }
+}
+
+public class ClassifiedDumpFileResult(
+    public val originalFullyClassifiedFile: File,
+    public val fullyClassifiedFile: File,
+    public val fallbackFile: File,
+    public val hasFixedClassifiers: Boolean,
+) {
+    public fun exists(): Boolean = fallbackFile.exists() || fullyClassifiedFile.exists()
+}
+
+public typealias IndependentClassifiers = Map<TestDumpRoot<*>, TestDumpClassifier<*>>
+
+/**
+ * Converts the received [File] to use the specified extension according to dump file conventions.
+ * Conversion is performed ***without*** the use of a
+ * [classifier][TestDumpDirectives.DUMP_CLASSIFIER].
+ *
+ * This is an infrastructure internal function and should be handled with care.
+ *
+ * @see toClassifiedDumpFile
+ */
+@TestInfrastructureInternals
+public fun File.toDefaultDumpFile(extension: String): File {
+    return withExtension(extension)
+}
+
+/**
+ * Gets the dump [File] ***without*** a [classifier][TestDumpDirectives.DUMP_CLASSIFIER] from the
+ * [TestModuleStructure].
+ *
+ * @see getClassifiedDumpFile
+ */
+@OptIn(TestInfrastructureInternals::class)
+public fun TestModuleStructure.getDefaultDumpFile(extension: String): File {
+    return originalTestDataFiles.first().toDefaultDumpFile(extension)
+}
+
+/**
+ * Converts the received [File] to use the specified extension according to dump file conventions.
+ * Conversion is performed ***with*** the use of a [classifier][TestDumpDirectives.DUMP_CLASSIFIER].
+ *
+ * This is an infrastructure internal function and should be handled with care.
+ */
+@TestInfrastructureInternals
+public fun File.toClassifiedDumpFile(
+    extension: String,
+    directives: RegisteredDirectives,
+): ClassifiedDumpFileResult {
+    val originalClassifiers = independentClassifiers(directives[TestDumpDirectives.DUMP_CLASSIFIER])
+    val fixedRoots = mutableSetOf<TestDumpRoot<*>>()
+    val classifiers = buildMap {
+        for ((root, classifier) in originalClassifiers) {
+            val fixedClassifiers = root.fixedClassifiers(directives)?.toSet()
+            if (fixedClassifiers == null) put(root, classifier)
+            else {
+                classifier.fix(fixedClassifiers)?.let {
+                    fixedRoots.add(root)
+                    put(root, it)
+                }
+            }
+        }
+    }
+    if (classifiers.isEmpty())
+        return toDefaultDumpFile(extension).let {
+            ClassifiedDumpFileResult(
+                withClassifiers(originalClassifiers, extension),
+                it,
+                it,
+                fixedRoots.isNotEmpty(),
+            )
+        }
+    val extension = ".${extension.removePrefix(".")}"
+    val mostSpecificClassifiers =
+        findMostSpecificClassifiersWithCompatibility(classifiers, extension).toMutableMap().apply {
+            for (root in fixedRoots) put(root, classifiers.getValue(root))
+        }
+
+    return ClassifiedDumpFileResult(
+        withClassifiers(originalClassifiers, extension),
+        withClassifiers(classifiers, extension),
+        withClassifiers(mostSpecificClassifiers, extension),
+        fixedRoots.isNotEmpty(),
+    )
+}
+
+private fun File.withClassifiers(classifiers: IndependentClassifiers, extension: String): File {
+    return withExtension(classifiers.canonicalExtension() + ".${extension.removePrefix(".")}")
+}
+
+private fun File.findMostSpecificClassifiersWithCompatibility(
+    classifiers: IndependentClassifiers,
+    extension: String,
+): IndependentClassifiers {
+    val roots = classifiers.keys.sortedBy { it.uniqueName }
+    val filePrefix = nameWithoutExtension
+    val mostSpecificClassifiers = mutableMapOf<TestDumpRoot<*>, TestDumpClassifier<*>>()
+    val fullyClassifiedPrefix = filePrefix + ".${classifiers.canonicalExtension()}"
+
+    parentFile.toPath().forEachDirectoryEntry { file ->
+        val fileName = file.fileName.toString()
+        if (!fileName.startsWith(filePrefix) || !fileName.endsWith(extension))
+            return@forEachDirectoryEntry
+        if (fileName.startsWith(fullyClassifiedPrefix)) return@forEachDirectoryEntry
+
+        val rootIterator = roots.iterator()
+        for (rawClassifier in
+            fileName.removePrefix(filePrefix).removeSuffix(extension).split('.')) {
+            if (rawClassifier.isEmpty()) continue
+            val parsedClassifier =
+                rootIterator.parse(rawClassifier)
+                    ?: return@forEachDirectoryEntry // unrecognized classifier
+            val root = parsedClassifier.root
+
+            if (!classifiers.getValue(root).isCompatibleWith(parsedClassifier))
+                return@forEachDirectoryEntry // incompatible
+
+            val mostSpecificClassifier = mostSpecificClassifiers[root]
+            if (
+                mostSpecificClassifier == null ||
+                    parsedClassifier.isCompatibleWith(mostSpecificClassifier)
+            ) {
+                // found a more specific classifier
+                mostSpecificClassifiers[root] = parsedClassifier
+            }
+        }
+    }
+    return mostSpecificClassifiers
+}
+
+private fun Iterator<TestDumpRoot<*>>.parse(rawClassifier: String): TestDumpClassifier<*>? {
+    if (!hasNext()) return null
+    return next().classifiersByExtension[rawClassifier] ?: parse(rawClassifier)
+}
+
+private fun independentClassifiers(
+    classifiers: Iterable<TestDumpClassifier<*>>
+): IndependentClassifiers {
+    val roots = mutableSetOf<TestDumpRoot<*>>()
+    val independentClassifiers = mutableSetOf<TestDumpClassifier<*>>()
+    // INV: independentClassifiers.map { it.root }.toSet() == roots && roots.size ==
+    // independentClassifiers.size
+    //  I.e. `independentClassifiers` have distinct roots, matching `roots` exactly
+    for (classifier in classifiers.distinct()) {
+        when (val compatibleWith = classifier.compatibleWith) {
+            null -> {
+                val root = classifier.root
+                if (root in roots)
+                    error(
+                        "Invalid $root classifier chain: " +
+                            "$classifier and ${independentClassifiers.single { it.root == root }} are incompatible"
+                    )
+                roots += root
+                independentClassifiers.add(classifier)
+            }
+            is TestDumpClassifier<*> -> {
+                if (compatibleWith !in independentClassifiers) {
+                    val root = compatibleWith.root
+                    val incompatibleClassifier =
+                        independentClassifiers
+                            .find { it.root == root }
+                            ?.takeUnless { classifier.isCompatibleWith(it) }
+                    if (incompatibleClassifier != null)
+                        error(
+                            "Invalid $root classifier chain: $classifier and $incompatibleClassifier are incompatible"
+                        )
+                    else
+                        error(
+                            "Invalid $root classifier chain: Please add $compatibleWith to the classifier chain"
+                        )
+                }
+                independentClassifiers.remove(compatibleWith)
+                independentClassifiers.add(classifier)
+            }
+        }
+    }
+    return independentClassifiers.associateBy { it.root }
+}
+
+private tailrec fun TestDumpClassifier<*>.fix(
+    fixedClassifiers: Set<TestDumpClassifier<*>>
+): TestDumpClassifier<*>? {
+    if (this in fixedClassifiers) return this
+    return compatibleWith?.fix(fixedClassifiers)
+}
+
+private fun IndependentClassifiers.canonicalExtension(): String =
+    entries
+        .sortedBy { it.key.uniqueName }
+        .joinToString(separator = ".") { it.value.extension.removePrefix(".") }
+
+/**
+ * Gets the dump [File] ***with*** a [classifier][TestDumpDirectives.DUMP_CLASSIFIER] from the
+ * [TestModuleStructure].
+ */
+@OptIn(TestInfrastructureInternals::class)
+public fun TestModuleStructure.getClassifiedDumpFile(extension: String): ClassifiedDumpFileResult {
+    return originalTestDataFiles.first().toClassifiedDumpFile(extension, allDirectives)
+}
+
+/**
+ * Asserts that [actualDump] matches the [default][getDefaultDumpFile] or
+ * [classified][getClassifiedDumpFile] dump file in the module structure. If the default dump file
+ * exists and matches [actualDump], this function ensures the classified dump file does not exist.
+ * When [actualDump] does not match the default dump file, it is compared against the classified
+ * dump file. If [actualDump] is `null`, this function ensures that the classified dump file does
+ * not exist.
+ */
+public fun Assertions.assertEqualsToDump(
+    moduleStructure: TestModuleStructure,
+    extension: String,
+    actualDump: String?,
+    sanitizer: (String) -> String = { it },
+) {
+    val produceDiff: Boolean = TestDumpDirectives.DUMP_AS_DIFF in moduleStructure.allDirectives
+
+    val classifiedDumpFile =
+        moduleStructure.getClassifiedDumpFile(
+            if (produceDiff) extension.removeSuffix(".txt") + ".patch" else extension
+        )
+    val originalFullyClassifiedFile = classifiedDumpFile.originalFullyClassifiedFile
+    val fullyClassifiedFile = classifiedDumpFile.fullyClassifiedFile
+    val fallbackFile = classifiedDumpFile.fallbackFile
+    val hasFixedClassifiers = classifiedDumpFile.hasFixedClassifiers
+    if (actualDump == null) {
+        assertFileDoesntExist(fullyClassifiedFile) {
+            "Dump file detected but nothing to dump: ${fullyClassifiedFile.name}"
+        }
+        return
+    }
+    if (originalFullyClassifiedFile.path != fullyClassifiedFile.path) {
+        assertFileDoesntExist(originalFullyClassifiedFile) {
+            "Classified dump file detected but its classifiers were fixed to $fullyClassifiedFile"
+        }
+    }
+    fun String.sanitize() = sanitizer.invoke(normalizeDump())
+    val defaultDumpFile = moduleStructure.getDefaultDumpFile(extension)
+    if (defaultDumpFile.path == fullyClassifiedFile.withExtension("txt").path) {
+        return assertEqualsToFile(defaultDumpFile, actualDump, sanitizer)
+    }
+    val defaultDump = defaultDumpFile.takeIf { it.exists() }?.readText()?.sanitize().orEmpty()
+    val fallbackDumpOrPatch = fallbackFile.takeIf { it.exists() }?.readText()?.sanitize().orEmpty()
+    val actualDumpOrPatch =
+        if (produceDiff)
+            buildPatch(
+                baseText = defaultDump,
+                targetText = actualDump.sanitize(),
+                baseFileName = defaultDumpFile.name,
+                targetFileName = fullyClassifiedFile.name.removeSuffix(".patch") + ".txt",
+            )
+        else actualDump
+    val isFileIdentical =
+        (produceDiff && actualDumpOrPatch.isEmpty()) ||
+            (fallbackFile.path != fullyClassifiedFile.path &&
+                fallbackDumpOrPatch == actualDumpOrPatch.sanitize())
+
+    if (isFileIdentical && !hasFixedClassifiers) {
+        assertFileDoesntExist(fullyClassifiedFile) {
+            "No need for a separate dump file: ${fullyClassifiedFile.name}"
+        }
+    } else {
+        assertEqualsToFile(fullyClassifiedFile, actualDumpOrPatch, sanitizer)
+
+        // Sanity check: patch application must result in the actual dump
+        if (produceDiff && actualDumpOrPatch.isNotEmpty())
+            checkTestInfrastructure(
+                applyPatch(defaultDump, actualDumpOrPatch) == actualDump.sanitize()
+            ) {
+                "Unable to reconstruct classified dump from patch: ${fullyClassifiedFile.absolutePath}"
+            }
+    }
+}
+
+/**
+ * Asserts that [actualDump] matches the [default][getDefaultDumpFile] or
+ * [classified][getClassifiedDumpFile] dump file in the module structure. If the default dump file
+ * exists and matches [actualDump], this function ensures the classified dump file does not exist.
+ * When [actualDump] does not match the default dump file, it is compared against the classified
+ * dump file. If [actualDump] is `null`, this function ensures that the classified dump file does
+ * not exist.
+ */
+context(base: AnalysisHandler<*>)
+public fun assertEqualsToDump(
+    extension: String,
+    actualDump: String?,
+    sanitizer: (String) -> String = { it },
+) {
+    base.testServices.assertions.assertEqualsToDump(
+        base.testServices.moduleStructure,
+        extension,
+        actualDump,
+        sanitizer = sanitizer,
+    )
+}
+
+private const val UNIFIED_CONTEXT_LINES = 3
+private const val ORIGINAL_FILE_LABEL_PREFIX = "a/"
+private const val UPDATED_FILE_LABEL_PREFIX = "b/"
+
+internal fun buildPatch(
+    baseText: String,
+    targetText: String,
+    baseFileName: String,
+    targetFileName: String,
+): String {
+    val baseLines = baseText.lines()
+    val targetLines = targetText.lines()
+    if (baseLines == targetLines) return ""
+
+    val patch = DiffUtils.diff(baseLines, targetLines)
+    val unifiedDiff =
+        UnifiedDiffUtils.generateUnifiedDiff(
+            "$ORIGINAL_FILE_LABEL_PREFIX$baseFileName",
+            "$UPDATED_FILE_LABEL_PREFIX$targetFileName",
+            baseLines,
+            patch,
+            UNIFIED_CONTEXT_LINES,
+        )
+    return unifiedDiff.joinToString(System.lineSeparator()).normalizeDump()
+}
+
+internal fun applyPatch(baseText: String, patchText: String): String {
+    val lines = patchText.lines().dropLastWhile { it.isEmpty() }
+    checkTestInfrastructure(lines.size >= 3) {
+        "Unknown target-specific patch format:\n$patchText"
+    }
+    checkTestInfrastructure(lines[0].startsWith("--- ") && lines[1].startsWith("+++ ")) {
+        "Unknown target-specific patch format:\n$patchText"
+    }
+
+    val patchedLines =
+        try {
+            val patch = UnifiedDiffUtils.parseUnifiedDiff(lines)
+            DiffUtils.patch(baseText.lines(), patch)
+        } catch (e: Throwable) {
+            throw TestInfrastructureException(
+                "Unknown target-specific patch format in:\n$patchText",
+                e,
+            )
+        }
+
+    return patchedLines.joinToString(System.lineSeparator()).normalizeDump()
+}
+
+private fun String.normalizeDump(): String = trim {
+    it <= ' '
+}
+    .convertLineSeparators()
+    .trimTrailingWhitespacesAndAddNewlineAtEOF()

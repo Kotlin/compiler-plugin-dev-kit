@@ -1,6 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.jsTestBase
 import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
@@ -9,14 +8,13 @@ import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
-import org.jetbrains.kotlin.test.runners.AbstractFirBlackBoxCodegenTestSpecBase
 
 public open class DevKitJvmBoxTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     parser: FirParser = FirParser.LightTree,
 ) :
-    DevKitTest(
-        object : AbstractFirBlackBoxCodegenTestSpecBase(parser) {},
+    BackportedFirBlackBoxCodegenTestSpecBase(
+        parser,
         {
             defaultDirectives {
                 versionDumpClassifier()
@@ -32,13 +30,11 @@ public open class DevKitJsBoxTestDumpless(
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     public val parser: FirParser = FirParser.LightTree,
 ) :
-    DevKitTest(
-        jsTestBase(
-            "",
-            "box/js",
-            targetBackend,
-            parser,
-        ),
+    BackportedJsTest(
+        "",
+        "box/js",
+        targetBackend,
+        parser,
         {
             // give each JS box test its own output directory, so no race conditions happen
             defaultDirectives {

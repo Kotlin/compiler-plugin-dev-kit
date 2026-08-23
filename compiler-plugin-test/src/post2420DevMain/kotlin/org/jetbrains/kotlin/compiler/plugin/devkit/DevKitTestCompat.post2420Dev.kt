@@ -6,6 +6,8 @@ import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.configuration.setupJvmPipelineSteps as realSetupJvmPipelineSteps
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
+import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
+import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDistinctSourceElementsHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
 import org.jetbrains.kotlin.test.model.TestFailureSuppressor
@@ -36,3 +38,6 @@ public actual fun RegisteredDirectivesBuilder.firIdenticalCompat() {}
 public actual fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) {
     realSetupJvmPipelineSteps(parser)
 }
+
+public actual fun FirDistinctSourceElementsHandler(testServices: TestServices): FirAnalysisHandler =
+    FirDistinctSourceElementsHandler(testServices)

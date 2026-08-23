@@ -1,19 +1,17 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.jsDiagnosticWithBackendTestBase
 import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
-import org.jetbrains.kotlin.test.runners.AbstractFirPhasedDiagnosticTest
 
 public open class DevKitJvmDiagnosticTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     parser: FirParser = FirParser.LightTree,
 ) :
-    DevKitTest(
-        object : AbstractFirPhasedDiagnosticTest(parser) {},
+    BackportedFirPhasedDiagnosticTest(
+        parser,
         {
             defaultDirectives {
                 versionDumpClassifier()
@@ -28,8 +26,8 @@ public open class DevKitJsDiagnosticTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     parser: FirParser = FirParser.LightTree,
 ) :
-    DevKitTest(
-        jsDiagnosticWithBackendTestBase(parser),
+    BackportedJsDiagnosticWithBackendTestBase(
+        parser,
         {
             defaultDirectives {
                 versionDumpClassifier()

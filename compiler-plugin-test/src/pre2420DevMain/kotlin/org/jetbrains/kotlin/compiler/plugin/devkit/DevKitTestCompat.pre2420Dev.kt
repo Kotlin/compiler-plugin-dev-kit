@@ -11,9 +11,12 @@ import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_IDENTIC
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
+import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
+import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
+import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
 
 public actual fun afterAnalysisChecker(
@@ -49,3 +52,11 @@ public actual fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirPars
         backendFacade = ::BackendCliJvmFacade,
     )
 }
+
+// no-op implementation
+public actual fun FirDistinctSourceElementsHandler(testServices: TestServices): FirAnalysisHandler =
+    object : FirAnalysisHandler(testServices) {
+        override fun processModule(module: TestModule, info: FirOutputArtifact) {}
+
+        override fun processAfterAllModules(someAssertionWasFailed: Boolean) {}
+    }

@@ -589,6 +589,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     "kotlin.test.update.test.data",
                     provider { providers.gradleProperty("updateTestData").isPresent.toString() },
                 )
+                +StringSystemPropertyArgumentProvider(
+                    "kotlin.compiler.plugin.devkit.versions",
+                    provider { testAgainst.joinToString(",") { "${it.version}" } },
+                )
             }
         }
         dependencies {
