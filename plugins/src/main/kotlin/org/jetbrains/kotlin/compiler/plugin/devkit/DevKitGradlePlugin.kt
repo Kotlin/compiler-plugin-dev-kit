@@ -282,7 +282,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
             }
         }
         val allVersionedFunctionalTests =
-            tasks.register<Test>("allVersionedFunctionalTests") {
+            tasks.register<DefaultTestTask>("allVersionedFunctionalTests") {
                 description = "Run all functional tests."
                 group = "verification"
                 enabled = false
@@ -290,16 +290,22 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
             }
 
         tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) { dependsOn(allVersionedFunctionalTests) }
-    }
-
-    private fun configurePlugins() {
+        val defaultFunctionalTest =
+            tasks.register<DefaultTestTask>("defaultFunctionalTest") {
+                enabled = false
+                dependsOn(defaultTestTarget.map { it.testTask })
+            }
         tasks.named<Test>(FUNCTIONAL_TEST) {
             enabled = false
             classpath = files()
             testClassesDirs = files()
-            dependsOn(defaultTestTarget.map { it.testTask })
+            dependsOn(defaultFunctionalTest)
+            // hide task
+            group = null
         }
+    }
 
+    private fun configurePlugins() {
         gradleTestKitSupport.apply {
             // TODO this definitely violates Isolated Projects. DevKit should instead
             //  publish needed dependencies into functionalTestRepo itself
