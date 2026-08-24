@@ -648,9 +648,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     }
 
     internal fun configureDependencies() {
-        testAgainst.configureEach {
-            for (compilation in listOf(mainCompilation, testFixturesCompilation, testCompilation)) {
-                compilation.forceKotlinVersion(this@configureEach.version)
+        testAgainst.configureEach target@{
+            compilations.configureEach {
+                if (this != entryPointCompilation) forceKotlinVersion(this@target.version)
             }
         }
         dependencies {
