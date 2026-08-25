@@ -13,11 +13,12 @@ internal enum class IdeStability {
 }
 
 /**
- * Every Kotlin release and IDE build the dev kit knows of, read out of this jar from the lists that
- * `fetch-all-kotlin-versions.py` and `fetch-all-ide-versions.py` generate.
+ * Every Kotlin release, IDE build and Kotlin module the dev kit knows of, read out of this jar from
+ * the lists that `fetch-all-kotlin-versions.py`, `fetch-all-ide-versions.py` and
+ * `fetch-all-kotlin-modules.py` generate.
  *
- * Both lists are only a catalogue of what exists; which of it a build actually tests against is
- * decided by the `minCliVersion`/`minIdeaVersion` family of properties.
+ * The version lists are only a catalogue of what exists; which of it a build actually tests against
+ * is decided by the `minCliVersion`/`minIdeaVersion` family of properties.
  */
 internal object KnownVersions {
     private const val RESOURCE_DIR = "META-INF/org/jetbrains/kotlin/compiler/plugin/devkit"
@@ -53,6 +54,12 @@ internal object KnownVersions {
             }
         }
     }
+
+    val kotlinModuleMappings: Map<String, String> =
+        readLines("kotlin-modules.txt").associate { line ->
+            require('=' in line) { "kotlin-modules.txt has a line that is not a mapping: $line" }
+            line.substringBefore('=').trim() to line.substringAfter('=').trim()
+        }
 
     private fun readLines(name: String): List<String> {
         val path = "$RESOURCE_DIR/$name"

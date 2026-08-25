@@ -47,7 +47,17 @@ step; consumers outside this repo need a publish.
    to that target's version. For a `dev` version it forces the *range* `[<classifier minus build number>, <version>]`
    (`2.4.20-dev-7885` → `[2.4.20-dev, 2.4.20-dev-7885]`), because not every dev build publishes every artifact.
    `kotlin("compiler-tests")` is a fake coordinate the same hook rewrites to
-   `kotlin-compiler-internal-test-framework`, or to `kotlin-compiler-tests-for-ide` on dev versions.
+   `kotlin-compiler-internal-test-framework`, or to `kotlin-compiler-tests-for-ide` on IDE versions.
+
+   On an IDE version a module is *renamed* as well as re-versioned, through `kotlin-modules.txt`
+   (`KnownVersions.kotlinModuleMappings`). That file is hand-curated and its mappings **must never be guessed**: the
+   renames are not mechanical, and being published in intellij-dependencies under its own name is not on its own a
+   reason to map a module to itself — `kotlin-compiler-internal-test-framework` is published there, just far too rarely
+   to depend on. `fetch-all-kotlin-modules.py` therefore only *discovers* modules — from `dev` plus
+   intellij-dependencies, the names a consumer would write, `bootstrap`'s extra `-for-ide` ones being a historical
+   accident — writes anything new as `foo=`, and exits **2** while any mapping is blank. `UNSUPPORTED` and `DEAD` are
+   the two ways to record that a human looked and there is no name to use; `forceKotlinVersion` fails on both rather
+   than resolving them as coordinates.
 4. **Packaging.** Every `Jar` gets manifest attribute `Kotlin-Compiler-Plugin-Multi-Release: true`. The jar root holds
    only the entry point; everything else lives under `META-INF/kotlin/plugin/<pluginId>/` (`<pluginId>` being
    `pluginPackage`), in `versions/<version>/` per target and `dependencies/<jar-name>/` per runtime dependency, unzipped

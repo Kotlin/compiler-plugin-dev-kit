@@ -8,6 +8,7 @@ import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.named
+import org.jetbrains.kotlin.compiler.plugin.devkit.KnownVersions.kotlinModuleMappings
 import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion.Companion.noVersion
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
@@ -52,6 +53,9 @@ private fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVer
     )
 }
 
+// generators and JS tests are not in kotlin-compiler-tests-for-ide
+// so we use the closest kotlin-compiler-internal-test-framework to provide them
+// while hoping that it somehow doesn't conflict with kotlin-compiler-tests-for-ide
 private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
     eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
@@ -62,9 +66,17 @@ private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion,
                     useTarget("${requested.group}:kotlin-compiler-internal-test-framework:$version")
                 "kotlin-compiler-internal-test-framework" if forIde ->
                     useVersion("[${version.lowestDev}, $version]")
-                "kotlin-compose-compiler-plugin" if forIde ->
-                    useTarget("${requested.group}:compose-compiler-plugin-for-ide:$version")
-                else -> useVersion("$version")
+                else ->
+                    when (val mapped = kotlinModuleMappings[requested.name]) {
+                        null -> {}
+                        else if !forIde -> useVersion("$version")
+                        "UNSUPPORTED",
+                        "DEAD" ->
+                            error(
+                                "Requested dependency $requested has no reasonable IDE equivalent"
+                            )
+                        else -> useTarget("${requested.group}:$mapped:$version")
+                    }
             }
         }
     }
