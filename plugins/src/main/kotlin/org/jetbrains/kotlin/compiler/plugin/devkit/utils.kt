@@ -126,3 +126,5 @@ internal val ideVersions =
     CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES.values
         .map { KotlinToolingVersion(it.toString()) }
         .toSet()
+
+internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 20)

@@ -57,6 +57,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import org.jetbrains.kotlin.gradle.testing.KotlinTaskTestRun
 import org.jetbrains.kotlin.gradle.testing.internal.KotlinTestsRegistry
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 public const val TEST_FIXTURES_COMPILATION_NAME: String =
     TestFixturesSupport.TEST_FIXTURE_SOURCESET_NAME
@@ -148,6 +149,10 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
     isSurrogate: Boolean = false,
     preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
 ) = createExternalKotlinTarget {
+    if (version.toKotlinVersion() < MIN_SUPPORTED_VERSION)
+        error(
+            "Unsupported Kotlin version: $version. Please use a version >= $MIN_SUPPORTED_VERSION"
+        )
     val forIde = version in ideVersions
     targetName = version.versionName
     platformType = KotlinPlatformType.jvm
