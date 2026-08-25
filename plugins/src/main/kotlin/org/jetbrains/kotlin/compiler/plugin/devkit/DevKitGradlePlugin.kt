@@ -29,6 +29,7 @@ import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 /** A single Kotlin version that the consuming Gradle plugin's functional tests run against. */
@@ -36,12 +37,12 @@ public interface DevKitGradlePluginTestTarget : Named {
     override fun getName(): String = version.versionString
 
     public val version: KotlinToolingVersion
-    public val testTask: TaskProvider<Test>
+    public val testTask: TaskProvider<out Test>
 }
 
 private class DevKitGradlePluginTestTargetImpl(
     override val version: KotlinToolingVersion,
-    override val testTask: TaskProvider<Test>,
+    override val testTask: TaskProvider<out Test>,
 ) : DevKitGradlePluginTestTarget {
     override fun equals(other: Any?): Boolean =
         other is DevKitGradlePluginTestTarget && other.version == version
@@ -171,9 +172,11 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
             testAgainst.findByName(version)
                 ?: DevKitGradlePluginTestTargetImpl(
                         KotlinToolingVersion(version),
-                        tasks.register<Test>(
+                        tasks.register<KotlinJvmTest>(
                             "${KotlinToolingVersion(version).versionName}FunctionalTest"
-                        ),
+                        ) {
+                            targetName = version
+                        },
                     )
                     .also(testAgainst::add)
         return target.apply(action)
@@ -264,12 +267,13 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 mustRunAfter("test")
                 maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
+                systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
                 systemProperty(
-                    "$DEV_KIT_PROPERTY_PREFIX.gradle.test.kotlin-version",
-                    version.versionString,
+                    "$DEV_KIT_PROPERTY_PREFIX.build.kotlin-version",
+                    kotlinToolingVersion,
                 )
                 +PropertiesSystemPropertyArgumentProvider(
-                    "$DEV_KIT_PROPERTY_PREFIX.gradle.test.properties",
+                    "$DEV_KIT_PROPERTY_PREFIX.test.gradle-properties",
                     functionalTestProperties,
                 )
                 +NestedArgumentProvider(

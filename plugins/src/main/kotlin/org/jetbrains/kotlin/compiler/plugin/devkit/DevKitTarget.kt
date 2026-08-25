@@ -354,7 +354,8 @@ internal class DevKitTestRunFactory(private val target: DevKitTarget) :
             )
         val testTaskOrProvider =
             target.project.registerTask<KotlinJvmTest>(testTaskName) { testTask ->
-                testTask.targetName = target.disambiguationClassifier
+                // CHANGED: use version instead of k2XX
+                testTask.targetName = "${target.version}"
                 testTask.description = "Runs tests against Kotlin ${target.version}"
                 testTask.group = JavaBasePlugin.VERIFICATION_GROUP
             }

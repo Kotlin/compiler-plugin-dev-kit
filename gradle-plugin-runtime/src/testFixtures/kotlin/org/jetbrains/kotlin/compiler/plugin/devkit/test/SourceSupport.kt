@@ -62,12 +62,12 @@ public fun String.toKotlinVersion(): KotlinVersion =
 
 /**
  * Asserts that the build output contains the expected text for the Kotlin version currently under
- * test ([getTestCompilerVersion]). [map] is keyed by Kotlin version string; the entry for the exact
+ * test ([TEST_COMPILER_VERSION]). [map] is keyed by Kotlin version string; the entry for the exact
  * version is used, otherwise the closest lower version's entry.
  */
 public fun BuildResult.assertOutputContainsOnDifferentKotlinVersions(map: Map<String, String>) {
     val mapped = map.mapKeys { it.key.toKotlinVersion() }
-    val testCompilerVersion = getTestCompilerVersion().toKotlinVersion()
+    val testCompilerVersion = "$TEST_COMPILER_VERSION".toKotlinVersion()
     val outputForVersion =
         mapped[testCompilerVersion]
             ?: mapped.entries.filter { it.key <= testCompilerVersion }.maxByOrNull { it.key }?.value

@@ -64,6 +64,15 @@ internal abstract class GenerateServices : DefaultTask() {
 }
 
 internal open class DefaultTestTask : DefaultTask() {
+    // copied from KotlinTestsRegistry
+    init {
+        val isIdeaActive = project.providers.systemProperty("idea.active").isPresent
+
+        if (isIdeaActive) {
+            extensions.extraProperties.set("idea.internal.test", true)
+        }
+    }
+
     @Option(
         option = "tests",
         description = "Sets test class or method name to be included, '*' is supported.",

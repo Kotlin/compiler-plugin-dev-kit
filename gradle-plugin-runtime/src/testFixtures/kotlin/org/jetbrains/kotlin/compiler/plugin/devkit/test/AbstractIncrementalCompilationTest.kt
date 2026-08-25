@@ -30,7 +30,17 @@ public abstract class AbstractIncrementalCompilationTest(
         if (!requiresMultiplatformIc) return
         assumeTrue(
             "KMP incremental compilation requires Kotlin $MULTIPLATFORM_IC_MIN_VERSION+",
-            getTestCompilerToolingVersion() >= MULTIPLATFORM_IC_MIN_VERSION,
+            TEST_COMPILER_VERSION >= MULTIPLATFORM_IC_MIN_VERSION,
+        )
+    }
+
+    @Before
+    public fun assumeKlibCompatibility() {
+        if (target == KmpTarget.JVM) return
+        assumeTrue(
+            "KLIBs are not forward compatible. The build uses $BUILD_COMPILER_VERSION " +
+                "which is greater than $TEST_COMPILER_VERSION",
+            TEST_COMPILER_VERSION >= BUILD_COMPILER_VERSION,
         )
     }
 

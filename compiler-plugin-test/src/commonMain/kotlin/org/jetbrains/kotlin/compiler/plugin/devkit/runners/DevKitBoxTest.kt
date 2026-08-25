@@ -1,6 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
@@ -16,8 +15,8 @@ public open class DevKitJvmBoxTest(
     BackportedFirBlackBoxCodegenTestSpecBase(
         parser,
         {
+            devKitDefaults()
             defaultDirectives {
-                versionDumpClassifier()
                 boxTestDefaults()
                 jvmDefaults()
             }
@@ -25,7 +24,7 @@ public open class DevKitJvmBoxTest(
         *config,
     )
 
-public open class DevKitJsBoxTestDumpless(
+public open class MultiVersionJsTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     public val parser: FirParser = FirParser.LightTree,
@@ -51,10 +50,10 @@ public open class DevKitJsBoxTest(
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     parser: FirParser = FirParser.LightTree,
 ) :
-    DevKitJsBoxTestDumpless(
+    MultiVersionJsTest(
         {
+            devKitDefaults()
             defaultDirectives {
-                versionDumpClassifier()
                 boxTestDefaults()
             }
         },

@@ -14,6 +14,7 @@ import com.autonomousapps.kit.gradle.PluginManagement
 import com.autonomousapps.kit.gradle.Repositories
 import com.autonomousapps.kit.gradle.Repository
 import org.intellij.lang.annotations.Language
+import org.junit.Assume.assumeTrue
 
 /**
  * Base for a TestKit fixture that generates single- or multi-module Gradle projects applying a
@@ -24,6 +25,15 @@ public abstract class AbstractDevKitGradleProject(
     protected val kotlinVersion: String? = null,
     protected val multiplatform: Boolean = false,
 ) : AbstractGradleProject() {
+    init {
+        // Technically, it could be a multiplatform JVM-only project
+        if (multiplatform)
+            assumeTrue(
+                "KLIBs are not forward compatible. The build uses $BUILD_COMPILER_VERSION " +
+                    "which is greater than $TEST_COMPILER_VERSION",
+                TEST_COMPILER_VERSION >= BUILD_COMPILER_VERSION,
+            )
+    }
 
     /** Source set that [source] declarations target by default. */
     protected val defaultSourceSet: String = if (multiplatform) "commonMain" else DEFAULT_SOURCE_SET
@@ -252,7 +262,7 @@ public abstract class AbstractDevKitGradleProject(
                 "kotlin.native.enableKlibsCrossCompilation=true",
                 "kotlin.native.ignoreDisabledTargets=true",
             ) +
-                System.getProperty("kotlin.compiler.plugin.devkit.gradle.test.properties")
+                System.getProperty("kotlin.compiler.plugin.devkit.test.gradle-properties")
                     .orEmpty()
                     .split(",")
         private val KOTLIN_REPOS =

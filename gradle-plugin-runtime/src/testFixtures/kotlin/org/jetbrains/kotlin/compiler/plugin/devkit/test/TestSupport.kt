@@ -68,17 +68,36 @@ public fun BuildResult.assertOutputContains(text: String) {
     assertContains(output, text)
 }
 
-/**
- * The Kotlin version the current `functionalTest<Version>` task is running against, read from the
- * system property
- * [DevKitGradlePlugin][org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin] sets on each
- * versioned test task.
- */
-public fun getTestCompilerVersion(): String =
-    System.getProperty("kotlin.compiler.plugin.devkit.gradle.test.kotlin-version")
+/** The Kotlin version the current `functionalTest<Version>` task is running against. */
+public val TEST_COMPILER_VERSION: KotlinToolingVersion by lazy {
+    KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.test.kotlin-version"))
+}
 
-public fun getTestCompilerToolingVersion(): KotlinToolingVersion =
-    KotlinToolingVersion(getTestCompilerVersion())
+/** The Kotlin version the current `functionalTest<Version>` task is running against. */
+@Deprecated(
+    "Use TEST_COMPILER_VERSION",
+    replaceWith =
+        ReplaceWith(
+            $$"\"$TEST_COMPILER_VERSION\"",
+            "kotlin.compiler.plugin.devkit.test.TEST_COMPILER_VERSION",
+        ),
+)
+public fun getTestCompilerVersion(): String = "$TEST_COMPILER_VERSION"
+
+@Deprecated(
+    "Use TEST_COMPILER_VERSION",
+    replaceWith =
+        ReplaceWith(
+            "TEST_COMPILER_VERSION",
+            "kotlin.compiler.plugin.devkit.test.TEST_COMPILER_VERSION",
+        ),
+)
+public fun getTestCompilerToolingVersion(): KotlinToolingVersion = TEST_COMPILER_VERSION
+
+/** The Kotlin version the build uses. */
+public val BUILD_COMPILER_VERSION: KotlinToolingVersion by lazy {
+    KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.build.kotlin-version"))
+}
 
 /**
  * The Kotlin/Native host target for the current machine, e.g. `macosArm64` on Apple Silicon,

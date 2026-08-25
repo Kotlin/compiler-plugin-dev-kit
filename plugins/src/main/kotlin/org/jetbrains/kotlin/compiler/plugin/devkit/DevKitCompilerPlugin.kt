@@ -590,8 +590,13 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     provider { providers.gradleProperty("updateTestData").isPresent.toString() },
                 )
                 +StringSystemPropertyArgumentProvider(
-                    "kotlin.compiler.plugin.devkit.versions",
+                    "$DEV_KIT_PROPERTY_PREFIX.versions",
                     provider { testAgainst.joinToString(",") { "${it.version}" } },
+                )
+                systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
+                systemProperty(
+                    "$DEV_KIT_PROPERTY_PREFIX.build.kotlin-version",
+                    kotlinToolingVersion,
                 )
             }
         }

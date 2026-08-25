@@ -1,6 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
@@ -13,8 +12,8 @@ public open class DevKitJvmDiagnosticTest(
     BackportedFirPhasedDiagnosticTest(
         parser,
         {
+            devKitDefaults()
             defaultDirectives {
-                versionDumpClassifier()
                 diagnosticTestDefaults()
                 jvmDefaults()
             }
@@ -29,8 +28,8 @@ public open class DevKitJsDiagnosticTest(
     BackportedJsDiagnosticWithBackendTestBase(
         parser,
         {
+            devKitDefaults()
             defaultDirectives {
-                versionDumpClassifier()
                 diagnosticTestDefaults()
             }
         },
