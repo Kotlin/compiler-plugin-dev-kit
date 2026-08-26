@@ -2,10 +2,15 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.DependencySubstitution
 import org.gradle.api.artifacts.ResolutionStrategy
 import org.gradle.api.artifacts.ResolvableConfiguration
+import org.gradle.api.artifacts.component.ModuleComponentSelector
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.attributes.LibraryElements
+import org.gradle.api.internal.artifacts.DefaultModuleIdentifier
+import org.gradle.api.internal.artifacts.dependencies.DefaultMutableVersionConstraint
+import org.gradle.internal.component.external.model.DefaultModuleComponentSelector
 import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.named
 import org.jetbrains.kotlin.compiler.plugin.devkit.KnownVersions.kotlinModuleMappings
@@ -57,17 +62,18 @@ private fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVer
 // so we use the closest kotlin-compiler-internal-test-framework to provide them
 // while hoping that it somehow doesn't conflict with kotlin-compiler-tests-for-ide
 private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
-    eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            when (requested.name) {
+    dependencySubstitution.all {
+        val requested = requested
+        if (requested is ModuleComponentSelector && requested.group == "org.jetbrains.kotlin") {
+            when (requested.module) {
                 "kotlin-compiler-tests" if forIde ->
-                    useTarget("${requested.group}:kotlin-compiler-tests-for-ide:$version")
+                    useModule("kotlin-compiler-tests-for-ide", "$version")
                 "kotlin-compiler-tests" ->
-                    useTarget("${requested.group}:kotlin-compiler-internal-test-framework:$version")
+                    useModule("kotlin-compiler-internal-test-framework", "$version")
                 "kotlin-compiler-internal-test-framework" if forIde ->
                     useVersion("[${version.lowestDev}, $version]")
                 else ->
-                    when (val mapped = kotlinModuleMappings[requested.name]) {
+                    when (val mapped = kotlinModuleMappings[requested.module]) {
                         null -> {}
                         else if !forIde -> useVersion("$version")
                         "UNSUPPORTED",
@@ -75,11 +81,29 @@ private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion,
                             error(
                                 "Requested dependency $requested has no reasonable IDE equivalent"
                             )
-                        else -> useTarget("${requested.group}:$mapped:$version")
+                        else -> useModule(mapped, "$version")
                     }
             }
         }
     }
+
+private fun DependencySubstitution.useVersion(version: String) =
+    useModule((requested as ModuleComponentSelector).module, version)
+
+// TODO technically uses internal API. See if
+//  newSelector is exposed somewhere
+private fun DependencySubstitution.useModule(
+    module: String,
+    version: String,
+) =
+    useTarget(
+        DefaultModuleComponentSelector.newSelector(
+            DefaultModuleIdentifier.newId((requested as ModuleComponentSelector).group, module),
+            DefaultMutableVersionConstraint(version).apply { strictly(version) },
+            requested.attributes,
+            requested.capabilitySelectors,
+        )
+    )
 
 internal fun KotlinCompilation<*>.forceKotlinVersion(version: KotlinToolingVersion) {
     val forIde = version in ideVersions
