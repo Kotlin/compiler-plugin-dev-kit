@@ -142,9 +142,8 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         objects.domainObjectContainer(DevKitGradlePluginTestTarget::class)
 
     init {
-        testAgainst(kotlinToolingVersion)
-        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
         registerSupportedVersions()
+        if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion)
     }
 
     override fun registerVersion(version: KotlinToolingVersion) {
@@ -184,17 +183,14 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
 
     /**
      * Which registered [testAgainst] version the generic `functionalTest` task delegates to.
-     * Defaults to [DEFAULT_TEST_VERSION_PROPERTY], or to the Kotlin Gradle Plugin version currently
-     * applied to this build if that property isn't set. If no [testAgainst] entry matches,
-     * `functionalTest` is left alone.
+     * Defaults to [DEFAULT_TEST_VERSION_PROPERTY], the Kotlin version applied to the build, or an
+     * arbitrary target otherwise
      */
     public val defaultTestTarget: Property<DevKitGradlePluginTestTarget> =
         objects.property(
-            testAgainst(
-                providers
-                    .gradleProperty(DEFAULT_TEST_VERSION_PROPERTY)
-                    .getOrElse(kotlinToolingVersion.versionString)
-            )
+            providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
+                ?: testAgainst.findByName(kotlinToolingVersion.versionName)
+                ?: testAgainst.last()
         )
 
     /** The default Kotlin version to run the `functionalTest` suite against. */

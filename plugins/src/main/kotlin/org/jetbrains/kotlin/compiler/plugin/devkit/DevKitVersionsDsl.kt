@@ -133,6 +133,12 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * can service a [registerVersion] call, which is later than this class can know about.
      */
     protected fun registerSupportedVersions() {
+        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach {
+            registerVersion(KotlinToolingVersion(it))
+        }
+        providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let {
+            registerVersion(KotlinToolingVersion(it))
+        }
         val minCliVersion = providers.gradleProperty(MIN_CLI_VERSION_PROPERTY).orNull
         val maxCliVersion = providers.gradleProperty(MAX_CLI_VERSION_PROPERTY).orNull
         val betaAndRc =

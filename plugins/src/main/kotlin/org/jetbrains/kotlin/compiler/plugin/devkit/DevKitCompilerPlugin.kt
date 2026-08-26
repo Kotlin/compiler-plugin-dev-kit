@@ -118,14 +118,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     public val preferredVersionForSharedSourceSetsInIde: Property<KotlinToolingVersion> =
         objects.property(KotlinToolingVersion::class.java)
 
-    private val surrogateTarget =
-        kotlinExtension.createDevKitTarget(
-            kotlinToolingVersion,
-            areDependenciesEmbedded = isPlugin,
-            isSurrogate = true,
-            preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
-        )
-
     private val genServicesDir =
         layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
     private val generateServices =
@@ -148,6 +140,14 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 }
             )
         }
+
+    private lateinit var surrogateTarget: DevKitTarget
+
+    init {
+        registerSupportedVersions()
+        if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion)
+    }
+
     private val entryPointCompilation =
         surrogateTarget.compilations.create("entryPoint") {
             defaultSourceSet.kotlin.setSrcDirs(emptyList<Any>())
@@ -157,12 +157,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     private val mainJar: TaskProvider<Jar> =
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
+            archiveAppendix.unset() // remove k2XX appendix
         }
-
-    init {
-        registerSupportedVersions()
-        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach { testAgainst(it) }
-    }
 
     override fun registerVersion(version: KotlinToolingVersion) {
         testAgainst(version)
@@ -170,18 +166,16 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     /**
      * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to
-     * [DEFAULT_TEST_VERSION_PROPERTY], or to the Kotlin version applied to this build if that
-     * property isn't set.
+     * [DEFAULT_TEST_VERSION_PROPERTY], the Kotlin version applied to the build, or an arbitrary
+     * target otherwise
      *
      * @see [defaultTestVersion] to set this using a version instead
      */
     public val defaultTestTarget: Property<DevKitTarget> =
         objects.property(
-            testAgainst(
-                providers
-                    .gradleProperty(DEFAULT_TEST_VERSION_PROPERTY)
-                    .getOrElse(kotlinToolingVersion.versionString)
-            )
+            providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
+                ?: testAgainst.findByName(kotlinToolingVersion.versionName)
+                ?: testAgainst.last()
         )
 
     /**
@@ -326,11 +320,16 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     ): DevKitTarget {
         val target =
             testAgainst.findByName(version.versionName)
-                ?: kotlinExtension.createDevKitTarget(
-                    version,
-                    areDependenciesEmbedded = isPlugin,
-                    preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
-                )
+                ?: kotlinExtension
+                    .createDevKitTarget(
+                        version,
+                        areDependenciesEmbedded = isPlugin,
+                        isSurrogate = !::surrogateTarget.isInitialized,
+                        preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
+                    )
+                    .also {
+                        if (!::surrogateTarget.isInitialized) surrogateTarget = it
+                    }
         return target.apply(action)
     }
 
