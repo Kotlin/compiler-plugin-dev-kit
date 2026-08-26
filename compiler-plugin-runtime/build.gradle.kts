@@ -26,6 +26,9 @@ kotlin {
 pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
+    versionHierarchy {
+        split("2.5.0-dev-5651")
+    }
 }
 
 tasks.generateTests { enabled = false }
