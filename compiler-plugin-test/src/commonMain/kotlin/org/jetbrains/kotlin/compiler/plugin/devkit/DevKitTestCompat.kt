@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
+import org.jetbrains.kotlin.test.services.TestService
 import org.jetbrains.kotlin.test.services.TestServices
 
 public expect fun afterAnalysisChecker(
@@ -57,3 +58,5 @@ public expect fun TestInfrastructureException(
  * See `LLDistinctSourceElementsChecker` for the corresponding Analysis API checker.
  */
 public expect fun FirDistinctSourceElementsHandler(testServices: TestServices): FirAnalysisHandler
+
+public expect val libraryProviderCtor: Constructor<TestService>?

@@ -32,6 +32,7 @@ pluginDevKit {
     addRuntimeDependency = false
 
     versionHierarchy {
+        split("2.5.0-dev-5676")
         split("2420Dev7600") {
             it < KotlinToolingVersion("2.4.20-dev-7600") ||
                 it == KotlinToolingVersion("2.4.20-Beta1")

@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.compiler.plugin.devkit.FirDistinctSourceElementsHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
+import org.jetbrains.kotlin.compiler.plugin.devkit.libraryProviderCtor
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
 import org.jetbrains.kotlin.test.FirParser
@@ -32,7 +33,6 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirInferenceLogsHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
-import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.TestPhase
 
@@ -70,7 +70,7 @@ public abstract class BackportedJsDiagnosticTestBase(
                 ::FirFailingTestSuppressor,
             )
             enableMetaInfoHandler()
-            useAdditionalService(::LibraryProvider)
+            libraryProviderCtor?.let(::useAdditionalService)
         },
         *config,
     )
