@@ -165,6 +165,16 @@ public val KotlinToolingVersion.isDev: Boolean
 public val KotlinToolingVersion.isIdeBuild: Boolean
     get() = classifier?.startsWith("ij", ignoreCase = true) == true
 
+/**
+ * The IDE branch an `-ij` build was cut on - `ij261` of `2.4.0-ij261-32` - or null for anything
+ * else.
+ *
+ * Two builds sharing it are the same branch at different points, so their trailing numbers do order
+ * them. Across branches those numbers mean nothing to each other.
+ */
+internal val KotlinToolingVersion.idePlatform: String?
+    get() = classifier?.takeIf { isIdeBuild }?.substringBefore('-')
+
 public fun KotlinToolingVersion.hasSameBaseVersionAs(other: KotlinToolingVersion): Boolean {
     return major == other.major && minor == other.minor && patch == other.patch
 }

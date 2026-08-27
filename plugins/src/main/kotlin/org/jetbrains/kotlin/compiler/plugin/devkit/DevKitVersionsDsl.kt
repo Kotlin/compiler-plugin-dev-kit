@@ -77,6 +77,9 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * IDE builds to support, as a platform build number, spelled only as precisely as needed: `253`
      * is the whole 2025.3 series, `253.29346.138` one build of it
      *
+     * Only the newest build of each release line counts, so "IntelliJ IDEA 2026.2 (eap)" registers
+     * one version rather than one per weekly EAP.
+     *
      * @param max upper bound, infinite if null
      */
     public fun ideaVersions(
@@ -90,10 +93,11 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
             if (includeRc) add(IdeStability.RC)
             if (includeEap) add(IdeStability.EAP)
         }
-        KnownVersions.ideBuilds
-            .filterValues { it.any(stabilities::contains) }
-            .keys
+        KnownVersions.ideTracks
+            .filterKeys { it.stability in stabilities }
+            .values
             .filter { it >= min && (max == null || it.baselineVersion <= max) }
+            .distinct()
             .mapNotNull {
                 CompilerVersionAliases.forIdeBuild(it)?.toString()?.let(::KotlinToolingVersion)
             }

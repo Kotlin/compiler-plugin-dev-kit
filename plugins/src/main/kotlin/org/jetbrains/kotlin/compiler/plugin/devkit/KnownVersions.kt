@@ -13,6 +13,20 @@ internal enum class IdeStability {
 }
 
 /**
+ * One IDE release line in one channel: the `idea-eap` section's `2026.2`, which its users would
+ * call "IntelliJ IDEA 2026.2 (eap)".
+ *
+ * A line publishes build after build over its life - a 2026.2 EAP roughly every week - and each
+ * build that bundles a different compiler would become a target of its own. Grouping by line is
+ * what lets only the newest of them count.
+ */
+internal data class IdeTrack(
+    val channel: String,
+    val version: String,
+    val stability: IdeStability,
+)
+
+/**
  * Every Kotlin release, IDE build and Kotlin module the dev kit knows of, read out of this jar from
  * the lists that `fetch-all-kotlin-versions.py`, `fetch-all-ide-versions.py` and
  * `fetch-all-kotlin-modules.py` generate.
@@ -37,19 +51,25 @@ internal object KnownVersions {
         readLines("kotlin-versions.txt").map(::KotlinToolingVersion).sorted()
 
     /**
-     * The platform build of every recorded IDE release, against the channels it shipped in - one
-     * Android Studio platform build is reused across its stable, RC and canary lines.
+     * The newest platform build of every recorded IDE release line - one Android Studio platform
+     * build is reused across its stable, RC and canary lines, so the same build can be the newest
+     * of several.
+     *
+     * Superseded builds of a line are dropped: nobody is expected to stay on last week's EAP, and
+     * each one bundling a different compiler would otherwise cost a target of its own.
      */
-    val ideBuilds: Map<IdeBuildNumber, Set<IdeStability>> = buildMap {
+    val ideTracks: Map<IdeTrack, IdeBuildNumber> = buildMap {
+        var channel = ""
         var stability: IdeStability? = null
         for (line in readLines("ide-versions.txt")) {
             if (line.startsWith('[') && line.endsWith(']')) {
-                stability = stabilityByChannel[line.trim('[', ']').substringAfterLast('-')]
+                channel = line.trim('[', ']')
+                stability = stabilityByChannel[channel.substringAfterLast('-')]
             } else if (stability != null) {
                 merge(
+                    IdeTrack(channel, line.substringAfter('='), stability),
                     IdeBuildNumber(line.substringBefore('=')),
-                    setOf(stability),
-                    Set<IdeStability>::plus,
+                    ::maxOf,
                 )
             }
         }

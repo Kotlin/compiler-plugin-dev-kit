@@ -359,7 +359,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                             group(name) {
                                 withCompilations {
                                     val target = it.target
-                                    target is DevKitTarget && condition(target.version)
+                                    // TODO expose IDE version somehow
+                                    target is DevKitTarget &&
+                                        condition(target.version.ideBranchPoint ?: target.version)
                                 }
                             }
                         }

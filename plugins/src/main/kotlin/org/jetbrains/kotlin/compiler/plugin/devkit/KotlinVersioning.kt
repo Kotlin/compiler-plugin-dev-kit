@@ -25,14 +25,47 @@ import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 private val KotlinToolingVersion.lowestDev: KotlinToolingVersion
     get() {
         require(isDev)
-        val classifier = requireNotNull(classifier)
-        val lastDashIndex = classifier.indexOfLast { it == '-' }
-        val newClassifier =
-            if (lastDashIndex == -1) classifier else classifier.substring(0, lastDashIndex)
-        return toKotlinVersion().toKotlinToolingVersion(newClassifier)
+        return toKotlinVersion().toKotlinToolingVersion("dev")
     }
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
+
+/**
+ * The `dev` build this version's IDE branch was cut from, as closely as the recorded IDE builds pin
+ * it down: what the newest IDE build of the same baseline shipped before that line moved onto `-ij`
+ * builds. Null when no recorded build of the baseline predates the branch.
+ */
+internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
+    get() {
+        if (classifier?.startsWith("ij") != true)
+            return this
+        val aliases = CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES
+        val ownBuild =
+            aliases.filterValues { it.toString() == toString() }.keys.minOrNull() ?: return null
+        return aliases.entries
+            .filter { (build, shipped) ->
+                build.baselineVersion == ownBuild.baselineVersion &&
+                    build < ownBuild &&
+                    shipped.isDev &&
+                    !shipped.isIdeBuild
+            }
+            .maxByOrNull { it.key }
+            ?.value
+            ?.let { KotlinToolingVersion(it.toString()) }
+    }
+
+/**
+ * `kotlin-compiler-internal-test-framework` carries no `-ij` publication, so an IDE target has to
+ * take a `dev` build of it — and any build past the point the IDE branch was cut is already a
+ * different compiler, which is what made the newest one a poor stand-in. The branch point caps it
+ * instead, and the range below it absorbs how rarely this module is published.
+ */
+private val KotlinToolingVersion.testFrameworkVersion: String
+    get() {
+        val ceiling = if (classifier?.startsWith("ij") == true) ideBranchPoint else this
+        // Nothing recorded before the branch, so there is nothing to cap with.
+        return ceiling?.let { "[${it.lowestDev}, $it]" } ?: "$lowestDev-+"
+    }
 
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
@@ -71,7 +104,7 @@ private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion,
                 "kotlin-compiler-tests" ->
                     useModule("kotlin-compiler-internal-test-framework", "$version")
                 "kotlin-compiler-internal-test-framework" if forIde ->
-                    useVersion("[${version.lowestDev}, $version]")
+                    useVersion(version.testFrameworkVersion)
                 else ->
                     when (val mapped = kotlinModuleMappings[requested.module]) {
                         null -> {}

@@ -43,11 +43,23 @@ step; consumers outside this repo need a publish.
    parent and an `actual` on each side. `withSourceSetTree(main, testFixtures, test)` gives the *same* grouping in all
    three trees, so fixtures and tests are shared exactly like main code. `compiler-plugin-test/build.gradle.kts` is the
    worked example.
-3. **Per-version dependencies.** `forceKotlinVersion` rewrites every `org.jetbrains.kotlin` dependency of a compilation
-   to that target's version. For a `dev` version it forces the *range* `[<classifier minus build number>, <version>]`
-   (`2.4.20-dev-7885` → `[2.4.20-dev, 2.4.20-dev-7885]`), because not every dev build publishes every artifact.
-   `kotlin("compiler-tests")` is a fake coordinate the same hook rewrites to
+3. **Per-version dependencies.** `forceKotlinVersion` pins every `org.jetbrains.kotlin` dependency of a compilation to
+   that target's version, exactly. `kotlin("compiler-tests")` is a fake coordinate the same hook rewrites to
    `kotlin-compiler-internal-test-framework`, or to `kotlin-compiler-tests-for-ide` on IDE versions.
+
+   `kotlin-compiler-internal-test-framework` on an IDE version is the one dependency *not* pinned: it keeps its name but
+   takes a *range*. It is wanted for the generators and the JS tests, which `kotlin-compiler-tests-for-ide` has none of,
+   but it carries no `-ij` publication at all and is published only sporadically even on the `dev` track, so neither an
+   exact pin nor a wildcard works — the newest `dev` build is already a different compiler from the one an `-ij` branch
+   was cut at.
+
+   The ceiling is therefore that **branch point**, recovered from `ide-mappings.txt` rather than from git: an IDE line
+   ships plain `dev` versions until its `-ij` branch is cut, so the newest `dev` version recorded against a *lower*
+   build of the same baseline is where the branch left trunk. `2.4.0-ij261-32` looks back past `261.23567.28` to
+   `261.22158.277`'s `2.4.0-dev-2631` and asks for `[2.4.0-dev, 2.4.0-dev-2631]`, landing on `2.4.0-dev-2124` — the
+   sporadic publishing is what the range absorbs. A baseline with no `dev` mapping before its branch (253 is one) has
+   nothing to cap with and falls back to `<base>-dev-+`, the newest build of the base version. All of this is in the
+   hope it doesn't clash with `kotlin-compiler-tests-for-ide` on the classpath.
 
    On an IDE version a module is *renamed* as well as re-versioned, through `kotlin-modules.txt`
    (`KnownVersions.kotlinModuleMappings`). That file is hand-curated and its mappings **must never be guessed**: the
@@ -82,9 +94,20 @@ step; consumers outside this repo need a publish.
    Caveat: plugins built against different dev kit versions still share those ~6 entry-point classes on the real plugin
    classpath. Renaming the entry-point package is the escape hatch if it ever changes.
 7. **Which version matches.** `VersionResolution.resolveVersion` picks the highest compatible version, special-casing
-   the
-   `dev` track so `2.3.20-dev-7791` doesn't match `2.3.20-Beta1`. `CompilerVersionAliases` maps an IDE build number
-   through `ide-mappings.txt`, which `fetch-all-ide-kotlin-versions.py` regenerates.
+   the `dev` track so `2.3.20-dev-7791` doesn't match `2.3.20-Beta1`. An `-ij` build instead takes the newest version of
+   its *own* IDE branch — the `ij261` of `2.4.0-ij261-32` — that is not ahead of it, since a build number from one
+   branch says nothing about another; only when the plugin holds no build of that branch does it fall back to the
+   earliest same-base version. Beware that an `-ij` version is `dev` *maturity* to `KotlinToolingVersion`, so anything
+   keyed on `isDev` takes it in too.
+
+   `CompilerVersionAliases` maps an IDE build number through `ide-mappings.txt`, which
+   `fetch-all-ide-kotlin-versions.py` regenerates: the target is the `-ij` version the IDE itself declares, read from
+   the newest `idea/*` tag at or below that build and never one above, which would claim a compiler the build predates.
+   Being a coordinate the IDE resolves, it is published in intellij-dependencies by construction, so no equivalent `dev`
+   build is searched for. That file stays exhaustive — one entry per build series — while
+   `DevKitVersionsDsl.ideaVersions` registers only the newest build of each release line recorded in `ide-versions.txt`
+   (`fetch-all-ide-versions.py`): `idea-eap`'s `2026.2`, not its nine weekly EAPs. The data stays truthful and the
+   target count stays payable.
 
 ## Module notes
 
@@ -133,6 +156,11 @@ dependency.
 `DevKitTestCompat.kt` is the `expect` compatibility surface, with `actual`s per version group (`pre2420Dev7600Main`,
 `post2420DevMain`, …).
 
+Everything here is *library* code that consumers' tests run against, `commonMain` only — the `@Test`s in `DevKitTest.kt`
+are part of that published surface, not a suite of this module's own. It has no test source set, no test data, and
+`tasks.generateTests { enabled = false }`, and nothing in the repo calls `DevKitTestGenerator`. So the test machinery
+this module exists to serve is exercised only downstream; see **Commands** for what that means for verifying a change.
+
 ### `version-resolution`
 
 Must keep **no** KGP dependency, since it also runs inside the compiler — that is why `KotlinToolingVersion` is vendored
@@ -145,13 +173,25 @@ finds**, to ensure that different versions of the devkit can co-exist.
 There is no `test` task. Each version gets `<target>Test`, registered with `KotlinTestsRegistry` so `allTests`
 aggregates them and `check` picks that up.
 
+**In this repo those tasks run nothing.** No module of the root build has a test source set or any test data, so every
+`<target>Test` reports `NO-SOURCE` and passes — a green `allTests` says only that every version still *compiles*, which
+is the signal to read it for. Don't take one as evidence that behaviour works; the suites it would run live in
+consumers. The repo's only executable tests are `version-resolution`'s, which are a plain JVM `test` task:
+
+```bash
+./gradlew allTests                       # compiles every registered Kotlin version; runs no tests
+./gradlew k2420_dev_7885Test             # one version; see `./gradlew tasks` for the list
+./gradlew --project-dir version-resolution test   # the only tests that execute
+./gradlew spotlessApply                  # format the whole repo
+```
+
+The rest of the per-version test surface is there for consumers, and behaves as documented once a module actually has
+test data:
+
 ```bash
 ./gradlew defaultTest                    # `…devkit.defaultTestVersion`, else the build's own Kotlin version
 ./gradlew defaultTest --tests 'Foo*'     # forwards the filter to every Test task in the project
-./gradlew allTests                       # every registered Kotlin version
-./gradlew k2420_dev_7885Test             # one version; see `./gradlew tasks` for the list
 ./gradlew k2420_dev_7885Test -PupdateTestData   # ...regenerating golden files
-./gradlew spotlessApply                  # format the whole repo
 ```
 
 Publishing is per build, so a release is three invocations — the root build first, since it compiles the other two on

@@ -23,15 +23,15 @@ class CompilerVersionAliasesTest {
     @Test
     fun `exact build maps to the version it bundles`() {
         assertThat(CompilerVersionAliases.forIdeBuild(IdeBuildNumber("253.29346.138")))
-            .isEqualTo(KotlinToolingVersion("2.3.0-dev-9992"))
+            .isEqualTo(KotlinToolingVersion("2.3.20-ij253-45"))
         assertThat(CompilerVersionAliases.forIdeBuild(IdeBuildNumber("261.23567.138")))
-            .isEqualTo(KotlinToolingVersion("2.4.0-dev-2631"))
+            .isEqualTo(KotlinToolingVersion("2.4.0-ij261-32"))
     }
 
     @Test
     fun `unmapped build takes the highest mapping below it`() {
         assertThat(CompilerVersionAliases.forIdeBuild(IdeBuildNumber("261.99999.1")))
-            .isEqualTo(KotlinToolingVersion("2.4.0-dev-2631"))
+            .isEqualTo(KotlinToolingVersion("2.4.0-ij261-71"))
     }
 
     @Test
