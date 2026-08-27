@@ -37,11 +37,9 @@ private val KotlinToolingVersion.capitalizedVersionName
  */
 internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
     get() {
-        if (classifier?.startsWith("ij") != true)
-            return this
+        if (!isIdeBuild) return this
         val aliases = CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES
-        val ownBuild =
-            aliases.filterValues { it.toString() == toString() }.keys.minOrNull() ?: return null
+        val ownBuild = aliases.filterValues { it == this }.keys.minOrNull() ?: return null
         return aliases.entries
             .filter { (build, shipped) ->
                 build.baselineVersion == ownBuild.baselineVersion &&
@@ -51,7 +49,6 @@ internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
             }
             .maxByOrNull { it.key }
             ?.value
-            ?.let { KotlinToolingVersion(it.toString()) }
     }
 
 /**
@@ -61,11 +58,7 @@ internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
  * instead, and the range below it absorbs how rarely this module is published.
  */
 private val KotlinToolingVersion.testFrameworkVersion: String
-    get() {
-        val ceiling = if (classifier?.startsWith("ij") == true) ideBranchPoint else this
-        // Nothing recorded before the branch, so there is nothing to cap with.
-        return ceiling?.let { "[${it.lowestDev}, $it]" } ?: "$lowestDev-+"
-    }
+    get() = ideBranchPoint?.let { "[${it.lowestDev}, $it]" } ?: "$lowestDev-+" // no cap
 
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(

@@ -16,7 +16,7 @@ import kotlin.io.path.getLastModifiedTime
 import kotlin.test.assertContains
 import kotlin.test.fail
 import org.gradle.testkit.runner.BuildResult
-import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 private val FILE_PATH_REGEX = Regex("file://.*?/(?=[^/]+\\.kt)")
 

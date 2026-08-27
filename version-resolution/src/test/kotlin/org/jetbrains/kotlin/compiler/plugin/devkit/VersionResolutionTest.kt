@@ -1,6 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.google.common.truth.Truth.assertThat
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.junit.Test
 
 class VersionResolutionTest {

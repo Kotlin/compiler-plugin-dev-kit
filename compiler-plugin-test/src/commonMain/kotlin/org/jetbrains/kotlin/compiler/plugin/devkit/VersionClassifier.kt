@@ -2,6 +2,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public val versions: Set<KotlinToolingVersion> by lazy {
     val versions =

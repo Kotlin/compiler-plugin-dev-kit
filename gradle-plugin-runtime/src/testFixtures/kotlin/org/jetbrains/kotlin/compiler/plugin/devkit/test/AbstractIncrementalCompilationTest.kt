@@ -8,7 +8,7 @@ import com.autonomousapps.kit.Subproject
 import java.io.File
 import org.gradle.testkit.runner.BuildResult
 import org.intellij.lang.annotations.Language
-import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 

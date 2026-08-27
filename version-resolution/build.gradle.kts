@@ -11,6 +11,7 @@ group = libs.versions.devkit.group.get()
 version = libs.versions.devkit.version.get()
 
 dependencies {
+    api(kotlin("tooling-core"))
     testImplementation(libs.truth)
 }
 

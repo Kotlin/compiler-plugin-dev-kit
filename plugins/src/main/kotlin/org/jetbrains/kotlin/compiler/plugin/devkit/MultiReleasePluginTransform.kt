@@ -20,6 +20,7 @@ import org.gradle.api.tasks.Input
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.PLUGIN_PATH
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.addOverlayAndDependencies
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.openDirectory
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 @CacheableTransform
 public abstract class MultiReleasePluginTransform :

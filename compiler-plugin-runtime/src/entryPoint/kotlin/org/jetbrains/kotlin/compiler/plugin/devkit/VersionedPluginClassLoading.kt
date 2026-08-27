@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.toPath
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.addOverlayAndDependencies
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public object VersionedPluginClassLoading {
     private val cache = ConcurrentHashMap<String, ClassLoader>()

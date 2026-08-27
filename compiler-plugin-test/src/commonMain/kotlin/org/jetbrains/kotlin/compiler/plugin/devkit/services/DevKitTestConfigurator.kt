@@ -1,10 +1,10 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.services
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinToolingVersion
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.services.MetaTestConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.defaultsProvider
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public val BUILD_COMPILER_VERSION: KotlinToolingVersion by lazy {
     KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.build.kotlin-version"))

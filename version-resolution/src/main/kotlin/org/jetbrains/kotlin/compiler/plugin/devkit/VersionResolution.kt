@@ -13,6 +13,8 @@ import kotlin.io.path.inputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.isDev
 
 public object VersionResolution {
     public const val PLUGIN_PATH: String = "META-INF/kotlin/plugin"

@@ -7,6 +7,8 @@ import com.autonomousapps.kit.SourceType
 import java.util.Locale
 import org.gradle.testkit.runner.BuildResult
 import org.intellij.lang.annotations.Language
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 private val CLASS_NAME_REGEX = Regex("(class|object|interface) (?<name>[a-zA-Z0-9_]+)")
 private val FUNCTION_NAME_REGEX = Regex("fun( <[a-zA-Z0-9_]+>)? (?<name>[a-zA-Z0-9_]+)")
@@ -55,10 +57,7 @@ public fun Source.copy(
     }
 }
 
-public fun String.toKotlinVersion(): KotlinVersion =
-    substringBefore("-").split(".").let { (major, minor, patch) ->
-        KotlinVersion(major.toInt(), minor.toInt(), patch.toInt())
-    }
+public fun String.toKotlinVersion(): KotlinVersion = KotlinToolingVersion(this).toKotlinVersion()
 
 /**
  * Asserts that the build output contains the expected text for the Kotlin version currently under

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
 public object CompilerVersionAliases {
     // Known tags-to-real version mappings for IDE builds.
     // Android Studio canary builds report a fake version like "2.3.255-dev-255".

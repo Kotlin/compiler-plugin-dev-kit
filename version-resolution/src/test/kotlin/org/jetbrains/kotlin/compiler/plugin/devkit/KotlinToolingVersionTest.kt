@@ -3,6 +3,8 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import com.google.common.truth.Truth.assertThat
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.classifierNumber
 import org.junit.Test
 
 class KotlinToolingVersionTest {
