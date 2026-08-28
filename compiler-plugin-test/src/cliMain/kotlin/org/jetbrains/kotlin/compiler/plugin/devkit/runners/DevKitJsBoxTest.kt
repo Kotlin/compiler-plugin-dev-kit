@@ -2,27 +2,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
-import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
-import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
-
-public open class DevKitJvmBoxTest(
-    vararg config: TestConfigurationBuilder.() -> Unit,
-    parser: FirParser = FirParser.LightTree,
-) :
-    BackportedFirBlackBoxCodegenTestSpecBase(
-        parser,
-        {
-            devKitDefaults()
-            defaultDirectives {
-                boxTestDefaults()
-                jvmDefaults()
-            }
-        },
-        *config,
-    )
 
 public open class MultiVersionJsTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
@@ -61,8 +42,3 @@ public open class DevKitJsBoxTest(
         targetBackend = targetBackend,
         parser = parser,
     )
-
-private fun RegisteredDirectivesBuilder.boxTestDefaults() {
-    +CodegenTestDirectives.DUMP_IR
-    +FirDiagnosticsDirectives.FIR_DUMP
-}

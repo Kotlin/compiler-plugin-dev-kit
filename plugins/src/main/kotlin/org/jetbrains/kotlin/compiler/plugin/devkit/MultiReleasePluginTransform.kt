@@ -48,10 +48,10 @@ public abstract class MultiReleasePluginTransform :
                         addOverlayAndDependencies(null, inputRoot, currentVersion) ?: return@default
                 }
                 return if (input.isDirectory())
-                    outputs.dir(input.name + "-$version").toPath().copyFrom(paths)
+                    outputs.dir(input.name + "-mv-$version").toPath().copyFrom(paths)
                 else {
                     val output =
-                        outputs.file(input.name.removeSuffix(".jar") + "-$version.jar").toPath()
+                        outputs.file(input.name.removeSuffix(".jar") + "-mv-$version.jar").toPath()
                     newFileSystem(output, mapOf("create" to true)).use {
                         it.rootDirectories.single().copyFrom(paths)
                     }

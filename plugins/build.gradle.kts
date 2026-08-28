@@ -27,6 +27,7 @@ dependencies {
     compileOnly(gradleKotlinDsl())
 
     compileOnly(kotlin("gradle-plugin"))
+    compileOnly(kotlin("gradle-plugin-idea"))
     implementation(libs.buildconfig)
     implementation(libs.node.gradle)
     implementation(libs.animal.sniffer)

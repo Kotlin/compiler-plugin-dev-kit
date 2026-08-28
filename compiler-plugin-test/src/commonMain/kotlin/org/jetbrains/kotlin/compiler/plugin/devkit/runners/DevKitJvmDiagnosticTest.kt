@@ -21,22 +21,7 @@ public open class DevKitJvmDiagnosticTest(
         *config,
     )
 
-public open class DevKitJsDiagnosticTest(
-    vararg config: TestConfigurationBuilder.() -> Unit,
-    parser: FirParser = FirParser.LightTree,
-) :
-    BackportedJsDiagnosticWithBackendTestBase(
-        parser,
-        {
-            devKitDefaults()
-            defaultDirectives {
-                diagnosticTestDefaults()
-            }
-        },
-        *config,
-    )
-
-private fun RegisteredDirectivesBuilder.diagnosticTestDefaults() {
+internal fun RegisteredDirectivesBuilder.diagnosticTestDefaults() {
     +FirDiagnosticsDirectives.FIR_DUMP
     +FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
 }

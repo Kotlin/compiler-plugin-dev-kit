@@ -98,10 +98,8 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
             .values
             .filter { it >= min && (max == null || it.baselineVersion <= max) }
             .distinct()
-            .mapNotNull {
-                CompilerVersionAliases.forIdeBuild(it)?.toString()?.let(::KotlinToolingVersion)
-            }
-            .forEach { registerVersion(it) }
+            .mapNotNull(CompilerVersionAliases::forIdeBuild)
+            .forEach(::registerVersion)
     }
 
     /**

@@ -37,39 +37,43 @@ step; consumers outside this repo need a publish.
 
 1. **Target naming.** `k` + version with `.` removed and `-` → `_`, lowercased: `2.4.20-dev-7885` → `k2420_dev_7885`.
    Every target has `main`, `testFixtures` and `test` compilations.
-2. **Sharing.** `DevKitHierarchyDsl`, mixed into the `pluginDevKit { }` extension, wraps KMP's hierarchy-template API so
-   an intermediate source set's membership is a predicate over `KotlinToolingVersion`. Because a given breaking change
-   usually lands once, the idiomatic shape is a `pre…`/`post…` split around one version, with `expect` in the shared
-   parent and an `actual` on each side. `withSourceSetTree(main, testFixtures, test)` gives the *same* grouping in all
-   three trees, so fixtures and tests are shared exactly like main code. `compiler-plugin-test/build.gradle.kts` is the
-   worked example.
+2. **Sharing.** `pluginDevKit { versionHierarchy { } }` (`DevKitHierarchyBuilder`) wraps KMP's hierarchy-template API so
+   an intermediate source set's membership is a predicate over `KotlinToolingVersion`; `split`/`splitDev` declare the
+   `pre…`/`post…` pair in one call. Because a given breaking change usually lands once, that split around one version is
+   the idiomatic shape, with `expect` in the shared parent and an `actual` on each side.
+   `withSourceSetTree(main, testFixtures, test)` gives the *same* grouping in all three trees, so fixtures and tests are
+   shared exactly like main code. `compiler-plugin-test/build.gradle.kts` is the worked example.
+
+   Two groups are always present alongside the version splits: `cli` and `ide`, keyed on `DevKitTarget.forIde`. So
+   `src/cliMain` is where anything that exists only in the CLI test framework goes — an IDE target compiles against
+   `kotlin-compiler-tests-for-ide` instead (see 3).
+
+   A predicate is evaluated on `ideBranchPoint ?: version`, never on an `-ij` version itself: a build number from an IDE
+   branch says nothing about which compiler changes that build contains, so `2.4.0-ij261-32` is classified by the `dev`
+   build its branch was cut from. That branch point is recovered from `ide-mappings.txt` rather than from git — an IDE
+   line ships plain `dev` versions until its `-ij` branch is cut, so the newest `dev` version recorded against a *lower*
+   build of the same baseline is where the branch left trunk (`2.4.0-ij261-32` looks back past `261.23567.28` to
+   `261.22158.277`'s `2.4.0-dev-2631`). A baseline with no `dev` mapping before its branch (253 is one) has none, and
+   falls back to being classified by its own version.
 3. **Per-version dependencies.** `forceKotlinVersion` pins every `org.jetbrains.kotlin` dependency of a compilation to
-   that target's version, exactly. `kotlin("compiler-tests")` is a fake coordinate the same hook rewrites to
-   `kotlin-compiler-internal-test-framework`, or to `kotlin-compiler-tests-for-ide` on IDE versions.
+   that target's version, exactly — but only the modules `kotlin-modules.txt` (`KnownVersions.kotlinModuleMappings`)
+   lists. A coordinate the dev kit has never heard of is left alone rather than forced to a version it was never
+   published at.
 
-   `kotlin-compiler-internal-test-framework` on an IDE version is the one dependency *not* pinned: it keeps its name but
-   takes a *range*. It is wanted for the generators and the JS tests, which `kotlin-compiler-tests-for-ide` has none of,
-   but it carries no `-ij` publication at all and is published only sporadically even on the `dev` track, so neither an
-   exact pin nor a wildcard works — the newest `dev` build is already a different compiler from the one an `-ij` branch
-   was cut at.
+   On an IDE version a module is *renamed* as well as re-versioned, through that same file: that is how the fixtures can
+   depend on `kotlin("compiler-internal-test-framework")` for every target and have an IDE one resolve
+   `kotlin-compiler-tests-for-ide`. There is no back channel from an IDE target to the CLI test framework — no fake
+   coordinate, no version range. `kotlin-compiler-tests-for-ide` carries neither the test generators nor the JS/Wasm
+   infrastructure, and the answer is that an IDE target compiles neither: the first lives behind `generateTests` (below,
+   which is pinned to a CLI compiler), the second in the `cli` group of 2.
 
-   The ceiling is therefore that **branch point**, recovered from `ide-mappings.txt` rather than from git: an IDE line
-   ships plain `dev` versions until its `-ij` branch is cut, so the newest `dev` version recorded against a *lower*
-   build of the same baseline is where the branch left trunk. `2.4.0-ij261-32` looks back past `261.23567.28` to
-   `261.22158.277`'s `2.4.0-dev-2631` and asks for `[2.4.0-dev, 2.4.0-dev-2631]`, landing on `2.4.0-dev-2124` — the
-   sporadic publishing is what the range absorbs. A baseline with no `dev` mapping before its branch (253 is one) has
-   nothing to cap with and falls back to `<base>-dev-+`, the newest build of the base version. All of this is in the
-   hope it doesn't clash with `kotlin-compiler-tests-for-ide` on the classpath.
-
-   On an IDE version a module is *renamed* as well as re-versioned, through `kotlin-modules.txt`
-   (`KnownVersions.kotlinModuleMappings`). That file is hand-curated and its mappings **must never be guessed**: the
-   renames are not mechanical, and being published in intellij-dependencies under its own name is not on its own a
-   reason to map a module to itself — `kotlin-compiler-internal-test-framework` is published there, just far too rarely
-   to depend on. `fetch-all-kotlin-modules.py` therefore only *discovers* modules — from `dev` plus
-   intellij-dependencies, the names a consumer would write, `bootstrap`'s extra `-for-ide` ones being a historical
-   accident — writes anything new as `foo=`, and exits **2** while any mapping is blank. `UNSUPPORTED` and `DEAD` are
-   the two ways to record that a human looked and there is no name to use; `forceKotlinVersion` fails on both rather
-   than resolving them as coordinates.
+   That file is hand-curated and its mappings **must never be guessed**: the renames are not mechanical, and being
+   published in intellij-dependencies under its own name is not on its own a reason to map a module to itself —
+   `kotlin-compiler-internal-test-framework` is published there, just far too rarely to depend on.
+   `fetch-all-kotlin-modules.py` therefore only *discovers* modules — from `dev` plus intellij-dependencies, the names a
+   consumer would write, `bootstrap`'s extra `-for-ide` ones being a historical accident — writes anything new as
+   `foo=`, and exits **2** while any mapping is blank. `UNSUPPORTED` and `DEAD` are the two ways to record that a human
+   looked and there is no name to use; `forceKotlinVersion` fails on both rather than resolving them as coordinates.
 4. **Packaging.** Every `Jar` gets manifest attribute `Kotlin-Compiler-Plugin-Multi-Release: true`. The jar root holds
    only the entry point; everything else lives under `META-INF/kotlin/plugin/<pluginId>/` (`<pluginId>` being
    `pluginPackage`), in `versions/<version>/` per target and `dependencies/<jar-name>/` per runtime dependency, unzipped
@@ -81,6 +85,12 @@ step; consumers outside this repo need a publish.
    non-matching artifacts pass through untouched. Only test fixtures and tests use it, and it is deliberately skipped
    for local project dependencies during IDE import, because rewriting the artifact loses the project identity IDEA
    needs.
+
+   The transform names its output `<name>-mv-<version>`, and that suffix is a contract with
+   `IdeMultiVersionDependencyResolver`, which recognises it to push the version into the IDE dependency's
+   `sourceSetName`. Without that disambiguation IDEA keys one Library per GAV and reuses whichever version's transformed
+   artifact it happened to resolve first in unrelated modules — which is how the bug showed up in a build setting
+   `preferredVersionForSharedSourceSetsInIde`.
 6. **Selection at compiler runtime.** The entry point is *generated* per plugin: buildconfig emits
    `<pluginPackage>.PluginInfo`, whose `REGISTRAR_CLASS`/`PROCESSOR_CLASS` initializers declare local subclasses of
    `DevKitCompilerPluginRegistrar` / `DevKitCommandLineProcessor`, and `GenerateServices` writes `META-INF/services`
@@ -119,14 +129,25 @@ those dependencies normally (a *library*, like `compiler-plugin-runtime` and `co
 
 - **Resources of every source set whose name ends in `Test` are remapped to `src/<sourceSetName>/data`** — the test data
   root kotlin-compiler-internal-test-framework expects.
-- The build's own Kotlin version is always registered, and is the **surrogate** target: the only publishable one, and
-  the one whose jar aggregates every version, so a consumer resolves a single artifact and lets the dev kit pick from
-  it. Every other target's elements configurations carry a `FakeKotlinCompilerVersion` attribute purely to lose against
-  the surrogate during resolution.
-- `generateTests` runs **once, against the highest registered version's** test fixtures, and every version's
-  `compileJava`/`compileKotlin` depends on it. Per target it receives that target's dir under `generatedTestsDir` plus
-  the data dirs of the test source set's whole `dependsOn` closure; `DevKitTestGenerator` derives a package suffix from
-  the output dir name, which is how one shared test data tree yields one generated suite per version.
+- The **surrogate** target is the *first* registered version: the only publishable one, and the one whose jar aggregates
+  every version, so a consumer resolves a single artifact and lets the dev kit pick from it. Every other target's
+  elements configurations carry a `FakeKotlinCompilerVersion` attribute purely to lose against the surrogate during
+  resolution. The build's own Kotlin version is registered only as a *fallback*, when properties and DSL between them
+  registered nothing at all — so in a range-driven build it is the lowest CLI version that ends up surrogate.
+- Test generation is **two** tasks, `generateTestsCli` and `generateTestsIde`, each with its own compilation from
+  `src/generateTestsCli` / `src/generateTestsIde` over a shared `src/generateTests`, created on the first CLI and the
+  first IDE target respectively and associated with that target's test fixtures. Both are forced to the newest Kotlin
+  release `KnownVersions` knows rather than their target's version, which is what keeps the generator off
+  `kotlin-compiler-tests-for-ide` — safe because which generator ran doesn't show up in the tests it generates, so
+  `generateTestsIde` can use the newest one too. Each generates only into the targets of its own kind. Per target a task
+  receives that target's dir under `generatedTestsDir` plus the data dirs of the test source set's whole `dependsOn`
+  closure; `DevKitTestGenerator` derives a package suffix from the output dir name, which is how one shared test data
+  tree yields one generated suite per version.
+
+  `generateTests` is just the lifecycle task those two hang off, and it is itself `enabled = false` — a disabled task
+  still runs its dependencies, so **`tasks.generateTests { enabled = false }` alone suppresses nothing**; a module that
+  wants no generated tests has to disable `generateTestsCli` and `generateTestsIde` too. Every version's
+  `compileJava`/`compileKotlin` depends on `generateTests`.
 - The internal test framework's JS/Wasm half wants a pile of `-D` paths — hence the per-version
   `testArtifacts`/`testArtifactsWasm` resolution, the d8 executable and the generated `repl.js`.
 - `testDataLibraries { }` entries reach test data as `<name>.jvm.classpath` / `<name>.js.classpath` system properties
@@ -156,10 +177,19 @@ dependency.
 `DevKitTestCompat.kt` is the `expect` compatibility surface, with `actual`s per version group (`pre2420Dev7600Main`,
 `post2420DevMain`, …).
 
-Everything here is *library* code that consumers' tests run against, `commonMain` only — the `@Test`s in `DevKitTest.kt`
-are part of that published surface, not a suite of this module's own. It has no test source set, no test data, and
-`tasks.generateTests { enabled = false }`, and nothing in the repo calls `DevKitTestGenerator`. So the test machinery
-this module exists to serve is exercised only downstream; see **Commands** for what that means for verifying a change.
+`src/cliMain` holds what only the CLI test framework has: `DevKitTestGenerator` and the JS runners. Anything shared with
+them, like `setupHandlersForDiagnosticTest`, has to stay in `commonMain` — moving a JS runner out is what pulls such a
+helper along with it.
+
+So an IDE version gets no JS tests, which is a deliberate trade rather than a gap to close: the IDE never exercises the
+JS backend, only the JVM one (through Evaluate Expression), and JS *diagnostics* are better covered by Analysis API
+tests than by compiler tests. JVM and JS runners are named apart (`DevKitJvmBoxTest` / `DevKitJsBoxTest`) for that
+reason.
+
+Everything here is *library* code that consumers' tests run against — the `@Test`s in `DevKitTest.kt` are part of that
+published surface, not a suite of this module's own. It has no test source set, no test data, and all three
+`generateTests*` tasks disabled, and nothing in the repo calls `DevKitTestGenerator`. So the test machinery this module
+exists to serve is exercised only downstream; see **Commands** for what that means for verifying a change.
 
 ### `version-resolution`
 
@@ -249,11 +279,13 @@ done
 
 ## Recipe: support a new Kotlin version
 
-1. Add the version to `kotlin.compiler.plugin.devkit.testAgainst` in the root `gradle.properties`.
+1. Usually nothing: this repo's `gradle.properties` registers by *range* — `minCliVersion` / `maxCliVersion` /
+   `includeBetaAndRc`, `minIdeaVersion` / `maxIdeaVersion` / `includeIdeaRc` / `includeIdeaEap`, and `useLatestDev` —
+   all `kotlin.compiler.plugin.devkit.*`, so a version inside a range arrives as soon as `KnownVersions` lists it. Widen
+   a bound, or name one version outright in `kotlin.compiler.plugin.devkit.testAgainst`.
 2. Build it. Because the shared sources are recompiled per version, most versions need nothing else.
-3. If something *does* break, decide where the split belongs in the hierarchy template (the
-   `kotlin.applyPluginDevKitHierarchyTemplate { }` block inside `pluginDevKit { }` in
-   `compiler-plugin-test/build.gradle.kts`), then move the differing declaration to an `expect` in the shared parent
-   with an `actual` on each side. The `DevKitTestCompat.*.kt` files show the pattern.
+3. If something *does* break, decide where the split belongs in the hierarchy template (the `versionHierarchy { }` block
+   inside `pluginDevKit { }` in `compiler-plugin-test/build.gradle.kts`), then move the differing declaration to an
+   `expect` in the shared parent with an `actual` on each side. The `DevKitTestCompat.*.kt` files show the pattern.
 
 Version *removal* works the same way in reverse.

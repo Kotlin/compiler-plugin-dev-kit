@@ -5,8 +5,6 @@
 
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
-import org.jetbrains.kotlin.compiler.plugin.devkit.FirDistinctSourceElementsHandler
-import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.libraryProviderCtor
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
@@ -26,13 +24,6 @@ import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.DIAGNOSTICS
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives
 import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirInferenceLogsHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.TestPhase
 
@@ -91,33 +82,3 @@ public abstract class BackportedJsDiagnosticWithBackendTestBase(
         },
         *config,
     )
-
-/** The list of `UNUSED_*` diagnostics which are disabled by default within diagnostic tests. */
-public val DEFAULT_UNUSED_DIAGNOSTICS: List<String> =
-    listOf(
-        "UNUSED_VARIABLE",
-        "UNUSED_PARAMETER",
-        "UNUSED_ANONYMOUS_PARAMETER",
-        "UNUSED_DESTRUCTURED_PARAMETER_ENTRY",
-        "UNUSED_TYPEALIAS_PARAMETER",
-        "UNUSED_VALUE",
-        "UNUSED_CHANGED_VALUE",
-        "UNUSED_EXPRESSION",
-        "UNUSED_LAMBDA_EXPRESSION",
-    )
-
-public fun TestConfigurationBuilder.setupHandlersForDiagnosticTest() {
-    configureFirHandlersStep {
-        useHandlers(
-            ::FirDiagnosticsHandler,
-            ::BackportedFirDumpHandler,
-            ::FirCfgDumpHandler,
-            ::FirVFirDumpHandler,
-            ::FirInferenceLogsHandler,
-            ::FirCfgConsistencyHandler,
-            ::FirResolvedTypesVerifier,
-            ::FirScopeDumpHandler,
-            ::FirDistinctSourceElementsHandler,
-        )
-    }
-}

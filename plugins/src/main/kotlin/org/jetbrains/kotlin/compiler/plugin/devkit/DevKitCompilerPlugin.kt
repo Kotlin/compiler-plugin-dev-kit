@@ -9,6 +9,7 @@ import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
@@ -58,6 +59,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     private val commonMain = kotlinExtension.run { sourceSets.commonMain.get() }
     private val commonTestFixtures = kotlinExtension.sourceSets.create("commonTestFixtures")
+    private val commonGenerateTests = kotlinExtension.sourceSets.create("generateTests")
 
     /**
      * The package used by convention for BuildConfig generation and where [generateTestsClass]
@@ -140,6 +142,24 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 }
             )
         }
+    private val generateTestsCli: TaskProvider<GenerateTestsTask> =
+        registerGenerateTestsTask("generateTestsCli", forIde = false) {
+            description = "Generate compiler plugin tests for CLI"
+        }
+    private val generateTestsIde: TaskProvider<GenerateTestsTask> =
+        registerGenerateTestsTask("generateTestsIde", forIde = true) {
+            description = "Generate compiler plugin tests for IDE"
+        }
+    /**
+     * Generates tests using [generateTestsClass], given the relevant test data directory, and
+     * outputs them to [generatedTestsDir]
+     */
+    public val generateTests: TaskProvider<Task> =
+        tasks.register("generateTests") {
+            description = "Generate compiler plugin tests"
+            enabled = false
+            dependsOn(generateTestsCli, generateTestsIde)
+        }
 
     private lateinit var surrogateTarget: DevKitTarget
 
@@ -155,14 +175,28 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
         }
 
-    private val generateTestsCompilation =
-        surrogateTarget.compilations.create(GENERATE_TESTS_COMPILATION_NAME) {
-            associateWith(surrogateTarget.testFixturesCompilation)
-            defaultSourceSet.kotlin.setSrcDirs(listOf("src/generateTests/kotlin"))
-            defaultSourceSet.resources.setSrcDirs(listOf("src/generateTests/resources"))
+    private fun DevKitTarget.createGenerateTestsCompilation(): DevKitCompilation =
+        compilations.create(GENERATE_TESTS_COMPILATION_NAME) {
+            val forIde = this@createGenerateTestsCompilation.forIde
+            associateWith(this@createGenerateTestsCompilation.testFixturesCompilation)
+            defaultSourceSet {
+                dependsOn(commonGenerateTests)
+                val sourceSetName =
+                    if (forIde) GENERATE_TESTS_IDE_SOURCE_SET_NAME
+                    else GENERATE_TESTS_CLI_SOURCE_SET_NAME
+                kotlin.setSrcDirs(listOf("src/$sourceSetName/kotlin"))
+                resources.setSrcDirs(listOf("src/$sourceSetName/resources"))
+            }
             // Uses latest EAP, so it never has to deal with kotlin-compiler-tests-for-ide
             forceKotlinVersion(KnownVersions.kotlinVersions.last())
+            (if (forIde) generateTestsIde else generateTestsCli) {
+                classpath(runtimeDependencyFiles, output.allOutputs)
+                enabled = true
+            }
         }
+
+    private var generateTestsIdeCompilation: DevKitCompilation? = null
+    private var generateTestsCliCompilation: DevKitCompilation? = null
 
     private val mainJar: TaskProvider<Jar> =
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
@@ -217,33 +251,32 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             defaultRepl.convention(javaClass.classLoader.getResource("repl.js")?.readText())
             outputFile = layout.buildDirectory.file("js-test-repl/repl.js").get().asFile
         }
-    /**
-     * Generates tests using [generateTestsClass], given the relevant test data directory, and
-     * outputs them to [generatedTestsDir]
-     */
-    public val generateTests: TaskProvider<GenerateTestsTask> =
-        tasks.register("generateTests", GenerateTestsTask::class) {
-            description = "Generate compiler plugin tests"
-            generatedTestsDir.set(this@DevKitCompilerConfigExtension.generatedTestsDir)
 
-            classpath(
-                generateTestsCompilation.runtimeDependencyFiles,
-                generateTestsCompilation.output.allOutputs,
-            )
+    private fun registerGenerateTestsTask(
+        name: String,
+        forIde: Boolean,
+        action: GenerateTestsTask.() -> Unit,
+    ): TaskProvider<GenerateTestsTask> =
+        tasks.register<GenerateTestsTask>(name) {
             mainClass.set(generateTestsClass)
             workingDir = rootDir
 
             testAgainst.configureEach {
+                if (this.forIde != forIde) return@configureEach
                 test {
+                    val outputDir = generatedTestsDir.dir(targetName)
+                    generatedTestsDirs.add(outputDir)
                     this as AbstractKotlinSourceSet
                     argFiles(
                         files(
                             provider { withDependsOnClosure.map { it.resources.sourceDirectories } }
                         ),
-                        generatedTestsDir.dir(targetName),
+                        outputDir,
                     )
                 }
             }
+            enabled = false
+            action()
         }
 
     init {
@@ -337,6 +370,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     )
                     .also {
                         if (!::surrogateTarget.isInitialized) surrogateTarget = it
+                        if (generateTestsCliCompilation == null && !it.forIde)
+                            generateTestsCliCompilation = it.createGenerateTestsCompilation()
+                        if (generateTestsIdeCompilation == null && it.forIde)
+                            generateTestsIdeCompilation = it.createGenerateTestsCompilation()
                     }
         return target.apply(action)
     }
@@ -358,6 +395,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
             common {
                 withCompilations { true }
+                group("ide") { withCompilations { (it.target as? DevKitTarget)?.forIde == true } }
+                group("cli") { withCompilations { (it.target as? DevKitTarget)?.forIde == false } }
                 template(
                     object : DevKitHierarchyBuilder {
                         override fun groupVersions(
@@ -664,7 +703,11 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     internal fun configureDependencies() {
         testAgainst.configureEach target@{
             compilations.configureEach {
-                if (this != entryPointCompilation && this != generateTestsCompilation)
+                if (
+                    this != entryPointCompilation &&
+                        this != generateTestsCliCompilation &&
+                        this != generateTestsIdeCompilation
+                )
                     forceKotlinVersion(this@target.version)
             }
         }
@@ -684,7 +727,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         commonTestFixtures.dependencies {
             api(kotlin("stdlib"))
             api(kotlin("test-junit5"))
-            api(kotlin("compiler-tests")) // fake; gets resolved by forceKotlinVersion
             api(kotlin("compiler-internal-test-framework"))
             api(kotlin("compiler"))
             runtimeOnly("junit:junit:4.13.2")

@@ -11,10 +11,15 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.gradle.ExternalKotlinTargetApi
+import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinBinaryDependency
+import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinResolvedBinaryDependency
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.ide.IdeDependencyResolver
+import org.jetbrains.kotlin.gradle.plugin.ide.IdeDependencyResolver.Companion.gradleArtifact
 import org.jetbrains.kotlin.gradle.plugin.ide.dependencyResolvers.IdeBinaryDependencyResolver
+import org.jetbrains.kotlin.gradle.plugin.ide.dependencyResolvers.IdeBinaryDependencyResolver.ArtifactResolutionStrategy
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -31,13 +36,49 @@ private fun KotlinSourceSet.selectCompilation(
     return compilations.maxWithOrNull(compareBy { (it.target as? DevKitTarget)?.version })
 }
 
+private class IdeMultiVersionDependencyResolver(private val resolver: IdeBinaryDependencyResolver) :
+    IdeDependencyResolver {
+    constructor(
+        binaryType: String = IdeaKotlinBinaryDependency.KOTLIN_COMPILE_BINARY_TYPE,
+        artifactResolutionStrategy: ArtifactResolutionStrategy =
+            ArtifactResolutionStrategy.Compilation(),
+    ) : this(IdeBinaryDependencyResolver(binaryType, artifactResolutionStrategy))
+
+    override fun resolve(sourceSet: KotlinSourceSet) =
+        resolver
+            .resolve(sourceSet)
+            .map {
+                if (it !is IdeaKotlinResolvedBinaryDependency) return@map it
+                val coordinates = it.coordinates ?: return@map it
+                val artifact = it.gradleArtifact ?: return@map it
+                val version =
+                    coordinates.attributes[KotlinCompilerVersion.attribute.name].takeUnless(
+                        KotlinCompilerVersion.NO_VERSION::equals
+                    ) ?: return@map it
+                /**
+                 * Without disambiguation by [version] IDE incorrectly creates one Library per GAV
+                 * with one of the resolution artifacts from the multi-version jar and reuses it in
+                 * inappropriate IDE Modules
+                 */
+                if (artifact.file.nameWithoutExtension.endsWith("-mv-$version")) {
+                    it.copy(
+                        coordinates =
+                            coordinates.copy(
+                                sourceSetName = KotlinToolingVersion(version).versionName
+                            )
+                    )
+                } else it
+            }
+            .toSet()
+}
+
 context(_: HasProject)
 internal fun IdeMultiVersionCompilationBinaryDependencyResolver(
     preferredVersionForIdeImport: Provider<out KotlinToolingVersion>
-) =
-    IdeBinaryDependencyResolver(
+): IdeDependencyResolver =
+    IdeMultiVersionDependencyResolver(
         artifactResolutionStrategy =
-            IdeBinaryDependencyResolver.ArtifactResolutionStrategy.Compilation(
+            ArtifactResolutionStrategy.Compilation(
                 compilationSelector = { it.selectCompilation(preferredVersionForIdeImport.orNull) },
                 componentFilter = { it !is ProjectComponentIdentifier },
             )
@@ -46,10 +87,10 @@ internal fun IdeMultiVersionCompilationBinaryDependencyResolver(
 context(_: HasProject)
 internal fun IdeMultiVersionCompilationProjectDependencyResolver(
     preferredVersionForIdeImport: Provider<out KotlinToolingVersion>
-) =
-    IdeBinaryDependencyResolver(
+): IdeDependencyResolver =
+    IdeMultiVersionDependencyResolver(
         artifactResolutionStrategy =
-            IdeBinaryDependencyResolver.ArtifactResolutionStrategy.Compilation(
+            ArtifactResolutionStrategy.Compilation(
                 compilationSelector = { it.selectCompilation(preferredVersionForIdeImport.orNull) },
                 componentFilter = { it is ProjectComponentIdentifier },
                 setupArtifactViewAttributes = {

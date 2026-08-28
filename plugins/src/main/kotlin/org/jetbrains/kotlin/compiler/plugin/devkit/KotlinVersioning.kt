@@ -19,14 +19,7 @@ import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.isDev
-import org.jetbrains.kotlin.tooling.core.toKotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
-private val KotlinToolingVersion.lowestDev: KotlinToolingVersion
-    get() {
-        require(isDev)
-        return toKotlinVersion().toKotlinToolingVersion("dev")
-    }
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
 
@@ -50,15 +43,6 @@ internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
             .maxByOrNull { it.key }
             ?.value
     }
-
-/**
- * `kotlin-compiler-internal-test-framework` carries no `-ij` publication, so an IDE target has to
- * take a `dev` build of it — and any build past the point the IDE branch was cut is already a
- * different compiler, which is what made the newest one a poor stand-in. The branch point caps it
- * instead, and the range below it absorbs how rarely this module is published.
- */
-private val KotlinToolingVersion.testFrameworkVersion: String
-    get() = ideBranchPoint?.let { "[${it.lowestDev}, $it]" } ?: "$lowestDev-+" // no cap
 
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
@@ -84,31 +68,16 @@ private fun Configuration.withCompilerVersionAttribute(version: KotlinToolingVer
     )
 }
 
-// generators and JS tests are not in kotlin-compiler-tests-for-ide
-// so we use the closest kotlin-compiler-internal-test-framework to provide them
-// while hoping that it somehow doesn't conflict with kotlin-compiler-tests-for-ide
 private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion, forIde: Boolean) =
     dependencySubstitution.all {
         val requested = requested
         if (requested is ModuleComponentSelector && requested.group == "org.jetbrains.kotlin") {
-            when (requested.module) {
-                "kotlin-compiler-tests" if forIde ->
-                    useModule("kotlin-compiler-tests-for-ide", "$version")
-                "kotlin-compiler-tests" ->
-                    useModule("kotlin-compiler-internal-test-framework", "$version")
-                "kotlin-compiler-internal-test-framework" if forIde ->
-                    useVersion(version.testFrameworkVersion)
-                else ->
-                    when (val mapped = kotlinModuleMappings[requested.module]) {
-                        null -> {}
-                        else if !forIde -> useVersion("$version")
-                        "UNSUPPORTED",
-                        "DEAD" ->
-                            error(
-                                "Requested dependency $requested has no reasonable IDE equivalent"
-                            )
-                        else -> useModule(mapped, "$version")
-                    }
+            when (val mapped = kotlinModuleMappings[requested.module]) {
+                null -> {}
+                else if !forIde -> useVersion("$version")
+                "UNSUPPORTED",
+                "DEAD" -> error("Requested dependency $requested has no reasonable IDE equivalent")
+                else -> useModule(mapped, "$version")
             }
         }
     }

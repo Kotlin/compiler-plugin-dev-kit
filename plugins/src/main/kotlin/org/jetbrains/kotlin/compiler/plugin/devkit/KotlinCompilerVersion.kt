@@ -16,13 +16,14 @@ internal abstract class KotlinCompilerVersion : Serializable, Named {
     companion object {
         val attribute: Attribute<KotlinCompilerVersion> =
             Attribute.of("org.jetbrains.kotlin.compiler.version", KotlinCompilerVersion::class.java)
+        const val NO_VERSION = "noVersion"
         context(_: HasProject)
         val noVersion: KotlinCompilerVersion
             get() = KotlinCompilerVersion(null)
 
         context(_: HasProject)
         operator fun invoke(version: KotlinToolingVersion?) =
-            objects.named(KotlinCompilerVersion::class.java, version?.versionString ?: "noVersion")
+            objects.named(KotlinCompilerVersion::class.java, version?.versionString ?: NO_VERSION)
     }
 }
 
