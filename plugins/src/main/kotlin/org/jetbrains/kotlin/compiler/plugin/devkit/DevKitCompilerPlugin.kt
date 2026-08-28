@@ -714,6 +714,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         dependencies {
             setupCompilerVersionAttribute()
             testAgainst.configureEach { registerMultiReleasePluginTransform(version) }
+            // for genereateTests*Compilation
+            registerMultiReleasePluginTransform(KnownVersions.kotlinVersions.last())
         }
 
         commonMain.dependencies {
