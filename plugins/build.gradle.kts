@@ -19,7 +19,7 @@ samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 assignment { annotation("org.gradle.api.SupportsKotlinAssignmentOverloading") }
 
 dependencies {
-    compileOnlyApi(libs.gradle.public.api) {
+    compileOnly(libs.gradle.public.api) {
         capabilities {
             requireCapability("org.gradle.experimental:gradle-public-api-internal")
         }
