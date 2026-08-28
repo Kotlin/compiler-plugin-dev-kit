@@ -16,7 +16,7 @@ group = libs.versions.devkit.group.get()
 version = libs.versions.devkit.version.get()
 
 dependencies {
-    compileOnlyApi(libs.gradle.public.api) {
+    compileOnly(libs.gradle.public.api) {
         capabilities {
             requireCapability("org.gradle.experimental:gradle-public-api-internal")
         }
