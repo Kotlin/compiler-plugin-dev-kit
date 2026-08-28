@@ -212,6 +212,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     init {
         val settings = (project.gradle as GradleInternal).settings
         // Very adhoc, but only needed for development
+        // TODO remove
         val devKitRepo =
             settings.dependencyResolutionManagement.repositories
                 .withType<MavenArtifactRepository>()
@@ -263,6 +264,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 mustRunAfter("test")
                 maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
+                systemProperty("org.gradle.testkit.dir", project.gradle.gradleUserHomeDir)
                 systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
                 systemProperty(
                     "$DEV_KIT_PROPERTY_PREFIX.build.kotlin-version",
