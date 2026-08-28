@@ -149,11 +149,21 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     }
 
     private val entryPointCompilation =
-        surrogateTarget.compilations.create("entryPoint") {
+        surrogateTarget.compilations.create(ENTRY_POINT_COMPILATION_NAME) {
             defaultSourceSet.kotlin.setSrcDirs(emptyList<Any>())
             defaultSourceSet.resources.setSrcDirs(listOf(genServicesDir.get()))
             tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
         }
+
+    private val generateTestsCompilation =
+        surrogateTarget.compilations.create(GENERATE_TESTS_COMPILATION_NAME) {
+            associateWith(surrogateTarget.testFixturesCompilation)
+            defaultSourceSet.kotlin.setSrcDirs(listOf("src/generateTests/kotlin"))
+            defaultSourceSet.resources.setSrcDirs(listOf("src/generateTests/resources"))
+            // Uses latest EAP, so it never has to deal with kotlin-compiler-tests-for-ide
+            forceKotlinVersion(KnownVersions.kotlinVersions.last())
+        }
+
     private val mainJar: TaskProvider<Jar> =
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
@@ -217,10 +227,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             generatedTestsDir.set(this@DevKitCompilerConfigExtension.generatedTestsDir)
 
             classpath(
-                provider {
-                    val testFixtures = testAgainst.maxBy { it.version }.testFixturesCompilation
-                    testFixtures.runtimeDependencyFiles + testFixtures.output.allOutputs
-                }
+                generateTestsCompilation.runtimeDependencyFiles,
+                generateTestsCompilation.output.allOutputs,
             )
             mainClass.set(generateTestsClass)
             workingDir = rootDir
@@ -656,7 +664,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     internal fun configureDependencies() {
         testAgainst.configureEach target@{
             compilations.configureEach {
-                if (this != entryPointCompilation) forceKotlinVersion(this@target.version)
+                if (this != entryPointCompilation && this != generateTestsCompilation)
+                    forceKotlinVersion(this@target.version)
             }
         }
         dependencies {
