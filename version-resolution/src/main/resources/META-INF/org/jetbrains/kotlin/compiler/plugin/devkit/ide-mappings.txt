@@ -80,11 +80,14 @@
 # Android Studio Quail 4 | 2026.1.4 Canary 4 (canary)
 # Android Studio Quail 4 | 2026.1.4 Canary 3 (canary)
 # Android Studio Quail 4 | 2026.1.4 Canary 2 (canary)
+# Android Studio Quail 4 | 2026.1.4 (stable)
 261.26222.65=2.4.0-ij261-71
 # IntelliJ IDEA 2026.1.5 (rc)
 261.27258.27=2.4.0-ij261-71
 # IntelliJ IDEA 2026.1.5 (stable)
 261.27258.48=2.4.0-ij261-71
+# IntelliJ IDEA 2026.2.2 (stable)
+262.10315.125=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.2 (eap)
 262.10315.19=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.2 (rc)
@@ -117,8 +120,11 @@
 # Android Studio Rabbit 1 | 2026.2.1 Canary 2 (canary)
 # Android Studio Rabbit 1 | 2026.2.1 Canary 1 (canary)
 # Android Studio Rabbit 1 | 2026.2.1 Canary 3 (canary)
+# Android Studio Rabbit 1 | 2026.2.1 Canary 4 (canary)
 262.9437.185=2.4.20-ij262-34
 # IntelliJ IDEA 2026.2.1 (eap)
 262.9437.22=2.4.20-ij262-34
 # IntelliJ IDEA 2026.2.1 (rc)
 262.9437.65=2.4.20-ij262-34
+# IntelliJ IDEA 2026.3 (eap)
+263.3889.65=2.5.0-dev-5423

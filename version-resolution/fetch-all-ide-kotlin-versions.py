@@ -26,7 +26,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 
-FILE_PATH = ".idea/libraries/kotlinc_kotlin_compiler_common.xml"
+FILE_PATH = "plugins/kotlin/util/project-model-updater/resources/model.properties"
 RAW_GH_BASE = "https://raw.githubusercontent.com/JetBrains/intellij-community"
 
 # Where the IDE itself gets its compiler from, and therefore where every alias target
@@ -184,7 +184,7 @@ def fetch_kotlin_version(tag):
     body, status = fetch_url(f"{RAW_GH_BASE}/{tag}/{FILE_PATH}")
     version = None
     if status == 200:
-        m = re.search(r'kotlin-compiler-common-for-ide:([^"]+)', body)
+        m = re.search(r'kotlincVersion=(.*)$', body, flags=re.MULTILINE)
         if m:
             version = m.group(1)
     _kotlin_version_cache[tag] = version
