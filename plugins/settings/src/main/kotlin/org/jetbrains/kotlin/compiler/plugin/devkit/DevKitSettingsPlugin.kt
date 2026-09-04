@@ -9,8 +9,25 @@ public class DevKitSettingsPlugin : Plugin<Settings> {
     override fun apply(target: Settings): Unit = target.run {
         pluginManagement.repositories.kotlinDevRepositories()
         dependencyResolutionManagement.repositories.kotlinDevRepositories()
+        dependencyResolutionManagement.repositories.ideStarterRepositories()
         gradle.lifecycle.beforeProject {
             this@beforeProject.pluginManager.apply("$DEV_KIT_GROUP.functional-test-publishing")
+        }
+    }
+}
+
+/**
+ * Where IDE Starter and the Driver SDK live, for the IDE tests.
+ *
+ * Declared here rather than on the project that wants them, because a project-level repository
+ * would shadow every repository this block declares. Starter pulls platform modules of its own
+ * build in transitively, so the whole namespace has to be reachable - but only that namespace,
+ * which leaves these two free for the builds that never run an IDE test.
+ */
+private fun RepositoryHandler.ideStarterRepositories() {
+    for (channel in listOf("releases", "snapshots")) {
+        maven("https://www.jetbrains.com/intellij-repository/$channel") {
+            content { includeGroupByRegex("""com\.jetbrains\.intellij(\..*)?""") }
         }
     }
 }

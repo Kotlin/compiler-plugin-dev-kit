@@ -74,6 +74,8 @@ buildConfig {
     }
     buildConfigField("DEV_KIT_GROUP", group.toString())
     buildConfigField("DEV_KIT_VERSION", version.toString())
+    buildConfigField("IDE_STARTER_VERSION", libs.versions.ide.starter.get())
+    buildConfigField("JUNIT_JUPITER_VERSION", libs.versions.junit.jupiter.get())
 }
 
 publishing {

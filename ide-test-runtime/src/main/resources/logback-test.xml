@@ -1,0 +1,15 @@
+<!--
+  IDE Starter logs at INFO through slf4j, which buries the test's own output. Shipped here rather
+  than left to each consumer because the noise is the same everywhere; a module that wants it back
+  puts its own logback-test.xml in src/ideTest/resources, which comes first on the classpath.
+-->
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%-5level %logger{0} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <root level="WARN">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>

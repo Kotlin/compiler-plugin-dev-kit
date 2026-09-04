@@ -88,15 +88,8 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
         includeRc: Boolean = false,
         includeEap: Boolean = false,
     ) {
-        val stabilities = buildSet {
-            add(IdeStability.STABLE)
-            if (includeRc) add(IdeStability.RC)
-            if (includeEap) add(IdeStability.EAP)
-        }
-        KnownVersions.ideTracks
-            .filterKeys { it.stability in stabilities }
+        KnownVersions.ideTracksInRange(min, max, includeRc, includeEap)
             .values
-            .filter { it >= min && (max == null || it.baselineVersion <= max) }
             .distinct()
             .mapNotNull(CompilerVersionAliases::forIdeBuild)
             .forEach(::registerVersion)
@@ -154,23 +147,13 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
             providers.gradleProperty(MIN_IDEA_VERSION_PROPERTY).orNull?.let(::IdeBuildNumber)
         val maxIdeaVersion =
             providers.gradleProperty(MAX_IDEA_VERSION_PROPERTY).orNull?.let(String::toIntOrNull)
-        val includeIdeaRc =
-            providers
-                .gradleProperty(INCLUDE_IDEA_RC_PROPERTY)
-                .orNull
-                ?.let(String::toBooleanStrictOrNull) ?: false
-        val includeIdeaEap =
-            providers
-                .gradleProperty(INCLUDE_IDEA_EAP_PROPERTY)
-                .orNull
-                ?.let(String::toBooleanStrictOrNull) ?: false
         if (minIdeaVersion != null)
-            ideaVersions(minIdeaVersion, maxIdeaVersion, includeIdeaRc, includeIdeaEap)
-        val useLatestDev =
-            providers
-                .gradleProperty(USE_LATEST_DEV_PROPERTY)
-                .orNull
-                ?.let(String::toBooleanStrictOrNull) ?: false
-        if (useLatestDev) useLatestDev()
+            ideaVersions(
+                minIdeaVersion,
+                maxIdeaVersion,
+                providers.gradleProperty(INCLUDE_IDEA_RC_PROPERTY).isTrue(),
+                providers.gradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue(),
+            )
+        if (providers.gradleProperty(USE_LATEST_DEV_PROPERTY).isTrue()) useLatestDev()
     }
 }

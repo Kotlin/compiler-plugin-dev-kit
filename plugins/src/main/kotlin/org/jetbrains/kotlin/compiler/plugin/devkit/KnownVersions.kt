@@ -24,7 +24,11 @@ internal data class IdeTrack(
     val channel: String,
     val version: String,
     val stability: IdeStability,
-)
+) {
+    /** The vendor half of [channel]: `idea` or `studio`. */
+    val product: String
+        get() = channel.substringBeforeLast('-')
+}
 
 /**
  * Every Kotlin release, IDE build and Kotlin module the dev kit knows of, read out of this jar from
@@ -73,6 +77,31 @@ internal object KnownVersions {
                 )
             }
         }
+    }
+
+    /**
+     * The [ideTracks] the `minIdeaVersion` family of settings selects, which is what both the
+     * compiler versions a plugin is built against and the IDEs its IDE tests run in are worked out
+     * from.
+     *
+     * @param max upper bound on the platform baseline, infinite if null
+     */
+    fun ideTracksInRange(
+        min: IdeBuildNumber,
+        max: Int? = null,
+        includeRc: Boolean = false,
+        includeEap: Boolean = false,
+    ): Map<IdeTrack, IdeBuildNumber> {
+        val stabilities = buildSet {
+            add(IdeStability.STABLE)
+            if (includeRc) add(IdeStability.RC)
+            if (includeEap) add(IdeStability.EAP)
+        }
+        return ideTracks
+            .filterKeys { it.stability in stabilities }
+            .filterValues {
+                it >= min && (max == null || it.baselineVersion <= max)
+            }
     }
 
     val kotlinModuleMappings: Map<String, String> =

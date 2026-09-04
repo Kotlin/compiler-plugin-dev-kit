@@ -18,16 +18,22 @@ public const val MAX_CLI_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.ma
 /** @see DevKitVersionsDsl.cliVersions */
 public const val INCLUDE_BETA_AND_RC_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeBetaAndRc"
 
-/** @see DevKitVersionsDsl.ideaVersions */
+/**
+ * The IDE builds this plugin supports. They decide both the compiler versions it is built against
+ * and the IDEs its IDE tests run in.
+ *
+ * @see DevKitVersionsDsl.ideaVersions
+ * @see IdeTestConfigExtension.ideaVersions
+ */
 public const val MIN_IDEA_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.minIdeaVersion"
 
-/** @see DevKitVersionsDsl.ideaVersions */
+/** @see MIN_IDEA_VERSION_PROPERTY */
 public const val MAX_IDEA_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.maxIdeaVersion"
 
-/** @see DevKitVersionsDsl.ideaVersions */
+/** @see MIN_IDEA_VERSION_PROPERTY */
 public const val INCLUDE_IDEA_RC_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeIdeaRc"
 
-/** @see DevKitVersionsDsl.ideaVersions */
+/** @see MIN_IDEA_VERSION_PROPERTY */
 public const val INCLUDE_IDEA_EAP_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeIdeaEap"
 
 /** @see DevKitVersionsDsl.useLatestDev */

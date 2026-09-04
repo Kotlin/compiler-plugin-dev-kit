@@ -1,13 +1,16 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.artifacts.dsl.DependencyHandler
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
+import org.gradle.api.internal.GradleInternal
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -49,6 +52,9 @@ context(_: HasProject)
 internal fun <T> Provider<out Boolean>.ifTrue(value: ProviderFlatMap.() -> T?) = provider {
     if (orNull == true) value() else null
 }
+
+/** A Gradle property that is present and spelled `true`. */
+internal fun Provider<String>.isTrue(): Boolean = orNull?.toBooleanStrictOrNull() ?: false
 
 internal inline fun <reified T : Any> ObjectFactory.property(convention: T?) =
     property<T>().convention(convention)
@@ -120,6 +126,30 @@ internal fun String.capitalizeAsciiOnly(): String {
             append(this@capitalizeAsciiOnly, 1, this@capitalizeAsciiOnly.length)
         }
     else this
+}
+
+/**
+ * `gradle.properties` lines carrying this build's `devKitSpace` credentials, so a generated test
+ * project can resolve dev kit artifacts from the same place the outer build does.
+ */
+// Very adhoc, but only needed for development
+// TODO remove
+context(_: HasProject)
+internal fun devKitSpaceCredentialProperties(): Provider<List<String>> {
+    val settings = (project.gradle as GradleInternal).settings
+    val devKitRepo =
+        settings.dependencyResolutionManagement.repositories
+            .withType<MavenArtifactRepository>()
+            .matching {
+                it.url.path.contains("compiler-plugin-dev-kit")
+            }
+    return provider {
+        val credentials = devKitRepo.singleOrNull()?.credentials ?: return@provider emptyList()
+        listOf(
+            "devKitSpaceUsername=${credentials.username}",
+            "devKitSpacePassword=${credentials.password}",
+        )
+    }
 }
 
 internal val ideVersions =
