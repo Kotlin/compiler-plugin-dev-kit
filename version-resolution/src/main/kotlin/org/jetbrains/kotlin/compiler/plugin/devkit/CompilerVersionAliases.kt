@@ -18,9 +18,9 @@ public object CompilerVersionAliases {
             return BUILT_IN_COMPILER_VERSION_ALIASES.entries
                 .filter { (build, shipped) ->
                     build.baselineVersion == baselineVersion &&
-                            build < this &&
-                            shipped.isDev &&
-                            !shipped.isIdeBuild
+                        build < this &&
+                        shipped.isDev &&
+                        !shipped.isIdeBuild
                 }
                 .maxByOrNull { it.key }
                 ?.value
@@ -57,7 +57,8 @@ public object CompilerVersionAliases {
      */
     @Suppress("UNCHECKED_CAST")
     public fun map(version: KotlinToolingVersion): KotlinToolingVersion =
-        if (ANDROID_STUDIO_DEV_REGEX.matches("$version")) IDE_BUILD_NUMBER?.let(::forIdeBuild) ?: version
+        if (ANDROID_STUDIO_DEV_REGEX.matches("$version"))
+            IDE_BUILD_NUMBER?.let(::forIdeBuild) ?: version
         else version
 
     public val IDE_BUILD_NUMBER: IdeBuildNumber? by lazy {

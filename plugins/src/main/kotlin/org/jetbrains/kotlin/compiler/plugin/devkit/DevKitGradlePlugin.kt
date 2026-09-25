@@ -120,7 +120,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         dependencies { functionalTest.runtimeOnlyConfigurationName(dependencyNotation) }
     }
 
-    private val companionIncludedBuilds =
+    private val includedCompanionBuilds =
         listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).mapNotNull {
             when {
                 it.isProjectPath -> {
@@ -221,6 +221,24 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     /** properties to place inside gradle.properties for the `functionalTest` suite. */
     public val functionalTestProperties: ListProperty<String> = objects.listProperty<String>()
 
+    /**
+     * The highest Kotlin version every library in [companionLibraries] was built using. This is
+     * used to filter KMP tests for lower versions because KLIBS are not backwards compatible.
+     *
+     * If there are any [companionLibraries] that come from included bulids, this defaults to the
+     * minimum supported version, thus assuming that included builds are used for KLIB compatibility
+     * Else, the current Kotlin bulid version is using, assuming that the libraries are built on it
+     */
+    public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
+        objects.property(
+            provider {
+                // TODO work out using a more sophisticated method
+                //  e.g. using kotlin-tooling-metadata.json
+                if (includedCompanionBuilds.isNotEmpty()) testAgainst.minOf { it.version }
+                else kotlinToolingVersion
+            }
+        )
+
     public companion object {
         /**
          * Property that's passed to each `functionalTest` to specify which KMP target to run
@@ -256,9 +274,9 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:MaxMetaspaceSize=1g")
                 systemProperty("org.gradle.testkit.dir", project.gradle.gradleUserHomeDir)
                 systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
-                systemProperty(
+                +StringSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.build.kotlin-version",
-                    kotlinToolingVersion,
+                    companionLibrariesKotlinVersion.map { it.toString() },
                 )
                 +PropertiesSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.test.gradle-properties",
@@ -300,8 +318,8 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     private fun configurePlugins() {
         gradleTestKitSupport.apply {
             withClasspaths(functionalTestProjectsClasspath.name)
-            if (companionIncludedBuilds.isNotEmpty()) {
-                withIncludedBuildProjects(*companionIncludedBuilds.map { ":$it:" }.toTypedArray())
+            if (includedCompanionBuilds.isNotEmpty()) {
+                withIncludedBuildProjects(*includedCompanionBuilds.map { ":$it:" }.toTypedArray())
             }
         }
 

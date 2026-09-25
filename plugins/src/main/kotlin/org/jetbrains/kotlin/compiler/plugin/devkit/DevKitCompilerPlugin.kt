@@ -31,6 +31,7 @@ import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.newInstance
+import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
@@ -122,7 +123,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
      * sets. If no version matches, the IDE will use the highest version available.
      */
     public val preferredVersionForSharedSourceSetsInIde: Property<KotlinToolingVersion> =
-        objects.property(KotlinToolingVersion::class.java)
+        objects.property()
 
     private val genServicesDir =
         layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
@@ -296,12 +297,15 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             register(it, "defaultTestDataLibraries", addToBuildConfig = false)
         }
 
+    private var hasIncludedCompanionBuilds = false
+
     init {
         listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             testDataLibraries {
                 when {
                     it.isProjectPath -> common(project(it))
-                    it.isIncludedBuildPath ->
+                    it.isIncludedBuildPath -> {
+                        hasIncludedCompanionBuilds = true
                         common(
                             provider {
                                 dependencies.create(
@@ -309,11 +313,30 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                                 )
                             }
                         )
+                    }
                     else -> common(it)
                 }
             }
         }
     }
+
+    /**
+     * The highest Kotlin version every library in [testDataLibraries] was built using. This is used
+     * to filter KMP tests for lower versions because KLIBS are not backwards compatible.
+     *
+     * If there are any [testDataLibraries] that come from included bulids, this defaults to the
+     * minimum supported version, thus assuming that included builds are used for KLIB compatibility
+     * Else, the current Kotlin bulid version is using, assuming that the libraries are built on it
+     */
+    public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
+        objects.property(
+            provider {
+                // TODO work out using a more sophisticated method
+                //  e.g. using kotlin-tooling-metadata.json
+                if (hasIncludedCompanionBuilds) testAgainst.minOf { it.version }
+                else kotlinToolingVersion
+            }
+        )
 
     /** Configure libraries that test data files can use */
     public fun testDataLibraries(block: DevKitTestDataLibraries.() -> Unit) {
@@ -662,9 +685,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     provider { testAgainst.joinToString(",") { "${it.version}" } },
                 )
                 systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
-                systemProperty(
+                +StringSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.build.kotlin-version",
-                    kotlinToolingVersion,
+                    companionLibrariesKotlinVersion.map { it.toString() },
                 )
             }
         }

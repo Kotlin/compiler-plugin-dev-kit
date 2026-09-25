@@ -94,7 +94,7 @@ public fun getTestCompilerVersion(): String = "$TEST_COMPILER_VERSION"
 )
 public fun getTestCompilerToolingVersion(): KotlinToolingVersion = TEST_COMPILER_VERSION
 
-/** The Kotlin version the build uses. */
+/** The Kotlin version that companion libraries use. */
 public val BUILD_COMPILER_VERSION: KotlinToolingVersion by lazy {
     KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.build.kotlin-version"))
 }
