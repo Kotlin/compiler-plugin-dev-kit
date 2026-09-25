@@ -120,26 +120,28 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         dependencies { functionalTest.runtimeOnlyConfigurationName(dependencyNotation) }
     }
 
-    private val includedCompanionBuilds =
-        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).mapNotNull {
+    /**
+     * Lists the included builds that should be passed to
+     * [GradleTestKitSupportExtension.withIncludedBuildProjects]. The test-kit extension only allows
+     * setting this once, so we collect them and only set them in [Project.afterEvaluate]
+     */
+    public val includedBuildProjects: ListProperty<String> = objects.listProperty()
+
+    init {
+        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             when {
-                it.isProjectPath -> {
-                    companionLibrary(project.project(it))
-                    null
-                }
+                it.isProjectPath -> companionLibrary(project.project(it))
                 it.isIncludedBuildPath -> {
                     val name = Path(it).name
                     val notation = provider { "${project.group}:$name:${project.version}" }
                     companionLibraries.add(notation)
                     dependencies { functionalTest.runtimeOnlyConfigurationName(notation) }
-                    name
+                    includedBuildProjects.add(name)
                 }
-                else -> {
-                    companionLibrary(it)
-                    null
-                }
+                else -> companionLibrary(it)
             }
         }
+    }
 
     /**
      * Whether to add an implementation dependency on `gradle-plugin-runtime`. Plugins that don't
@@ -234,7 +236,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
             provider {
                 // TODO work out using a more sophisticated method
                 //  e.g. using kotlin-tooling-metadata.json
-                if (includedCompanionBuilds.isNotEmpty()) testAgainst.minOf { it.version }
+                if (includedBuildProjects().isNotEmpty()) testAgainst.minOf { it.version }
                 else kotlinToolingVersion
             }
         )
@@ -318,8 +320,16 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     private fun configurePlugins() {
         gradleTestKitSupport.apply {
             withClasspaths(functionalTestProjectsClasspath.name)
-            if (includedCompanionBuilds.isNotEmpty()) {
-                withIncludedBuildProjects(*includedCompanionBuilds.map { ":$it:" }.toTypedArray())
+            // TODO find another way to allow user to configure included builds here without
+            //  afterEvaluate
+            project.afterEvaluate {
+                with(ProviderFlatMap.Unsafe) {
+                    val includedBuildProjects = includedBuildProjects()
+                    if (includedBuildProjects.isNotEmpty())
+                        withIncludedBuildProjects(
+                            *includedBuildProjects.map { ":$it:" }.toTypedArray()
+                        )
+                }
             }
         }
 

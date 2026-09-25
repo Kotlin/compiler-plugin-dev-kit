@@ -12,24 +12,12 @@ import org.gradle.kotlin.dsl.maven
 
 public class DevKitSettingsPlugin : Plugin<Settings> {
     override fun apply(target: Settings): Unit = target.run {
-        extensions.create("pluginDevKit", DevKitSettingsExtension::class.java, this)
         pluginManagement.repositories.kotlinDevRepositories()
         dependencyResolutionManagement.repositories.kotlinDevRepositories()
-        val includedCompanionBuilds =
-            listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).filter { it.isIncludedBuildPath }
-
-        includedCompanionBuilds.forEach { includeBuild(it) }
         gradle.lifecycle.beforeProject {
-            if (this == rootProject && includedCompanionBuilds.isNotEmpty()) {
-                pluginManager.apply("base")
-                tasks.named("check") {
-                    includedCompanionBuilds.forEach {
-                        dependsOn(gradle.includedBuild(Path(it).name).task(":check"))
-                    }
-                }
-            }
             pluginManager.apply("$DEV_KIT_GROUP.functional-test-publishing")
         }
+        extensions.create("pluginDevKit", DevKitSettingsExtension::class.java, this)
     }
 }
 
@@ -53,6 +41,26 @@ public abstract class DevKitSettingsExtension(private val settings: Settings) {
                     create("libs") { from(objects.fileCollection().from(catalogPath)) }
                 }
             }
+    }
+
+    /** Includes the build at [path], and wires [Settings.rootProject]'s `:check` task to it. */
+    public fun includeCompanionBuild(path: String): Unit = settings.run {
+        includeBuild(path)
+        gradle.beforeProject {
+            if (this == rootProject) {
+                pluginManager.apply("base")
+                tasks.named("check") {
+                    dependsOn(gradle.includedBuild(Path(path).name).task(":check"))
+                }
+            }
+        }
+    }
+
+    init {
+        settings
+            .listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY)
+            .filter { it.isIncludedBuildPath }
+            .forEach { includeCompanionBuild(it) }
     }
 }
 
