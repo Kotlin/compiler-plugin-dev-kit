@@ -7,56 +7,58 @@ internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
  * Versions declared in the `pluginDevKit { }` block are registered on top of these, so a version
  * that needs an overlay or any other customization can still be named there.
  */
-public const val TEST_AGAINST_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.testAgainst"
+public const val TEST_AGAINST_PROPERTY: String = "kotlin.compiler.plugin.devkit.testAgainst"
 
 /** @see DevKitVersionsDsl.cliVersions */
-public const val MIN_CLI_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.minCliVersion"
+public const val MIN_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minCliVersion"
 
 /** @see DevKitVersionsDsl.cliVersions */
-public const val MAX_CLI_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.maxCliVersion"
+public const val MAX_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.maxCliVersion"
 
 /** @see DevKitVersionsDsl.cliVersions */
-public const val INCLUDE_BETA_AND_RC_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeBetaAndRc"
+public const val INCLUDE_BETA_AND_RC_PROPERTY: String =
+    "kotlin.compiler.plugin.devkit.includeBetaAndRc"
 
 /**
  * The IDE builds this plugin supports. They decide both the compiler versions it is built against
  * and the IDEs its IDE tests run in.
  *
  * @see DevKitVersionsDsl.ideaVersions
- * @see IdeTestConfigExtension.ideaVersions
  */
-public const val MIN_IDEA_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.minIdeaVersion"
+public const val MIN_IDEA_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minIdeaVersion"
 
 /** @see MIN_IDEA_VERSION_PROPERTY */
-public const val MAX_IDEA_VERSION_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.maxIdeaVersion"
+public const val MAX_IDEA_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.maxIdeaVersion"
 
 /** @see MIN_IDEA_VERSION_PROPERTY */
-public const val INCLUDE_IDEA_RC_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeIdeaRc"
+public const val INCLUDE_IDEA_RC_PROPERTY: String = "kotlin.compiler.plugin.devkit.includeIdeaRc"
 
 /** @see MIN_IDEA_VERSION_PROPERTY */
-public const val INCLUDE_IDEA_EAP_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.includeIdeaEap"
+public const val INCLUDE_IDEA_EAP_PROPERTY: String = "kotlin.compiler.plugin.devkit.includeIdeaEap"
 
 /** @see DevKitVersionsDsl.useLatestDev */
-public const val USE_LATEST_DEV_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.useLatestDev"
+public const val USE_LATEST_DEV_PROPERTY: String = "kotlin.compiler.plugin.devkit.useLatestDev"
 
 /**
  * Gradle property holding the version that the generic `test`/`functionalTest` task delegates to.
  * The version is registered if [TEST_AGAINST_PROPERTY] didn't already list it.
  */
 public const val DEFAULT_TEST_VERSION_PROPERTY: String =
-    "$DEV_KIT_PROPERTY_PREFIX.defaultTestVersion"
+    "kotlin.compiler.plugin.devkit.defaultTestVersion"
 
 /** Gradle property holding the plugin package, and with it the plugin ID. */
-public const val PLUGIN_PACKAGE_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.pluginPackage"
+public const val PLUGIN_PACKAGE_PROPERTY: String = "kotlin.compiler.plugin.devkit.pluginPackage"
 
 /** Gradle property holding the path of the compiler-plugin project a Gradle plugin applies. */
-public const val COMPILER_PLUGIN_PROPERTY: String = "$DEV_KIT_PROPERTY_PREFIX.compilerPlugin"
+public const val COMPILER_PLUGIN_PROPERTY: String = "kotlin.compiler.plugin.devkit.compilerPlugin"
 
 /**
  * Gradle property listing the libraries a plugin ships for its users, separated by commas or
  * whitespace. An entry starting with `:` is a project path in this build, published under that
- * project's own `group`, `name` and `version`; anything else is used as-is as a
+ * project's own `group`, `name` and `version`; an entry starting with `.` or `/` is considered an
+ * included build, which will automatically be included if the settings plugin is applied, and will
+ * be used as a library with the project's `group` and `version`; anything else is used as-is as a
  * `group:artifact:version` coordinate.
  */
 public const val COMPANION_LIBRARIES_PROPERTY: String =
-    "$DEV_KIT_PROPERTY_PREFIX.companionLibraries"
+    "kotlin.compiler.plugin.devkit.companionLibraries"
