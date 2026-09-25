@@ -47,7 +47,7 @@ public abstract class BackportedFirPhasedDiagnosticTest(
     DevKitTest(
         {
             defaultDirectives {
-                LATEST_PHASE_IN_PIPELINE with TestPhase.BACKEND
+                LATEST_PHASE_IN_PIPELINE with TestPhase.entries.last()
                 LANGUAGE + "+EnableDfaWarningsInK2"
                 DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "-$it" }
             }

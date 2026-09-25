@@ -149,6 +149,7 @@ public class DevKitTarget(
 internal fun KotlinMultiplatformExtension.createDevKitTarget(
     version: KotlinToolingVersion,
     areDependenciesEmbedded: Boolean,
+    forIde: Boolean,
     isSurrogate: Boolean = false,
     preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
 ) = createExternalKotlinTarget {
@@ -156,7 +157,6 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
         error(
             "Unsupported Kotlin version: $version. Please use a version >= $MIN_SUPPORTED_VERSION"
         )
-    val forIde = version in ideVersions
     targetName = version.versionName
     platformType = KotlinPlatformType.jvm
     targetFactory = ExternalKotlinTargetDescriptor.TargetFactory {

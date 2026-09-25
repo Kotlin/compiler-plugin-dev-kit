@@ -34,7 +34,7 @@ public object DevKitTestGenerator {
 }
 
 context(name: SourceSetName)
-public inline fun <reified T> TestGroup.sourceSetTestClass(
+public inline fun <reified T: Any> TestGroup.sourceSetTestClass(
     suiteTestClassName: String = getDefaultSuiteTestClassName(T::class.java.simpleName),
     suiteTestClassPackage: String = suiteTestClassPackage(T::class.java, name.name),
     annotations: List<AnnotationModel> = emptyList(),

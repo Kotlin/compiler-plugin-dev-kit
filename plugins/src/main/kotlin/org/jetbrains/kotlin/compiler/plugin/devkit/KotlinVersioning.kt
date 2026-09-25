@@ -13,12 +13,12 @@ import org.gradle.api.internal.artifacts.dependencies.DefaultMutableVersionConst
 import org.gradle.internal.component.external.model.DefaultModuleComponentSelector
 import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.named
+import org.jetbrains.kotlin.compiler.plugin.devkit.CompilerVersionAliases.ideBranchPoint
 import org.jetbrains.kotlin.compiler.plugin.devkit.KnownVersions.kotlinModuleMappings
 import org.jetbrains.kotlin.compiler.plugin.devkit.KotlinCompilerVersion.Companion.noVersion
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 
 private val KotlinToolingVersion.capitalizedVersionName
     get() = "K$baseVersionName"
@@ -30,28 +30,22 @@ private val KotlinToolingVersion.capitalizedVersionName
  */
 internal val KotlinToolingVersion.ideBranchPoint: KotlinToolingVersion?
     get() {
-        if (!isIdeBuild) return this
-        val aliases = CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES
-        val ownBuild = aliases.filterValues { it == this }.keys.minOrNull() ?: return null
-        return aliases.entries
-            .filter { (build, shipped) ->
-                build.baselineVersion == ownBuild.baselineVersion &&
-                    build < ownBuild &&
-                    shipped.isDev &&
-                    !shipped.isIdeBuild
-            }
-            .maxByOrNull { it.key }
-            ?.value
+        return if (!isIdeBuild) this
+        else
+            CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES.filterValues { it == this }
+                .keys
+                .minOrNull()
+                ?.ideBranchPoint
     }
 
 context(_: HasProject)
 internal fun NamedDomainObjectProvider<out Configuration>.withKotlinVersion(
     version: KotlinToolingVersion,
+    forIde: Boolean,
     action: ResolvableConfiguration.() -> Unit = {},
 ) =
     configurations.resolvable("$name${version.capitalizedVersionName}") {
         extendsFrom(this@withKotlinVersion)
-        val forIde = version in ideVersions
         resolutionStrategy.forceKotlinVersion(version, forIde)
         action()
     }
@@ -100,8 +94,10 @@ private fun DependencySubstitution.useModule(
         )
     )
 
-internal fun KotlinCompilation<*>.forceKotlinVersion(version: KotlinToolingVersion) {
-    val forIde = version in ideVersions
+internal fun KotlinCompilation<*>.forceKotlinVersion(
+    version: KotlinToolingVersion,
+    forIde: Boolean,
+) {
     configurations.named(compileDependencyConfigurationName) {
         resolutionStrategy.forceKotlinVersion(version, forIde)
         withCompilerVersionAttribute(version)

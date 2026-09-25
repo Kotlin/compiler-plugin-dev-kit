@@ -36,11 +36,11 @@ public sealed interface IdeUnderTest {
          *
          * `IU`/`IC` take a marketing version (`2026.1.1`) for releases and a platform build number
          * (`261.27258.27`) for an `rc`/`eap` extra. `AS` takes an Android Studio version
-         * (`2026.1.1.8`), with the download file prefix as an optional extra for the builds whose
-         * file name doesn't follow from their version.
+         * (`2026.1.1.8`) and, as its extra, a comma-separated list of installer URLs - hence the
+         * three-way split, which leaves the `:` in those URLs alone.
          */
         public fun parse(spec: String): IdeUnderTest {
-            val parts = spec.substringBefore('#').trim().split(':')
+            val parts = spec.trim().split(':', limit = 3)
             require(parts.size in 2..3) { "Not an IDE spec: '$spec'" }
             val (product, version) = parts
             val extra = parts.getOrElse(2) { "" }.takeIf(String::isNotEmpty)
@@ -57,7 +57,7 @@ public sealed interface IdeUnderTest {
                                 ?: IdeBuildType.RELEASE,
                     )
 
-                "AS" -> AndroidStudio(version = version, downloadFilePrefix = extra)
+                "AS" -> AndroidStudio(version = version)
                 else -> error("Unknown IDE product code '$product' in spec '$spec'")
             }
         }
@@ -99,12 +99,6 @@ public data class IntelliJIdea(
 /** An Android Studio build, identified by its four-component version. */
 public data class AndroidStudio(
     public val version: String,
-    /**
-     * Overrides the file name IDE Starter downloads, for the builds whose installer isn't named
-     * after their version - `android-studio-quail3-rc1` for `2026.1.3.5`. Left null, Starter looks
-     * the build up in Google's release list itself.
-     */
-    public val downloadFilePrefix: String? = null,
 ) : IdeUnderTest {
     override val id: String
         get() = "androidStudio" + version.replace('.', '_')
@@ -113,5 +107,5 @@ public data class AndroidStudio(
         get() = "Android Studio $version"
 
     override val spec: String
-        get() = "AS:$version" + downloadFilePrefix?.let { ":$it" }.orEmpty()
+        get() = "AS:$version"
 }

@@ -152,9 +152,12 @@ internal fun devKitSpaceCredentialProperties(): Provider<List<String>> {
     }
 }
 
-internal val ideVersions =
-    CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES.values
-        .map { KotlinToolingVersion(it.toString()) }
-        .toSet()
-
 internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 20)
+
+private class ProviderToString(val provider: Provider<*>) {
+    override fun toString(): String = provider.orNull.toString()
+}
+
+internal val Provider<*>.asString: Any get() = ProviderToString(this)
+
+internal fun <T : Any> Provider<T>.asString(transform: (T) -> String): Any = ProviderToString(map(transform))

@@ -171,9 +171,9 @@ Kotlin plugin's FIR analysis loads only the compiler plugins the IDE ships with.
 - **The suite hangs off `pluginDevKit("gradle-plugin")`, in a `src/ideTest` source set of its own.** An IDE test
   exercises the *Gradle* plugin as much as the compiler plugin — the IDE only ever sees the compiler plugin through the
   model the Gradle plugin contributes — so that is the extension it belongs on. A module wanting the suite to itself
-  applies that same plugin for nothing else and points `ideTest { gradlePluginProject = ":gradle-plugin" }` at the
-  plugin under test; there is no second plugin for that case. It does mean such a module inherits the whole Gradle
-  plugin setup.
+  applies that same plugin for nothing else and declares `functionalTestProject(project(":gradle-plugin"))`, which is
+  what gets the plugin under test into its own functional test repository; there is no second plugin for that case. It
+  does mean such a module inherits the whole Gradle plugin setup.
 - The separate source set is what makes either work: out of `functionalTest`, the plugin's own functional tests
   would be run once per IDE and the IDE tests once per Kotlin version. Calling `ideTest { }` is the opt-in — otherwise
   every Gradle plugin module would pay for a 250 MB Starter dependency and a task per supported IDE.

@@ -181,8 +181,8 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion)
     }
 
-    override fun registerVersion(version: KotlinToolingVersion) {
-        if (version !in ideVersions) testAgainst(version)
+    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
+        if (!forIde) testAgainst(version)
     }
 
     /**

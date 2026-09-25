@@ -15,6 +15,7 @@ import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
+import org.gradle.api.java.archives.internal.DefaultManifest
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
@@ -46,6 +47,7 @@ import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.isDev
 
 @OptIn(ExperimentalWasmDsl::class)
 public abstract class DevKitCompilerConfigExtension
@@ -188,7 +190,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 resources.setSrcDirs(listOf("src/$sourceSetName/resources"))
             }
             // Uses latest EAP, so it never has to deal with kotlin-compiler-tests-for-ide
-            forceKotlinVersion(KnownVersions.kotlinVersions.last())
+            forceKotlinVersion(KnownVersions.kotlinVersions.last(), forIde = false)
             (if (forIde) generateTestsIde else generateTestsCli) {
                 classpath(runtimeDependencyFiles, output.allOutputs)
                 enabled = true
@@ -204,8 +206,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             archiveAppendix.unset() // remove k2XX appendix
         }
 
-    override fun registerVersion(version: KotlinToolingVersion) {
-        testAgainst(version)
+    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
+        testAgainst(version, forIde = forIde)
     }
 
     /**
@@ -357,6 +359,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: KotlinToolingVersion,
+        forIde: Boolean = version.isDev,
         action: DevKitTarget.() -> Unit = {},
     ): DevKitTarget {
         val target =
@@ -365,6 +368,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     .createDevKitTarget(
                         version,
                         areDependenciesEmbedded = isPlugin,
+                        forIde = forIde,
                         isSurrogate = !::surrogateTarget.isInitialized,
                         preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
                     )
@@ -381,8 +385,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     /** Declares a version that the plugin should be tested against. This method is idempotent. */
     public fun testAgainst(
         version: String,
+        forIde: Boolean = KotlinToolingVersion(version).isDev,
         action: DevKitTarget.() -> Unit = {},
-    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), action)
+    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), forIde, action)
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     public fun versionHierarchy(template: DevKitHierarchyBuilder.() -> Unit) {
@@ -570,9 +575,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         val testArtifactsWasm = configurations.dependencyScope("testArtifactsWasm")
         testAgainst.configureEach {
             testTask {
-                val testArtifacts = testArtifacts.withKotlinVersion(version)
+                val testArtifacts = testArtifacts.withKotlinVersion(version, forIde)
                 val testArtifactsWasm =
-                    testArtifactsWasm.withKotlinVersion(version) {
+                    testArtifactsWasm.withKotlinVersion(version, forIde) {
                         isTransitive = false
                         attributes {
                             attribute(
@@ -667,7 +672,20 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     internal fun configureMultiVersionJars() {
         tasks.withType<Jar> {
-            manifest { attributes("Kotlin-Compiler-Plugin-Multi-Release" to true) }
+            manifest {
+                attributes(
+                    "Kotlin-Compiler-Plugin-Multi-Release" to true,
+                    "Kotlin-Compiler-Plugin-Since-Build" to ideaSinceBuild.asString,
+                    "Kotlin-Compiler-Plugin-Until-Build" to ideaUntilBuild.asString { "$it.*" },
+                )
+                // TODO DefaultManifest is internal
+                from(DefaultManifest(null)) {
+                    eachEntry {
+                        if (key == "Kotlin-Compiler-Plugin-Until-Build" && value == "null")
+                            exclude()
+                    }
+                }
+            }
         }
         testAgainst.configureEach {
             mainJar {
@@ -708,7 +726,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                         this != generateTestsCliCompilation &&
                         this != generateTestsIdeCompilation
                 )
-                    forceKotlinVersion(this@target.version)
+                    forceKotlinVersion(this@target.version, this@target.forIde)
             }
         }
         dependencies {

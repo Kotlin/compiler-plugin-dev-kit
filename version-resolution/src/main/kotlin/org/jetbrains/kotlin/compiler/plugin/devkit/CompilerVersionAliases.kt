@@ -3,8 +3,29 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.isDev
 
 public object CompilerVersionAliases {
+    private val ANDROID_STUDIO_DEV_REGEX = Regex("""^(\d+\.\d+)\.255-dev-\d+$""")
+
+    /**
+     * The `dev` build this version's IDE branch was cut from, as closely as the recorded IDE builds
+     * pin it down: what the newest IDE build of the same baseline shipped before that line moved
+     * onto `-ij` builds. Null when no recorded build of the baseline predates the branch.
+     */
+    public val IdeBuildNumber.ideBranchPoint: KotlinToolingVersion?
+        get() {
+            return BUILT_IN_COMPILER_VERSION_ALIASES.entries
+                .filter { (build, shipped) ->
+                    build.baselineVersion == baselineVersion &&
+                            build < this &&
+                            shipped.isDev &&
+                            !shipped.isIdeBuild
+                }
+                .maxByOrNull { it.key }
+                ?.value
+        }
+
     // Known tags-to-real version mappings for IDE builds.
     // Android Studio canary builds report a fake version like "2.3.255-dev-255".
     // The real version can be found by checking the IntelliJ tag for the studio build number:
@@ -36,20 +57,24 @@ public object CompilerVersionAliases {
      */
     @Suppress("UNCHECKED_CAST")
     public fun map(version: KotlinToolingVersion): KotlinToolingVersion =
+        if (ANDROID_STUDIO_DEV_REGEX.matches("$version")) IDE_BUILD_NUMBER?.let(::forIdeBuild) ?: version
+        else version
+
+    public val IDE_BUILD_NUMBER: IdeBuildNumber? by lazy {
         runCatching {
-                val appInfo = Class.forName("com.intellij.openapi.application.ApplicationInfo")
-                val build =
-                    appInfo
-                        .getMethod("getInstance")
-                        .invoke(null)
-                        .let(appInfo.getMethod("getBuild")::invoke)
-                build
-                    .let(build.javaClass.getMethod("withoutProductCode")::invoke)
-                    .toString()
-                    .let(::IdeBuildNumber)
-            }
+            val appInfo = Class.forName("com.intellij.openapi.application.ApplicationInfo")
+            val build =
+                appInfo
+                    .getMethod("getInstance")
+                    .invoke(null)
+                    .let(appInfo.getMethod("getBuild")::invoke)
+            build
+                .let(build.javaClass.getMethod("withoutProductCode")::invoke)
+                .toString()
+                .let(::IdeBuildNumber)
+        }
             .getOrNull()
-            ?.let(::forIdeBuild) ?: version
+    }
 
     /**
      * The Kotlin version an IDE build ships

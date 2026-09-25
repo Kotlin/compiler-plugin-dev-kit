@@ -77,7 +77,7 @@ public abstract class BackportedJsDiagnosticWithBackendTestBase(
                 useHandlers(::KlibBackendDiagnosticsHandler)
             }
             defaultDirectives {
-                TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE with TestPhase.BACKEND
+                TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE with TestPhase.entries.last()
             }
         },
         *config,

@@ -149,8 +149,7 @@ def fetch_android_studio_releases(channels):
         if not platform_build or channel not in channels:
             continue
         # `name` is '<codename> | <version>', e.g. 'Android Studio Quail 3 | 2026.1.3'.
-        name = item.get("name", "")
-        version = name.rpartition("|")[2].strip() or item.get("version", "")
+        version = item.get("version", "")
         if not version:
             continue
         releases.append({

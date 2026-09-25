@@ -26,6 +26,7 @@ import org.gradle.kotlin.dsl.the
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.jvm.JvmTargetValidationMode
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 /** How stable an IntelliJ IDEA build is; the Gradle-side mirror of `ide-test-runtime`'s enum. */
@@ -200,19 +201,45 @@ public open class IdeTestConfigExtension(final override val project: Project) : 
         )
 
     /**
-     * Registers an Android Studio build, by its four-component version.
-     *
-     * [downloadFilePrefix] overrides the installer file name for the builds that don't follow the
-     * default pattern - `android-studio-quail3-rc1` for `2026.1.3.5`, which Google's release list
-     * is the place to look up. Left out, IDE Starter searches that list itself.
-     *
-     * This operation is idempotent.
+     * Registers an Android Studio build, by its four-component version. This operation is
+     * idempotent.
      */
-    public fun androidStudio(version: String, downloadFilePrefix: String? = null): DevKitIdeTarget =
+    public fun androidStudio(version: String): DevKitIdeTarget =
         register(
             id = lowerCamelCaseName("androidStudio", version.replace('.', '_')),
-            spec = "AS:$version" + downloadFilePrefix?.let { ":$it" }.orEmpty(),
+            spec = "AS:$version",
         )
+
+    /**
+     * Android Studio builds to run against, as an IntelliJ platform build number - the same key
+     * space [ideaVersions] takes, since that is what Android Studio releases are recorded against.
+     *
+     * Which download each build needs comes from the dev kit's own copy of Google's release list,
+     * so there is nothing to spell out per build. Google's channels are normalised onto IntelliJ's:
+     * `beta` counts as [includeRc] and `canary` as [includeEap].
+     *
+     * @param max upper bound on the baseline, infinite if null
+     */
+    public fun androidStudioVersions(
+        min: IdeBuildNumber,
+        max: Int? = null,
+        includeRc: Boolean = false,
+        includeEap: Boolean = false,
+    ) {
+        newestPerBaseline(min, max, includeRc, includeEap, product = "studio").forEach { (track) ->
+            androidStudio(track.version)
+        }
+    }
+
+    /** @see androidStudioVersions */
+    public fun androidStudioVersions(
+        min: String,
+        max: Int? = null,
+        includeRc: Boolean = false,
+        includeEap: Boolean = false,
+    ) {
+        androidStudioVersions(IdeBuildNumber(min), max, includeRc, includeEap)
+    }
 
     /**
      * IntelliJ IDEA builds to run against, as a platform build number spelled only as precisely as
@@ -223,9 +250,6 @@ public open class IdeTestConfigExtension(final override val project: Project) : 
      * different compiler, but an IDE is a gigabyte-and-a-half download and a multi-minute run, and
      * two patch releases of one baseline analyse the same code the same way.
      *
-     * Android Studio is never registered here - its download coordinates don't follow from a
-     * platform build, so it has to be named through [androidStudio].
-     *
      * @param max upper bound on the baseline, infinite if null
      */
     public fun ideaVersions(
@@ -234,21 +258,31 @@ public open class IdeTestConfigExtension(final override val project: Project) : 
         includeRc: Boolean = false,
         includeEap: Boolean = false,
     ) {
+        newestPerBaseline(min, max, includeRc, includeEap, product = "idea").forEach {
+            (track, release) ->
+            when (track.stability) {
+                // A release is looked up by marketing version, a prerelease by build number.
+                IdeStability.STABLE -> intellijIdea(track.version)
+                IdeStability.RC -> intellijIdea("$release", DevKitIdeBuildType.RC)
+                IdeStability.EAP -> intellijIdea("$release", DevKitIdeBuildType.EAP)
+            }
+        }
+    }
+
+    /** One release line per platform baseline per channel: the newest recorded build of each. */
+    private fun newestPerBaseline(
+        min: IdeBuildNumber,
+        max: Int?,
+        includeRc: Boolean,
+        includeEap: Boolean,
+        product: String,
+    ): List<Map.Entry<IdeTrack, IdeBuildNumber>> =
         KnownVersions.ideTracksInRange(min, max, includeRc, includeEap)
             .entries
-            .filter { it.key.product == "idea" }
+            .filter { it.key.product == product }
             .groupBy { it.key.stability to it.value.baselineVersion }
             .values
             .map { line -> line.maxBy { it.value } }
-            .forEach { (track, build) ->
-                when (track.stability) {
-                    // A release is looked up by marketing version, a prerelease by build number.
-                    IdeStability.STABLE -> intellijIdea(track.version)
-                    IdeStability.RC -> intellijIdea("$build", DevKitIdeBuildType.RC)
-                    IdeStability.EAP -> intellijIdea("$build", DevKitIdeBuildType.EAP)
-                }
-            }
-    }
 
     /** @see ideaVersions */
     public fun ideaVersions(
@@ -262,7 +296,14 @@ public open class IdeTestConfigExtension(final override val project: Project) : 
 
     private fun register(id: String, spec: String): DevKitIdeTarget =
         ides.findByName(id)
-            ?: DevKitIdeTarget(id, spec, tasks.register<Test>("${id}IdeTest")).also(ides::add)
+            ?: DevKitIdeTarget(
+                    id,
+                    spec,
+                    tasks.register<KotlinJvmTest>("${id}IdeTest") {
+                        targetName = id
+                    },
+                )
+                .also(ides::add)
 
     /**
      * Registers everything the `minIdeaVersion` family of properties asks for.
@@ -275,12 +316,11 @@ public open class IdeTestConfigExtension(final override val project: Project) : 
         val min =
             providers.gradleProperty(MIN_IDEA_VERSION_PROPERTY).orNull?.let(::IdeBuildNumber)
                 ?: return
-        ideaVersions(
-            min,
-            providers.gradleProperty(MAX_IDEA_VERSION_PROPERTY).orNull?.toIntOrNull(),
-            providers.gradleProperty(INCLUDE_IDEA_RC_PROPERTY).isTrue(),
-            providers.gradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue(),
-        )
+        val max = providers.gradleProperty(MAX_IDEA_VERSION_PROPERTY).orNull?.toIntOrNull()
+        val includeRc = providers.gradleProperty(INCLUDE_IDEA_RC_PROPERTY).isTrue()
+        val includeEap = providers.gradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue()
+        ideaVersions(min, max, includeRc, includeEap)
+        androidStudioVersions(min, max, includeRc, includeEap)
     }
 
     private fun configureDependencies() = dependencies {

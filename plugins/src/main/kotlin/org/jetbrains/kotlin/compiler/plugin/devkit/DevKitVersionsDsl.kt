@@ -1,8 +1,11 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.Project
+import org.gradle.api.provider.Property
+import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 /**
@@ -18,6 +21,25 @@ public enum class BetaAndRc {
 
 public abstract class DevKitVersionsDsl internal constructor(final override val project: Project) :
     HasProject {
+
+    /**
+     * the lowest Idea build this plugin supports. This only affects the range reported in metadata
+     * read by IDE. Importantly, it does not affect the versions you actually test against.
+     *
+     * @see ideaVersions
+     */
+    public val ideaSinceBuild: Property<IdeBuildNumber> = objects.property()
+
+    /**
+     * the highest Idea build this plugin supports. This only affects the range reported in metadata
+     * read by IDE. Importantly, it does not affect the versions you actually test against.
+     *
+     * This gets interpreted as `2XX.*`, i.e. it's the highest supported major build.
+     *
+     * @see ideaVersions
+     */
+    public val ideaUntilBuild: Property<Int> = objects.property()
+
     /**
      * Kotlin versions to test against, compared by base version so that a bound of `2.4.20` also
      * takes in `2.4.20-Beta1`.
@@ -50,7 +72,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
 
                     else -> false
                 }
-            if (included) registerVersion(version)
+            if (included) registerVersion(version, forIde = false)
         }
     }
 
@@ -88,11 +110,13 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
         includeRc: Boolean = false,
         includeEap: Boolean = false,
     ) {
+        ideaSinceBuild.set(min)
+        ideaUntilBuild.set(max)
         KnownVersions.ideTracksInRange(min, max, includeRc, includeEap)
             .values
             .distinct()
             .mapNotNull(CompilerVersionAliases::forIdeBuild)
-            .forEach(::registerVersion)
+            .forEach { registerVersion(it, forIde = true) }
     }
 
     /**
@@ -113,7 +137,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
     /** Adds the latest Kotlin dev version. This is useful for reacting early to breaking changes */
     public fun useLatestDev() {
         val latestDev = providers.of(LatestDevVersion::class.java) {}.get()
-        registerVersion(KotlinToolingVersion(latestDev))
+        registerVersion(KotlinToolingVersion(latestDev), forIde = false)
     }
 
     /**
@@ -121,7 +145,10 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * to be idempotent: a version can be discovered twice, and named in [TEST_AGAINST_PROPERTY] on
      * top of that.
      */
-    protected abstract fun registerVersion(version: KotlinToolingVersion)
+    protected abstract fun registerVersion(
+        version: KotlinToolingVersion,
+        forIde: Boolean = version.isDev,
+    )
 
     /**
      * Registers everything the properties ask for, and freezes the ranges. Called once the module

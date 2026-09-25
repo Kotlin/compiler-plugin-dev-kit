@@ -13,6 +13,7 @@ import kotlin.io.path.inputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import org.jetbrains.kotlin.compiler.plugin.devkit.CompilerVersionAliases.ideBranchPoint
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.isDev
 
@@ -48,6 +49,9 @@ public object VersionResolution {
         if (currentVersion.isIdeBuild) {
             findHighestSameIdeBranchVersion(currentVersion, versions)?.let {
                 return it
+            }
+            CompilerVersionAliases.IDE_BUILD_NUMBER?.ideBranchPoint?.let {
+                return resolveVersion(it, versions)
             }
             findLowestSameBaseVersion(currentVersion, versions)?.let {
                 return it
