@@ -128,30 +128,6 @@ internal fun String.capitalizeAsciiOnly(): String {
     else this
 }
 
-/**
- * `gradle.properties` lines carrying this build's `devKitSpace` credentials, so a generated test
- * project can resolve dev kit artifacts from the same place the outer build does.
- */
-// Very adhoc, but only needed for development
-// TODO remove
-context(_: HasProject)
-internal fun devKitSpaceCredentialProperties(): Provider<List<String>> {
-    val settings = (project.gradle as GradleInternal).settings
-    val devKitRepo =
-        settings.dependencyResolutionManagement.repositories
-            .withType<MavenArtifactRepository>()
-            .matching {
-                it.url.path.contains("compiler-plugin-dev-kit")
-            }
-    return provider {
-        val credentials = devKitRepo.singleOrNull()?.credentials ?: return@provider emptyList()
-        listOf(
-            "devKitSpaceUsername=${credentials.username}",
-            "devKitSpacePassword=${credentials.password}",
-        )
-    }
-}
-
 internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 20)
 
 private class ProviderToString(val provider: Provider<*>) {

@@ -13,7 +13,6 @@
           <option value="compiler-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
           <option value="compiler-plugin-test:publishAllPublicationsToDevKitSpaceRepository" />
           <option value="gradle-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
-          <option value="ide-test-runtime:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:settings:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":version-resolution:publishAllPublicationsToDevKitSpaceRepository" />

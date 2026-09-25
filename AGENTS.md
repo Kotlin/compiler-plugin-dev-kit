@@ -161,34 +161,6 @@ it passes to the build under test. Its buildconfig-generated `PluginInfo` feeds
 `DevKitSupportPlugin`, the `KotlinCompilerPluginSupportPlugin` base class the consumer extends;
 `gradle-plugin-runtime`'s `testFixtures` holds the TestKit harness those functional tests run on.
 
-### IDE tests — `pluginDevKit { ideTest { } }` and `ide-test-runtime`
-
-For testing the plugin *in the IDE*: one real IntelliJ IDEA or Android Studio launched per registered version, opening
-a project that applies the plugin, and checking that the IDE's own analysis of it is what the sources declare. The
-single thing that makes any of it possible is `kotlin.k2.only.bundled.compiler.plugins.enabled=false` — without it the
-Kotlin plugin's FIR analysis loads only the compiler plugins the IDE ships with.
-
-- **The suite hangs off `pluginDevKit("gradle-plugin")`, in a `src/ideTest` source set of its own.** An IDE test
-  exercises the *Gradle* plugin as much as the compiler plugin — the IDE only ever sees the compiler plugin through the
-  model the Gradle plugin contributes — so that is the extension it belongs on. A module wanting the suite to itself
-  applies that same plugin for nothing else and declares `functionalTestProject(project(":gradle-plugin"))`, which is
-  what gets the plugin under test into its own functional test repository; there is no second plugin for that case. It
-  does mean such a module inherits the whole Gradle plugin setup.
-- The separate source set is what makes either work: out of `functionalTest`, the plugin's own functional tests
-  would be run once per IDE and the IDE tests once per Kotlin version. Calling `ideTest { }` is the opt-in — otherwise
-  every Gradle plugin module would pay for a 250 MB Starter dependency and a task per supported IDE.
-- The project the IDE opens is **not checked in**. `AbstractDevKitIdeTest` extends `AbstractDevKitGradleProject`, so it
-  is described the same way a functional test's is and written at test time. The functional test repository and the
-  plugin-under-test version reach it through the argument providers on the `functionalTest` *task*, copied onto each
-  IDE test task — one more reason the suite lives in a Gradle plugin module. Only
-  `gradle/wrapper/gradle-wrapper.properties` is written next to the project — the IDE reads the distribution out of
-  that file and drives Gradle through the tooling API, so no `gradlew` is needed.
-- **No IntelliJ Platform Gradle Plugin.** `ide-starter-squashed` embeds the platform, so the six Starter/Driver
-  coordinates are ordinary dependencies and every `Test` task can be an ordinary one. Their repositories are declared
-  in `DevKitSettingsPlugin` rather than on the project, because a project-level repository would shadow every
-  repository the settings script declares; the `com.jetbrains.intellij.*` content filter keeps them free for builds
-  that never run an IDE test.
-
 ### `plugins/settings/`
 
 The settings plugin's id is the group itself, so a settings script applies it as `kotlin("compiler.plugin.devkit")`.
@@ -252,15 +224,6 @@ test data:
 ./gradlew k2420_dev_7885Test -PupdateTestData   # ...regenerating golden files
 ```
 
-A module that called `ideTest { }` gets its own set, none of them on `check` — each one downloads and drives a whole
-IDE:
-
-```bash
-./gradlew :ide-tests:ideaUltimate2026_1_1IdeTest
-./gradlew :ide-tests:defaultIdeTest             # one IDE
-./gradlew :ide-tests:allIdeTests                # all of them
-```
-
 Publishing is per build, so a release is three invocations — the root build first, since it compiles the other two on
 the way and is therefore the one that can still fail after something has been uploaded:
 
@@ -280,8 +243,7 @@ done
   recoverable from the code.
 - **Gradle/Kotlin compatibility is set by `tapmoc`**, not by hand: every Gradle-side module calls
   `gradle(libs.versions.gradle.get())`, deriving `--release`, `languageVersion`/`apiVersion` and `coreLibrariesVersion`
-  from the oldest supported Gradle (catalog `gradle`). Don't re-add `jvmTarget` / `targetCompatibility`. The one module
-  that sets its own is `ide-test-runtime`, which is not Gradle-side at all.
+  from the oldest supported Gradle (catalog `gradle`). Don't re-add `jvmTarget` / `targetCompatibility`.
 - `plugins/src/main/kotlin/.../utils.kt` defines `context(_: HasProject)` accessors — that is why plugin code writes
   bare `tasks`, `configurations`, `objects`, `layout` with no `project.` prefix.
 - **`DevKitTarget` is a real KMP target**, built on `ExternalKotlinTargetApi`. `DevKitTarget.kt` and

@@ -3,14 +3,14 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
-import org.gradle.api.Action
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.DependencyScopeConfiguration
-import org.gradle.api.plugins.ExtensionAware
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.internal.GradleInternal
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
@@ -26,8 +26,8 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
+import org.gradle.kotlin.dsl.withType
 import org.gradle.language.base.plugins.LifecycleBasePlugin
-import org.gradle.plugin.devel.GradlePluginDevelopmentExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -51,15 +51,14 @@ private class DevKitGradlePluginTestTargetImpl(
 }
 
 // GradleTestKitSupportExtension doesn't expose it publicly
-internal const val FUNCTIONAL_TEST = "functionalTest"
+private const val FUNCTIONAL_TEST = "functionalTest"
 
-internal val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
+private val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
     setOf("RepoAndVersionArgumentProvider", "IncludeBuildReposArgumentProvider")
 
 public open class GradlePluginConfigExtension(project: Project) : DevKitVersionsDsl(project) {
     private val buildConfig: BuildConfigExtension = project.the()
     private val gradleTestKitSupport: GradleTestKitSupportExtension = project.the()
-    private val gradlePluginDevelopment: GradlePluginDevelopmentExtension = project.the()
     private val sourceSets: SourceSetContainer = project.the()
     private val main = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
     private val functionalTest = sourceSets.getByName(FUNCTIONAL_TEST)
@@ -119,40 +118,6 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     /** Adds a library to this Gradle plugin's users */
     public fun companionLibrary(dependencyNotation: String) {
         companionLibraries.add(dependencyNotation)
-    }
-
-    private var ideTest: IdeTestConfigExtension? = null
-
-    /**
-     * Adds IDE integration tests to this module, in a `src/ideTest` source set of their own.
-     *
-     * An IDE test exercises a Gradle plugin as much as it does the compiler plugin - the IDE only
-     * ever sees the compiler plugin through the model the Gradle plugin contributes - which is why
-     * this lives here. It works either way round: alongside a real Gradle plugin, or in a module
-     * that applies this plugin for nothing else and points [IdeTestConfigExtension.gradlePluginId]
-     * at the plugin under test.
-     *
-     * Calling this at all is what opts in: registering the IDE tasks and resolving IDE Starter for
-     * a module with no IDE tests would cost every Gradle plugin module a 250 MB dependency and a
-     * task per supported IDE.
-     */
-    public fun ideTest(action: Action<in IdeTestConfigExtension> = Action {}) {
-        val ideTest =
-            ideTest
-                ?: (this as ExtensionAware)
-                    .extensions
-                    .create<IdeTestConfigExtension>("ideTest", project)
-                    .apply {
-                        // A single declared plugin is the norm; a module declaring none, or
-                        // several, has to name the one its IDE tests should apply.
-                        gradlePluginId.convention(
-                            provider { gradlePluginDevelopment.plugins.singleOrNull()?.id }
-                                .orElse(pluginPackage)
-                        )
-                        configure()
-                    }
-                    .also { this.ideTest = it }
-        action.execute(ideTest)
     }
 
     init {
@@ -242,8 +207,29 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
      * properties to place inside gradle.properties for the `functionalTest` suite. By default,
      * it'll try to add your `devKitSpace` credentials.
      */
-    public val functionalTestProperties: ListProperty<String> =
-        objects.listProperty<String>().apply { addAll(devKitSpaceCredentialProperties()) }
+    public val functionalTestProperties: ListProperty<String> = objects.listProperty<String>()
+
+    init {
+        val settings = (project.gradle as GradleInternal).settings
+        // Very adhoc, but only needed for development
+        // TODO remove
+        val devKitRepo =
+            settings.dependencyResolutionManagement.repositories
+                .withType<MavenArtifactRepository>()
+                .matching {
+                    it.url.path.contains("compiler-plugin-dev-kit")
+                }
+        functionalTestProperties.addAll(
+            provider {
+                val credentials =
+                    devKitRepo.singleOrNull()?.credentials ?: return@provider emptyList()
+                listOf(
+                    "devKitSpaceUsername=${credentials.username}",
+                    "devKitSpacePassword=${credentials.password}",
+                )
+            }
+        )
+    }
 
     public companion object {
         /**
