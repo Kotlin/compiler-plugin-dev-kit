@@ -9,8 +9,6 @@ import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.DependencyScopeConfiguration
-import org.gradle.api.artifacts.repositories.MavenArtifactRepository
-import org.gradle.api.internal.GradleInternal
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
@@ -26,7 +24,6 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
-import org.gradle.kotlin.dsl.withType
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
@@ -203,33 +200,8 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
         defaultTestTarget.set(testAgainst.named(version))
     }
 
-    /**
-     * properties to place inside gradle.properties for the `functionalTest` suite. By default,
-     * it'll try to add your `devKitSpace` credentials.
-     */
+    /** properties to place inside gradle.properties for the `functionalTest` suite. */
     public val functionalTestProperties: ListProperty<String> = objects.listProperty<String>()
-
-    init {
-        val settings = (project.gradle as GradleInternal).settings
-        // Very adhoc, but only needed for development
-        // TODO remove
-        val devKitRepo =
-            settings.dependencyResolutionManagement.repositories
-                .withType<MavenArtifactRepository>()
-                .matching {
-                    it.url.path.contains("compiler-plugin-dev-kit")
-                }
-        functionalTestProperties.addAll(
-            provider {
-                val credentials =
-                    devKitRepo.singleOrNull()?.credentials ?: return@provider emptyList()
-                listOf(
-                    "devKitSpaceUsername=${credentials.username}",
-                    "devKitSpacePassword=${credentials.password}",
-                )
-            }
-        )
-    }
 
     public companion object {
         /**
