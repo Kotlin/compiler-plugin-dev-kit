@@ -5,6 +5,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import java.io.File
 import javax.inject.Inject
+import kotlin.io.path.Path
+import kotlin.io.path.name
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
@@ -296,7 +298,20 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     init {
         listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
-            testDataLibraries { if (it.isProjectPath) common(project(it)) else common(it) }
+            testDataLibraries {
+                when {
+                    it.isProjectPath -> common(project(it))
+                    it.isIncludedBuildPath ->
+                        common(
+                            provider {
+                                dependencies.create(
+                                    "${project.group}:${Path(it).name}:${project.version}"
+                                )
+                            }
+                        )
+                    else -> common(it)
+                }
+            }
         }
     }
 

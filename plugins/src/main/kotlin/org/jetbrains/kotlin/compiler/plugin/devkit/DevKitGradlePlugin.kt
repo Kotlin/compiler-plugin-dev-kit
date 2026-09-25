@@ -3,6 +3,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
+import kotlin.io.path.Path
+import kotlin.io.path.name
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.NamedDomainObjectProvider
@@ -115,13 +117,29 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     /** Adds a library to this Gradle plugin's users */
     public fun companionLibrary(dependencyNotation: String) {
         companionLibraries.add(dependencyNotation)
+        dependencies { functionalTest.runtimeOnlyConfigurationName(dependencyNotation) }
     }
 
-    init {
-        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
-            if (it.isProjectPath) companionLibrary(project.project(it)) else companionLibrary(it)
+    private val companionIncludedBuilds =
+        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).mapNotNull {
+            when {
+                it.isProjectPath -> {
+                    companionLibrary(project.project(it))
+                    null
+                }
+                it.isIncludedBuildPath -> {
+                    val name = Path(it).name
+                    val notation = provider { "${project.group}:$name:${project.version}" }
+                    companionLibraries.add(notation)
+                    dependencies { functionalTest.runtimeOnlyConfigurationName(notation) }
+                    name
+                }
+                else -> {
+                    companionLibrary(it)
+                    null
+                }
+            }
         }
-    }
 
     /**
      * Whether to add an implementation dependency on `gradle-plugin-runtime`. Plugins that don't
@@ -281,9 +299,10 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
 
     private fun configurePlugins() {
         gradleTestKitSupport.apply {
-            // TODO this definitely violates Isolated Projects. DevKit should instead
-            //  publish needed dependencies into functionalTestRepo itself
             withClasspaths(functionalTestProjectsClasspath.name)
+            if (companionIncludedBuilds.isNotEmpty()) {
+                withIncludedBuildProjects(*companionIncludedBuilds.map { ":$it:" }.toTypedArray())
+            }
         }
 
         buildConfig {

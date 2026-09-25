@@ -1,16 +1,13 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.gradle.api.artifacts.dsl.DependencyHandler
-import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
-import org.gradle.api.internal.GradleInternal
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -28,6 +25,9 @@ internal fun listFromGradleProperty(property: String): List<String> =
  */
 internal val String.isProjectPath: Boolean
     get() = startsWith(':')
+
+internal val String.isIncludedBuildPath: Boolean
+    get() = startsWith('.') || startsWith('/')
 
 internal val KotlinToolingVersion.versionString: String
     get() = toString()
@@ -134,6 +134,8 @@ private class ProviderToString(val provider: Provider<*>) {
     override fun toString(): String = provider.orNull.toString()
 }
 
-internal val Provider<*>.asString: Any get() = ProviderToString(this)
+internal val Provider<*>.asString: Any
+    get() = ProviderToString(this)
 
-internal fun <T : Any> Provider<T>.asString(transform: (T) -> String): Any = ProviderToString(map(transform))
+internal fun <T : Any> Provider<T>.asString(transform: (T) -> String): Any =
+    ProviderToString(map(transform))
