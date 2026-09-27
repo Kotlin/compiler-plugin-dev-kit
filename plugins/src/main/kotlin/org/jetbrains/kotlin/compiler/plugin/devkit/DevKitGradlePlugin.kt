@@ -11,6 +11,7 @@ import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.project.IsolatedProject
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.SourceSetContainer
@@ -37,6 +38,16 @@ public interface DevKitGradlePluginTestTarget : Named {
 
     public val version: KotlinToolingVersion
     public val testTask: TaskProvider<out Test>
+}
+
+public sealed interface ProjectOrGav {
+    public data class LocalProject(public val isolated: IsolatedProject) : ProjectOrGav
+
+    public data class Gav(
+        public val group: String,
+        public val artifact: String,
+        public val version: String?,
+    ) : ProjectOrGav
 }
 
 private class DevKitGradlePluginTestTargetImpl(
@@ -79,11 +90,22 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
      * The compiler plugin project that this Gradle plugin applies. Defaults to the project at the
      * path in [COMPILER_PLUGIN_PROPERTY], if that is set.
      */
-    public val compilerPlugin: Property<Project> = objects.property()
+    public val compilerPlugin: Property<ProjectOrGav> = objects.property()
 
     init {
         providers.gradleProperty(COMPILER_PLUGIN_PROPERTY).orNull?.let {
-            compilerPlugin.convention(project.project(it))
+            compilerPlugin.convention(
+                when {
+                    it.isProjectPath -> ProjectOrGav.LocalProject(project.project(it).isolated)
+                    it.isDependencyNotation -> {
+                        val dep = dependencies.create(it) {}
+                        ProjectOrGav.Gav(dep.group, dep.name, dep.version)
+                    }
+                    else -> {
+                        ProjectOrGav.Gav(project.group.toString(), it, project.version.toString())
+                    }
+                }
+            )
         }
     }
 
@@ -133,12 +155,13 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                 it.isProjectPath -> companionLibrary(project.project(it))
                 it.isIncludedBuildPath -> {
                     val name = Path(it).name
-                    val notation = provider { "${project.group}:$name:${project.version}" }
+                    val notation = siblingDependencyGav(name)
                     companionLibraries.add(notation)
                     dependencies { functionalTest.runtimeOnlyConfigurationName(notation) }
                     includedBuildProjects.add(name)
                 }
-                else -> companionLibrary(it)
+                it.isDependencyNotation -> companionLibrary(it)
+                else -> companionLibraries.add(siblingDependencyGav(it))
             }
         }
     }
@@ -251,7 +274,15 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
 
     private fun configureDependencies() = dependencies {
         main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
-        functionalTestProjectsClasspath(compilerPlugin.map { project(it.isolated.path) })
+        functionalTestProjectsClasspath(
+            compilerPlugin.map { plugin ->
+                when (plugin) {
+                    is Gav ->
+                        "${plugin.group}:${plugin.artifact}${plugin.version?.let { ":$it" }.orEmpty()}"
+                    is LocalProject -> project(plugin.isolated.path)
+                }
+            }
+        )
 
         main.implementationConfigurationName(
             addRuntimeDependency.ifTrue { "$DEV_KIT_GROUP:gradle-plugin-runtime:$DEV_KIT_VERSION" }
@@ -347,12 +378,22 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                         type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
                         expression(
                             compilerPlugin.map {
+                                val gav =
+                                    when (it) {
+                                        is ProjectOrGav.Gav -> it
+                                        is ProjectOrGav.LocalProject ->
+                                            ProjectOrGav.Gav(
+                                                project.group.toString(),
+                                                it.isolated.name,
+                                                project.version.toString(),
+                                            )
+                                    }
                                 """
-                                |SubpluginArtifact(
-                                |  groupId = "${project.group}",
-                                |  artifactId = "${it.isolated.name}",
-                                |  version = "${project.version}",
-                                |)
+                                    |SubpluginArtifact(
+                                    |  groupId = "${gav.group}",
+                                    |  artifactId = "${gav.artifact}",
+                                    |  version = "${gav.version}",
+                                    |)
                                 """
                                     .trimMargin()
                             }

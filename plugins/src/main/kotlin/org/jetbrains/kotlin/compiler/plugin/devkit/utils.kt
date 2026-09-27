@@ -1,11 +1,13 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
+import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
@@ -28,6 +30,9 @@ internal val String.isProjectPath: Boolean
 
 internal val String.isIncludedBuildPath: Boolean
     get() = startsWith('.') || startsWith('/')
+
+internal val String.isDependencyNotation: Boolean
+    get() = contains(':')
 
 internal val KotlinToolingVersion.versionString: String
     get() = toString()
@@ -139,3 +144,22 @@ internal val Provider<*>.asString: Any
 
 internal fun <T : Any> Provider<T>.asString(transform: (T) -> String): Any =
     ProviderToString(map(transform))
+
+context(_: HasProject)
+internal fun siblingDependencyGav(
+    name: String,
+    group: String? = null,
+    version: String? = null,
+): Provider<String> {
+    val group = provider { group ?: project.group.toString() }
+    val version = provider { version ?: project.version.toString() }
+    return provider { "${group()}:$name:${version()}" }
+}
+
+context(_: HasProject)
+internal fun siblingDependency(
+    name: String,
+    group: String? = null,
+    version: String? = null,
+): Provider<ExternalModuleDependency> =
+    siblingDependencyGav(name, group, version).map { dependencies.create(it) {} }

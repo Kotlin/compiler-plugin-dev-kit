@@ -306,15 +306,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     it.isProjectPath -> common(project(it))
                     it.isIncludedBuildPath -> {
                         hasIncludedCompanionBuilds = true
-                        common(
-                            provider {
-                                dependencies.create(
-                                    "${project.group}:${Path(it).name}:${project.version}"
-                                )
-                            }
-                        )
+                        common(siblingDependency(Path(it).name))
                     }
-                    else -> common(it)
+                    it.isDependencyNotation -> common(it)
+                    else -> common(siblingDependency(it))
                 }
             }
         }

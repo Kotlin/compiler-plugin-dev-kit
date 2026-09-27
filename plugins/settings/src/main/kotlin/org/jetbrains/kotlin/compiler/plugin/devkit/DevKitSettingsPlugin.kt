@@ -25,22 +25,19 @@ public abstract class DevKitSettingsExtension(private val settings: Settings) {
     @get:Inject protected abstract val objects: ObjectFactory
 
     /**
-     * Includes the build at [path], and uses the [pathToVersionCatalog] relative to [path] to
-     * create a `libs` version catalog
+     * Uses the [pathToVersionCatalog] relative to [pathToRoot] to create a [name] version catalog
      */
-    public fun includeRootBuild(
-        path: String,
-        pathToVersionCatalog: String? = "gradle/libs.versions.toml",
+    public fun createVersionCatalogFrom(
+        pathToRoot: String,
+        pathToVersionCatalog: String = "gradle/libs.versions.toml",
+        name: String = "libs",
     ): Unit = settings.run {
-        pluginManagement.includeBuild(path)
-        includeBuild(path)
-        if (pathToVersionCatalog != null)
-            dependencyResolutionManagement {
-                val catalogPath = settings.rootDir.toPath() / path / pathToVersionCatalog
-                versionCatalogs {
-                    create("libs") { from(objects.fileCollection().from(catalogPath)) }
-                }
+        dependencyResolutionManagement {
+            val catalogPath = settings.rootDir.toPath() / pathToRoot / pathToVersionCatalog
+            versionCatalogs {
+                create(name) { from(objects.fileCollection().from(catalogPath)) }
             }
+        }
     }
 
     /** Includes the build at [path], and wires [Settings.rootProject]'s `:check` task to it. */
