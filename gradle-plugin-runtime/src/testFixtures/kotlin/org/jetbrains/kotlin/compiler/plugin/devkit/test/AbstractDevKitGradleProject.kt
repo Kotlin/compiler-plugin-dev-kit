@@ -201,15 +201,21 @@ public abstract class AbstractDevKitGradleProject(
             pluginManagement =
                 PluginManagement(
                     repositories(
-                        Repository.FUNC_TEST_INCLUDED_BUILDS +
-                            KOTLIN_REPOS +
-                            Repository.DEFAULT_PLUGINS
+                      buildList {
+                        addAll(Repository.FUNC_TEST_INCLUDED_BUILDS)
+                        addAll(Repository.DEFAULT_PLUGINS)
+                        addAll(KOTLIN_REPOS)
+                      }
                     )
                 )
             dependencyResolutionManagement =
                 DependencyResolutionManagement(
                     repositories(
-                        Repository.FUNC_TEST_INCLUDED_BUILDS + KOTLIN_REPOS + Repository.DEFAULT
+                      buildList {
+                        addAll(Repository.FUNC_TEST_INCLUDED_BUILDS)
+                        addAll(Repository.DEFAULT)
+                        addAll(KOTLIN_REPOS)
+                      }
                     )
                 )
         }
