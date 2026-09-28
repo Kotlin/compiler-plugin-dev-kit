@@ -21,14 +21,17 @@ public abstract class DevKitSupportPlugin(public val info: DevKitPluginInfo) :
 
     override fun getPluginArtifact(): SubpluginArtifact = info.artifact
 
+    public open fun Project.shouldAddRuntimeDependency(): Boolean = true
+
     final override fun applyToCompilation(
         kotlinCompilation: KotlinCompilation<*>
     ): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.project
 
-        kotlinCompilation.defaultSourceSet.dependencies {
-            info.companionLibraryCoordinates.forEach(::implementation)
-        }
+        if (project.shouldAddRuntimeDependency())
+            kotlinCompilation.defaultSourceSet.dependencies {
+                info.companionLibraryCoordinates.forEach(::implementation)
+            }
 
         return project.applyToCompilation(kotlinCompilation)
     }
