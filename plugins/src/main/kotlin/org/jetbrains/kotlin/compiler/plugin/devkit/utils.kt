@@ -9,27 +9,19 @@ import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.extra
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-private val entrySeparators = Regex("[,\\s]+")
-
-context(_: HasProject)
-internal fun listFromGradleProperty(property: String): List<String> =
-    providers.gradleProperty(property).getOrElse("").split(entrySeparators).filter {
-        it.isNotEmpty()
-    }
+internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
 
 /**
  * A `:`-prefixed entry of a library property is a project in this build, everything else a module.
  */
 internal val String.isProjectPath: Boolean
     get() = startsWith(':')
-
-internal val String.isIncludedBuildPath: Boolean
-    get() = startsWith('.') || startsWith('/')
 
 internal val String.isDependencyNotation: Boolean
     get() = contains(':')
@@ -163,3 +155,13 @@ internal fun siblingDependency(
     version: String? = null,
 ): Provider<ExternalModuleDependency> =
     siblingDependencyGav(name, group, version).map { dependencies.create(it) {} }
+
+context(_: HasProject)
+internal fun extOrGradleProperty(propertyName: String): Provider<String> = provider {
+    if (project.extra.has(propertyName)) project.extra[propertyName].toString()
+    else providers.gradleProperty(propertyName).orNull
+}
+
+context(_: HasProject)
+internal fun listFromExtAndGradleProperty(property: String): List<String> =
+    providers.listFromGradleProperty(property) + project.extra.list(property)

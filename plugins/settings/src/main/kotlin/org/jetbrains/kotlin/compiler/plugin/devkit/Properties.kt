@@ -1,7 +1,5 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
-internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
-
 /**
  * Gradle property listing the Kotlin versions to test against, separated by commas or whitespace.
  * Versions declared in the `pluginDevKit { }` block are registered on top of these, so a version
@@ -9,13 +7,13 @@ internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
  */
 public const val TEST_AGAINST_PROPERTY: String = "kotlin.compiler.plugin.devkit.testAgainst"
 
-/** @see DevKitVersionsDsl.cliVersions */
+/** @see DevKitVersionsProperties.cliVersions */
 public const val MIN_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minCliVersion"
 
-/** @see DevKitVersionsDsl.cliVersions */
+/** @see DevKitVersionsProperties.cliVersions */
 public const val MAX_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.maxCliVersion"
 
-/** @see DevKitVersionsDsl.cliVersions */
+/** @see DevKitVersionsProperties.cliVersions */
 public const val INCLUDE_BETA_AND_RC_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.includeBetaAndRc"
 
@@ -23,7 +21,7 @@ public const val INCLUDE_BETA_AND_RC_PROPERTY: String =
  * The IDE builds this plugin supports. They decide both the compiler versions it is built against
  * and the IDEs its IDE tests run in.
  *
- * @see DevKitVersionsDsl.ideaVersions
+ * @see DevKitVersionsProperties.ideaVersions
  */
 public const val MIN_IDEA_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minIdeaVersion"
 
@@ -36,7 +34,7 @@ public const val INCLUDE_IDEA_RC_PROPERTY: String = "kotlin.compiler.plugin.devk
 /** @see MIN_IDEA_VERSION_PROPERTY */
 public const val INCLUDE_IDEA_EAP_PROPERTY: String = "kotlin.compiler.plugin.devkit.includeIdeaEap"
 
-/** @see DevKitVersionsDsl.useLatestDev */
+/** @see DevKitVersionsProperties.useLatestDev */
 public const val USE_LATEST_DEV_PROPERTY: String = "kotlin.compiler.plugin.devkit.useLatestDev"
 
 /**
@@ -62,3 +60,6 @@ public const val COMPILER_PLUGIN_PROPERTY: String = "kotlin.compiler.plugin.devk
  */
 public const val COMPANION_LIBRARIES_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.companionLibraries"
+
+/** Property that's passed to each `functionalTest` to specify which KMP target to run against. */
+public const val KMP_TARGET_PROPERTY: String = "kotlin.compiler.plugin.devkit.gradle.test.kmpTarget"

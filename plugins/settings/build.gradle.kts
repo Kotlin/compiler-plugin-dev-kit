@@ -23,6 +23,7 @@ dependencies {
     }
     compileOnly(kotlin("gradle-plugin"))
     implementation(libs.testkit.plugin)
+    api(kotlin("tooling-core"))
 }
 
 gradlePlugin {
@@ -39,7 +40,10 @@ gradlePlugin {
     }
 }
 
-kotlin { explicitApi() }
+kotlin {
+    explicitApi()
+    compilerOptions { optIn.add("$group.DevKitInternal") }
+}
 
 buildConfig {
     packageName(group.toString())

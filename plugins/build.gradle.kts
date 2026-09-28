@@ -33,6 +33,7 @@ dependencies {
     implementation(libs.animal.sniffer)
     implementation(libs.testkit.plugin)
     api("$group:version-resolution:$version")
+    api(project(":settings"))
 }
 
 gradlePlugin {
@@ -61,6 +62,7 @@ kotlin {
             "-Xcontext-parameters",
             "-Xallow-contracts-on-more-functions",
         )
+        optIn.add("$group.DevKitInternal")
     }
 }
 

@@ -73,8 +73,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
      */
     public val pluginPackage: Property<String> =
         objects.property(
-            providers
-                .gradleProperty(PLUGIN_PACKAGE_PROPERTY)
+            extOrGradleProperty(PLUGIN_PACKAGE_PROPERTY)
                 .orElse(provider { project.group.toString() })
         )
 
@@ -222,7 +221,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
      */
     public val defaultTestTarget: Property<DevKitTarget> =
         objects.property(
-            providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
+            extOrGradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
                 ?: testAgainst.findByName(kotlinToolingVersion.versionName)
                 ?: testAgainst.last()
         )
@@ -300,7 +299,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     private var hasIncludedCompanionBuilds = false
 
     init {
-        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+        listFromExtAndGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             testDataLibraries {
                 when {
                     it.isProjectPath -> common(project(it))
@@ -673,7 +672,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 // Regenerate golden files: ./gradlew :compiler-plugin:test -PupdateTestData=true
                 +StringSystemPropertyArgumentProvider(
                     "kotlin.test.update.test.data",
-                    provider { providers.gradleProperty("updateTestData").isPresent.toString() },
+                    provider { extOrGradleProperty("updateTestData").isPresent.toString() },
                 )
                 +StringSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.versions",

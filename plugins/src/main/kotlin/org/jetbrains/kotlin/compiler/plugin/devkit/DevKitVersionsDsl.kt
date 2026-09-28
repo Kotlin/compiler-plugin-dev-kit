@@ -8,19 +8,8 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
-/**
- * Which `Beta` and `RC` releases to test against, on top of every stable one.
- *
- * @see DevKitVersionsDsl.cliVersions
- */
-public enum class BetaAndRc {
-    NONE,
-    LATEST,
-    ALL,
-}
-
 public abstract class DevKitVersionsDsl internal constructor(final override val project: Project) :
-    HasProject {
+    HasProject, DevKitVersionsProperties {
 
     /**
      * the lowest Idea build this plugin supports. This only affects the range reported in metadata
@@ -40,17 +29,10 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      */
     public val ideaUntilBuild: Property<Int> = objects.property()
 
-    /**
-     * Kotlin versions to test against, compared by base version so that a bound of `2.4.20` also
-     * takes in `2.4.20-Beta1`.
-     *
-     * @param max upper bound, infinite if null
-     * @param betaAndRc which `Beta` and `RC` releases to test against, on top of every stable one
-     */
-    public fun cliVersions(
+    override fun cliVersions(
         min: KotlinVersion,
-        max: KotlinVersion? = null,
-        betaAndRc: BetaAndRc = BetaAndRc.NONE,
+        max: KotlinVersion?,
+        betaAndRc: BetaAndRc,
     ) {
         val inRange =
             KnownVersions.kotlinVersions.filter {
@@ -76,17 +58,10 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
         }
     }
 
-    /**
-     * Kotlin versions to test against, compared by base version so that a bound of `2.4.20` also
-     * takes in `2.4.20-Beta1`.
-     *
-     * @param max upper bound, infinite if null
-     * @param betaAndRc which `Beta` and `RC` releases to test against, on top of every stable one
-     */
-    public fun cliVersions(
+    override fun cliVersions(
         min: String,
-        max: String? = null,
-        betaAndRc: BetaAndRc = BetaAndRc.NONE,
+        max: String?,
+        betaAndRc: BetaAndRc,
     ) {
         cliVersions(
             KotlinToolingVersion(min).toKotlinVersion(),
@@ -119,23 +94,16 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
             .forEach { registerVersion(it, forIde = true) }
     }
 
-    /**
-     * IDE builds to support, as a platform build number, spelled only as precisely as needed: `253`
-     * is the whole 2025.3 series, `253.29346.138` one build of it
-     *
-     * @param max upper bound, infinite if null
-     */
-    public fun ideaVersions(
+    override fun ideaVersions(
         min: String,
-        max: Int? = null,
-        includeRc: Boolean = false,
-        includeEap: Boolean = false,
+        max: Int?,
+        includeRc: Boolean,
+        includeEap: Boolean,
     ) {
         ideaVersions(IdeBuildNumber(min), max, includeRc, includeEap)
     }
 
-    /** Adds the latest Kotlin dev version. This is useful for reacting early to breaking changes */
-    public fun useLatestDev() {
+    override fun useLatestDev() {
         val latestDev = providers.of(LatestDevVersion::class.java) {}.get()
         registerVersion(KotlinToolingVersion(latestDev), forIde = false)
     }
@@ -155,32 +123,31 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * can service a [registerVersion] call, which is later than this class can know about.
      */
     protected fun registerSupportedVersions() {
-        listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach {
+        listFromExtAndGradleProperty(TEST_AGAINST_PROPERTY).forEach {
             registerVersion(KotlinToolingVersion(it))
         }
-        providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let {
+        extOrGradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let {
             registerVersion(KotlinToolingVersion(it))
         }
-        val minCliVersion = providers.gradleProperty(MIN_CLI_VERSION_PROPERTY).orNull
-        val maxCliVersion = providers.gradleProperty(MAX_CLI_VERSION_PROPERTY).orNull
+        val minCliVersion = extOrGradleProperty(MIN_CLI_VERSION_PROPERTY).orNull
+        val maxCliVersion = extOrGradleProperty(MAX_CLI_VERSION_PROPERTY).orNull
         val betaAndRc =
-            providers
-                .gradleProperty(INCLUDE_BETA_AND_RC_PROPERTY)
+            extOrGradleProperty(INCLUDE_BETA_AND_RC_PROPERTY)
                 .orNull
                 ?.let(String::uppercase)
                 ?.let(BetaAndRc::valueOf) ?: BetaAndRc.NONE
         if (minCliVersion != null) cliVersions(minCliVersion, maxCliVersion, betaAndRc)
         val minIdeaVersion =
-            providers.gradleProperty(MIN_IDEA_VERSION_PROPERTY).orNull?.let(::IdeBuildNumber)
+            extOrGradleProperty(MIN_IDEA_VERSION_PROPERTY).orNull?.let(::IdeBuildNumber)
         val maxIdeaVersion =
-            providers.gradleProperty(MAX_IDEA_VERSION_PROPERTY).orNull?.let(String::toIntOrNull)
+            extOrGradleProperty(MAX_IDEA_VERSION_PROPERTY).orNull?.let(String::toIntOrNull)
         if (minIdeaVersion != null)
             ideaVersions(
                 minIdeaVersion,
                 maxIdeaVersion,
-                providers.gradleProperty(INCLUDE_IDEA_RC_PROPERTY).isTrue(),
-                providers.gradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue(),
+                extOrGradleProperty(INCLUDE_IDEA_RC_PROPERTY).isTrue(),
+                extOrGradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue(),
             )
-        if (providers.gradleProperty(USE_LATEST_DEV_PROPERTY).isTrue()) useLatestDev()
+        if (extOrGradleProperty(USE_LATEST_DEV_PROPERTY).isTrue()) useLatestDev()
     }
 }

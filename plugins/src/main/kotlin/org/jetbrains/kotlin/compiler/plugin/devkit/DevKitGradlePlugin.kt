@@ -14,6 +14,7 @@ import org.gradle.api.artifacts.DependencyScopeConfiguration
 import org.gradle.api.project.IsolatedProject
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
@@ -28,6 +29,7 @@ import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.language.base.plugins.LifecycleBasePlugin
+import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -40,15 +42,40 @@ public interface DevKitGradlePluginTestTarget : Named {
     public val testTask: TaskProvider<out Test>
 }
 
-public sealed interface ProjectOrGav {
-    public data class LocalProject(public val isolated: IsolatedProject) : ProjectOrGav
+public sealed class ProjectOrGav {
+    internal abstract val artifact: String
 
-    public data class Gav(
-        public val group: String,
-        public val artifact: String,
-        public val version: String?,
-    ) : ProjectOrGav
+    public data class LocalProject(public val isolated: IsolatedProject) : ProjectOrGav() {
+        override val artifact: String
+            get() = isolated.name
+    }
+
+    public data class External(
+        val group: String,
+        override val artifact: String,
+        val version: String?,
+    ) : ProjectOrGav()
+
+    public data class Sibling(override val artifact: String) : ProjectOrGav()
 }
+
+context(_: HasProject)
+private val ProjectOrGav.group: String
+    get() =
+        when (this) {
+            is External -> group
+            is LocalProject,
+            is Sibling -> project.group.toString()
+        }
+
+context(_: HasProject)
+private val ProjectOrGav.version: String?
+    get() =
+        when (this) {
+            is External -> version
+            is LocalProject,
+            is Sibling -> project.version.toString()
+        }
 
 private class DevKitGradlePluginTestTargetImpl(
     override val version: KotlinToolingVersion,
@@ -73,7 +100,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     private val main = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
     private val functionalTest = sourceSets.getByName(FUNCTIONAL_TEST)
 
-    private val kmpTarget = providers.gradleProperty(KMP_TARGET)
+    public val kmpTarget: Provider<String> = extOrGradleProperty(KMP_TARGET_PROPERTY)
 
     /**
      * The package name of this Gradle plugin. Defaults to [PLUGIN_PACKAGE_PROPERTY], else the
@@ -81,8 +108,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
      */
     public val pluginPackage: Property<String> =
         objects.property(
-            providers
-                .gradleProperty(PLUGIN_PACKAGE_PROPERTY)
+            extOrGradleProperty(PLUGIN_PACKAGE_PROPERTY)
                 .orElse(provider { project.group.toString() })
         )
 
@@ -93,17 +119,15 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     public val compilerPlugin: Property<ProjectOrGav> = objects.property()
 
     init {
-        providers.gradleProperty(COMPILER_PLUGIN_PROPERTY).orNull?.let {
+        extOrGradleProperty(COMPILER_PLUGIN_PROPERTY).orNull?.let {
             compilerPlugin.convention(
                 when {
                     it.isProjectPath -> ProjectOrGav.LocalProject(project.project(it).isolated)
                     it.isDependencyNotation -> {
                         val dep = dependencies.create(it) {}
-                        ProjectOrGav.Gav(dep.group, dep.name, dep.version)
+                        ProjectOrGav.External(dep.group, dep.name, dep.version)
                     }
-                    else -> {
-                        ProjectOrGav.Gav(project.group.toString(), it, project.version.toString())
-                    }
+                    else -> ProjectOrGav.Sibling(it)
                 }
             )
         }
@@ -130,14 +154,18 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
 
     /** Adds a library to this Gradle plugin's users */
     public fun companionLibrary(companion: Project, group: Any? = null, version: Any? = null) {
-        val group = provider { group ?: project.group }
-        val version = provider { version ?: project.version }
-        companionLibraries.add(provider { "${group()}:${companion.isolated.name}:${version()}" })
+        companionLibraries.add(
+            siblingDependencyGav(companion.isolated.name, group?.toString(), version?.toString())
+        )
         functionalTestProject(companion)
     }
 
     /** Adds a library to this Gradle plugin's users */
-    public fun companionLibrary(dependencyNotation: String) {
+    public fun companionLibrary(dependencyNotationOrSiblingName: String) {
+        val dependencyNotation =
+            if (dependencyNotationOrSiblingName.isDependencyNotation)
+                provider { dependencyNotationOrSiblingName }
+            else siblingDependencyGav(dependencyNotationOrSiblingName)
         companionLibraries.add(dependencyNotation)
         dependencies { functionalTest.runtimeOnlyConfigurationName(dependencyNotation) }
     }
@@ -150,18 +178,15 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     public val includedBuildProjects: ListProperty<String> = objects.listProperty()
 
     init {
-        listFromGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+        listFromExtAndGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             when {
                 it.isProjectPath -> companionLibrary(project.project(it))
                 it.isIncludedBuildPath -> {
                     val name = Path(it).name
-                    val notation = siblingDependencyGav(name)
-                    companionLibraries.add(notation)
-                    dependencies { functionalTest.runtimeOnlyConfigurationName(notation) }
+                    companionLibrary(name)
                     includedBuildProjects.add(name)
                 }
-                it.isDependencyNotation -> companionLibrary(it)
-                else -> companionLibraries.add(siblingDependencyGav(it))
+                else -> companionLibrary(it)
             }
         }
     }
@@ -228,7 +253,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
      */
     public val defaultTestTarget: Property<DevKitGradlePluginTestTarget> =
         objects.property(
-            providers.gradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
+            extOrGradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
                 ?: testAgainst.findByName(kotlinToolingVersion.versionName)
                 ?: testAgainst.last()
         )
@@ -264,20 +289,13 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
             }
         )
 
-    public companion object {
-        /**
-         * Property that's passed to each `functionalTest` to specify which KMP target to run
-         * against.
-         */
-        public const val KMP_TARGET: String = "$DEV_KIT_PROPERTY_PREFIX.gradle.test.kmpTarget"
-    }
-
     private fun configureDependencies() = dependencies {
         main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
         functionalTestProjectsClasspath(
             compilerPlugin.map { plugin ->
                 when (plugin) {
-                    is Gav ->
+                    is Sibling,
+                    is External ->
                         "${plugin.group}:${plugin.artifact}${plugin.version?.let { ":$it" }.orEmpty()}"
                     is LocalProject -> project(plugin.isolated.path)
                 }
@@ -321,7 +339,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                         // Hacky: pick up repo and included-build repos from functionalTest
                         .filter { it.javaClass.simpleName in FUNCTIONAL_TEST_ARGUMENT_PROVIDERS }
                 )
-                +OptionalStringSystemPropertyArgumentProvider(KMP_TARGET, kmpTarget)
+                +OptionalStringSystemPropertyArgumentProvider(KMP_TARGET_PROPERTY, kmpTarget)
             }
         }
         val allVersionedFunctionalTests =
@@ -378,21 +396,11 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
                         type("org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact")
                         expression(
                             compilerPlugin.map {
-                                val gav =
-                                    when (it) {
-                                        is ProjectOrGav.Gav -> it
-                                        is ProjectOrGav.LocalProject ->
-                                            ProjectOrGav.Gav(
-                                                project.group.toString(),
-                                                it.isolated.name,
-                                                project.version.toString(),
-                                            )
-                                    }
                                 """
                                     |SubpluginArtifact(
-                                    |  groupId = "${gav.group}",
-                                    |  artifactId = "${gav.artifact}",
-                                    |  version = "${gav.version}",
+                                    |  groupId = "${it.group}",
+                                    |  artifactId = "${it.artifact}",
+                                    |  version = "${it.version}",
                                     |)
                                 """
                                     .trimMargin()
