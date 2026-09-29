@@ -71,7 +71,7 @@ public abstract class DevKitSettingsExtension(private val settings: Settings) :
 
     init {
         settings
-            .listFromExtAndGradleProperty(COMPANION_LIBRARIES_PROPERTY)
+            .listFromExtOrGradleProperty(COMPANION_LIBRARIES_PROPERTY)
             .filter { it.isIncludedBuildPath }
             .forEach { includeBuildWithChecks(it) }
     }

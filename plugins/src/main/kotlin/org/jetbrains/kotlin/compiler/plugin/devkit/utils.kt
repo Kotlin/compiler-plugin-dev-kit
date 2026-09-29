@@ -158,10 +158,10 @@ internal fun siblingDependency(
 
 context(_: HasProject)
 internal fun extOrGradleProperty(propertyName: String): Provider<String> = provider {
-    if (project.extra.has(propertyName)) project.extra[propertyName].toString()
-    else providers.gradleProperty(propertyName).orNull
+    providers.gradleProperty(propertyName).orNull
+        ?: if (project.extra.has(propertyName)) project.extra[propertyName].toString() else null
 }
 
 context(_: HasProject)
-internal fun listFromExtAndGradleProperty(property: String): List<String> =
-    providers.listFromGradleProperty(property) + project.extra.list(property)
+internal fun listFromExtOrGradleProperty(property: String): List<String> =
+    providers.listFromGradleProperty(property).ifEmpty { project.extra.list(property) }

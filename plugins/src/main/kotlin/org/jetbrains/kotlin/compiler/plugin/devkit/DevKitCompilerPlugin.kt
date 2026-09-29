@@ -299,7 +299,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     private var hasIncludedCompanionBuilds = false
 
     init {
-        listFromExtAndGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+        listFromExtOrGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             testDataLibraries {
                 when {
                     it.isProjectPath -> common(project(it))

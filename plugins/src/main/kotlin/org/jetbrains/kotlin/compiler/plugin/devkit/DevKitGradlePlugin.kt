@@ -178,7 +178,7 @@ public open class GradlePluginConfigExtension(project: Project) : DevKitVersions
     public val includedBuildProjects: ListProperty<String> = objects.listProperty()
 
     init {
-        listFromExtAndGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
+        listFromExtOrGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
             when {
                 it.isProjectPath -> companionLibrary(project.project(it))
                 it.isIncludedBuildPath -> {

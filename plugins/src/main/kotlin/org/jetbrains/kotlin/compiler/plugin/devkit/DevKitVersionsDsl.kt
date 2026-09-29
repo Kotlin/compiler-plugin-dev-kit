@@ -123,7 +123,7 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
      * can service a [registerVersion] call, which is later than this class can know about.
      */
     protected fun registerSupportedVersions() {
-        listFromExtAndGradleProperty(TEST_AGAINST_PROPERTY).forEach {
+        listFromExtOrGradleProperty(TEST_AGAINST_PROPERTY).forEach {
             registerVersion(KotlinToolingVersion(it))
         }
         extOrGradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let {

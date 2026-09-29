@@ -37,5 +37,5 @@ internal fun ExtraPropertiesExtension.appendList(property: String, value: String
     this[property] = prefix + value
 }
 
-internal fun Settings.listFromExtAndGradleProperty(property: String): List<String> =
-    providers.listFromGradleProperty(property) + extra.list(property)
+internal fun Settings.listFromExtOrGradleProperty(property: String): List<String> =
+    providers.listFromGradleProperty(property).ifEmpty { extra.list(property) }
