@@ -29,6 +29,7 @@ import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.extra
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
+import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.property
@@ -37,6 +38,7 @@ import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.DEPENDENCIES_PATH
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.PLUGIN_PATH
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.VERSIONS_PATH
@@ -264,6 +266,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         tasks.register<GenerateTestsTask>(name) {
             mainClass.set(generateTestsClass)
             workingDir = rootDir
+            val rootArgs = objects.listProperty<CommandLineArgumentProvider>()
+            +NestedSystemPropertyArgumentProvider(
+                "$DEV_KIT_PROPERTY_PREFIX.roots",
+                rootArgs,
+                delimiter = ";",
+            )
 
             testAgainst.configureEach {
                 if (this.forIde != forIde) return@configureEach
@@ -271,12 +279,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     val outputDir = generatedTestsDir.dir(targetName)
                     generatedTestsDirs.add(outputDir)
                     this as AbstractKotlinSourceSet
-                    argFiles(
+                    val inputFiles =
                         files(
                             provider { withDependsOnClosure.map { it.resources.sourceDirectories } }
-                        ),
-                        outputDir,
-                    )
+                        )
+
+                    rootArgs.add(filesCommandLineArgumentProvider(inputFiles, outputDir))
                 }
             }
             enabled = false

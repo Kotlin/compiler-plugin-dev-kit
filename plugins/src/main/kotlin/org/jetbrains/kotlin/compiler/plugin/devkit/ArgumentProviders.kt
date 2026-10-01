@@ -8,7 +8,6 @@ import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
@@ -17,6 +16,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.testing.Test
 import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.process.JavaForkOptions
+import org.jetbrains.kotlin.gradle.plugin.HasProject
 
 internal interface CommandLineArgumentProviderFlatMap : CommandLineArgumentProvider, ProviderFlatMap
 
@@ -32,13 +32,11 @@ internal class FilesCommandLineArgumentProvider(
         )
 }
 
-internal fun JavaExec.argFiles(
+context(_: HasProject)
+internal fun filesCommandLineArgumentProvider(
     inputFiles: FileCollection,
     outputDir: Provider<out Directory>,
-) =
-    argumentProviders.add(
-        FilesCommandLineArgumentProvider(project.rootDir.path, inputFiles, outputDir)
-    )
+) = FilesCommandLineArgumentProvider(rootDir.path, inputFiles, outputDir)
 
 internal class LibraryPathArgumentProvider(
     @Input val propNames: List<String>,
@@ -98,6 +96,17 @@ internal class PropertiesSystemPropertyArgumentProvider(
     @Input val properties: Provider<List<String>>,
 ) : CommandLineArgumentProviderFlatMap {
     override fun asArguments() = listOf("-D$propName=${properties.get().joinToString(",")}")
+}
+
+internal class NestedSystemPropertyArgumentProvider(
+    @Input val propName: String,
+    @Nested val properties: Provider<out Iterable<CommandLineArgumentProvider>>,
+    @Input val delimiter: String = ",",
+) : CommandLineArgumentProviderFlatMap {
+    override fun asArguments() =
+        listOf(
+            "-D$propName=${properties.get().flatMap { it.asArguments() }.joinToString(delimiter)}"
+        )
 }
 
 context(exec: JavaForkOptions)
