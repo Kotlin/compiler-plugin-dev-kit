@@ -383,8 +383,8 @@ def main():
         representative = entries[0]["ide_name"]
         major = build.split(".")[0]
 
-        # 221 is the first platform to bundle Kotlin
-        if (int(major) if major.isdigit() else 0) < 221:
+        # 253 is the lowest platform we support
+        if (int(major) if major.isdigit() else 0) < 253:
             continue
 
         print(f"━━━ {representative} (build {build}) ━━━")

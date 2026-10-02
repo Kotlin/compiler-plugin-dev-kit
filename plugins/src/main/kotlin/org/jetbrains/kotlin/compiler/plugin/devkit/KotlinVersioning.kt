@@ -67,7 +67,8 @@ private fun ResolutionStrategy.forceKotlinVersion(version: KotlinToolingVersion,
         val requested = requested
         if (requested is ModuleComponentSelector && requested.group == "org.jetbrains.kotlin") {
             when (val mapped = kotlinModuleMappings[requested.module]) {
-                null -> {}
+                null, /* not in the file */
+                "UNRELATED" /* Uses unrelated versioning scheme */ -> {}
                 else if !forIde -> useVersion("$version")
                 "UNSUPPORTED",
                 "DEAD" -> error("Requested dependency $requested has no reasonable IDE equivalent")
