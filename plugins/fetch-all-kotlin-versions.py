@@ -8,6 +8,11 @@ get pruned, so they stay author-supplied rather than discovered.
 
 Runs off a single maven-metadata.xml request - no auth, no tooling.
 
+Exit codes:
+  0  the file was already up to date
+  2  the list changed
+  1  the run itself failed - bad arguments, or the metadata could not be read
+
 Usage:
   ./fetch-all-kotlin-versions.py [--artifact kotlin-compiler-embeddable]
 
@@ -23,6 +28,9 @@ import xml.etree.ElementTree as ET
 MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
 DEFAULT_ARTIFACT = "kotlin-compiler-embeddable"
 OUTPUT_PATH = "src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/kotlin-versions.txt"
+
+# Exit 2 once the list has changed
+EXIT_CHANGED = 2
 
 HEADER_LINES = [
     "# Every Kotlin release published to Maven Central",
@@ -61,6 +69,12 @@ def main():
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_file = os.path.join(script_dir, OUTPUT_PATH)
+
+    previous = []
+    if os.path.exists(output_file):
+        with open(output_file) as f:
+            previous = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w") as f:
         for line in HEADER_LINES:
@@ -69,6 +83,14 @@ def main():
             f.write(f"{version}\n")
 
     print(f"Written to: {output_file}")
+
+    if versions != previous:
+        added = [v for v in versions if v not in set(previous)]
+        removed = [v for v in previous if v not in set(versions)]
+        print(f"\nFAILED: kotlin-versions.txt changed ({len(added)} added, {len(removed)} removed).",
+              file=sys.stderr)
+        print("Review and commit the regenerated file, then re-run.", file=sys.stderr)
+        sys.exit(EXIT_CHANGED)
 
 
 if __name__ == "__main__":

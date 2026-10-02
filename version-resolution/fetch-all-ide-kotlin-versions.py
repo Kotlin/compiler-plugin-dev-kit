@@ -10,6 +10,11 @@ mapping names exactly what the IDE ships.
 
 Works entirely via HTTP/API calls - no IDE binaries are downloaded.
 
+Exit codes:
+  0  the file was already up to date
+  2  entries were added or updated
+  1  the run itself failed - gh is missing or unauthenticated
+
 Usage:
   ./fetch-all-ide-kotlin-versions.py [--channels stable,canary,beta,eap,rc]
 
@@ -33,6 +38,9 @@ RAW_GH_BASE = "https://raw.githubusercontent.com/JetBrains/intellij-community"
 # has to resolve. Only used to sanity-check the versions we write.
 INTELLIJ_DEPENDENCIES = "https://redirector.kotlinlang.org/maven/intellij-dependencies"
 PUBLISHED_ARTIFACT = "kotlin-compiler"
+
+# Exit 2 once the file has changed
+EXIT_CHANGED = 2
 
 
 def parse_kotlin_base_version(version_str):
@@ -484,6 +492,12 @@ def main():
 
     print(f"Written to: {output_file}")
     print()
+
+    if additions or updates:
+        print(f"FAILED: ide-mappings.txt changed ({additions} new, {updates} updated).",
+              file=sys.stderr)
+        print("Review and commit the regenerated file, then re-run.", file=sys.stderr)
+        sys.exit(EXIT_CHANGED)
 
 
 if __name__ == "__main__":

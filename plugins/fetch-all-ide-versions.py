@@ -14,6 +14,11 @@ Android Studio releases share one platform build; the newest of them wins the en
 Neither source promises to keep serving a build forever, so this is additive: existing
 entries are never dropped, only updated.
 
+Exit codes:
+  0  the file was already up to date
+  2  entries were added or updated
+  1  the run itself failed - an unknown channel argument
+
 Usage:
   ./fetch-all-ide-versions.py [--channels stable,rc,eap,beta,canary] [--min-platform 221]
 
@@ -38,6 +43,9 @@ HEADER_LINES = [
 
 # 253 (2025.3) is the lowest platform we care about
 DEFAULT_MIN_PLATFORM = 253
+
+# Exit 2 once the file has changed
+EXIT_CHANGED = 2
 
 # Written in this order; anything else found in an existing file is appended after.
 SECTION_ORDER = [
@@ -289,6 +297,12 @@ def main():
 
     print(f"Written to: {output_file}")
     print()
+
+    if additions or updates:
+        print(f"FAILED: ide-versions.txt changed ({additions} new, {updates} updated).",
+              file=sys.stderr)
+        print("Review and commit the regenerated file, then re-run.", file=sys.stderr)
+        sys.exit(EXIT_CHANGED)
 
 
 if __name__ == "__main__":

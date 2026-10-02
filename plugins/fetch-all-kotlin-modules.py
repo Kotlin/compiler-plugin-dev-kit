@@ -283,9 +283,9 @@ def main():
     # Everything above went to stdout; without this the verdict can surface before it.
     sys.stdout.flush()
     total = len(newly_added) + len(still_unmapped)
-    report(f"\n{'=' * 75}")
+    print(f"\n{'=' * 75}")
     report(f"FAILED: {total} of {len(entries)} modules have no mapping")
-    report(f"{'=' * 75}")
+    print(f"{'=' * 75}")
     report("Each needs a human decision: the intellij-dependencies name to use, which may")
     report("well be its own. Being published there under its own name is NOT on its own a")
     report("reason to map it to itself - check the publication is frequent enough to")
