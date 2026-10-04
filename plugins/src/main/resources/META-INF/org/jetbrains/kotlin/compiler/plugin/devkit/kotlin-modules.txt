@@ -60,6 +60,7 @@ kotlin-analysis-api-fir-diagnostics=UNRELATED
 kotlin-analysis-api-implementation=UNRELATED
 kotlin-analysis-api-intellij-api-surface-components=UNRELATED
 kotlin-analysis-api-intellij-implementation-components=UNRELATED
+kotlin-analysis-api-internal-test-framework=UNRELATED
 kotlin-analysis-api-js-plain-objects-compiler-plugin-support=UNRELATED
 kotlin-analysis-api-kotlinx-serialization-compiler-plugin-support=UNRELATED
 kotlin-analysis-api-lombok-compiler-plugin-support=UNRELATED
