@@ -207,7 +207,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     private val mainJar: TaskProvider<Jar> =
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
-            archiveAppendix.unset() // remove k2XX appendix
         }
 
     override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {

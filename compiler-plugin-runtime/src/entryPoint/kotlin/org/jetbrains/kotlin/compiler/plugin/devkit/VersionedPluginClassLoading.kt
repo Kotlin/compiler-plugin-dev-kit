@@ -3,6 +3,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import java.net.URI
 import java.net.URL
 import java.net.URLClassLoader
+import java.net.URLConnection
+import java.net.URLStreamHandler
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.toPath
@@ -41,11 +43,20 @@ public object VersionedPluginClassLoading {
         val paths = buildList {
             urls.forEach { addOverlayAndDependencies(id, it.toURI().toPath(), currentVersion) }
         }
-        return URLClassLoader(
-            paths.map { it.toURL() }.toTypedArray(),
-            parent.parent,
-        )
+        val urls = paths.map {
+            val url = it.toURL()
+            // Disable caching for our directory-in-jar urls so hot reloading works
+            if (url.protocol == "jar") url.withHandler(DisableCachesStreamHandler) else url
+        }
+        return URLClassLoader(urls.toTypedArray(), parent.parent)
+    }
+
+    private object DisableCachesStreamHandler : URLStreamHandler() {
+        override fun openConnection(u: URL): URLConnection =
+            u.withHandler(null).openConnection().apply { useCaches = false }
     }
 
     private fun Path.toURL(): URL = URI(toUri().toString() + "/").toURL()
+
+    private fun URL.withHandler(handler: URLStreamHandler?) = URL.of(toURI(), handler)
 }
