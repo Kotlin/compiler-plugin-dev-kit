@@ -28,6 +28,7 @@ pluginDevKit {
     addRuntimeDependency = false
     versionHierarchy {
         split("2.5.0-dev-5651")
+        split("2.4.20-dev-2793")
     }
 }
 
