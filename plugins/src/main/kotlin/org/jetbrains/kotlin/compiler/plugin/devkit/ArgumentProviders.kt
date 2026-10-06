@@ -21,14 +21,18 @@ import org.jetbrains.kotlin.gradle.plugin.HasProject
 internal interface CommandLineArgumentProviderFlatMap : CommandLineArgumentProvider, ProviderFlatMap
 
 internal class FilesCommandLineArgumentProvider(
-    @Input val rootDir: String,
-    @InputFiles @PathSensitive(PathSensitivity.RELATIVE) val inputFiles: FileCollection,
+    private val rootDir: String,
+    private val inputFiles: FileCollection,
     @OutputDirectory val outputDir: Provider<out Directory>,
 ) : CommandLineArgumentProviderFlatMap {
+    @get:Input
+    val inputFilePaths: List<String>
+        get() = inputFiles.map { it.toRelativeString(File(rootDir)) }
+
     override fun asArguments() =
         listOf(
             outputDir().asFile.toRelativeString(File(rootDir)),
-            inputFiles.joinToString(",") { it.toRelativeString(File(rootDir)) },
+            inputFilePaths.joinToString(","),
         )
 }
 

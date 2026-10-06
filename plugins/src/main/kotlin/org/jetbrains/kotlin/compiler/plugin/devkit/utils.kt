@@ -12,7 +12,9 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.extra
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
+import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
@@ -165,3 +167,9 @@ internal fun extOrGradleProperty(propertyName: String): Provider<String> = provi
 context(_: HasProject)
 internal fun listFromExtOrGradleProperty(property: String): List<String> =
     providers.listFromGradleProperty(property).ifEmpty { project.extra.list(property) }
+
+internal val KotlinSourceSet.allResourceDirectories
+    get() =
+        (this as AbstractKotlinSourceSet).withDependsOnClosure.map {
+            it.resources.sourceDirectories
+        }

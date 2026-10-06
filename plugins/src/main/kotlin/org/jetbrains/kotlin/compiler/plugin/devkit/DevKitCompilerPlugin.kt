@@ -20,6 +20,7 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.java.archives.internal.DefaultManifest
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
@@ -48,7 +49,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
-import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
@@ -147,6 +147,18 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     }
                 }
             )
+        }
+
+    private val collectTestData: TaskProvider<CollectTestDataTask> =
+        tasks.register<CollectTestDataTask>("collectTestData") {
+            rootDirPath.set(rootDir.absolutePath)
+            targetFile.set(layout.buildDirectory.file("testDataInfo/testDataFilesList.txt"))
+            filePatterns.set(listOf("**/*.kt", "**/*.kts", "**/*.kt.can-freeze-ide"))
+            testAgainst.configureEach {
+                test {
+                    testDataFiles.from(provider { allResourceDirectories })
+                }
+            }
         }
     private val generateTestsCli: TaskProvider<GenerateTestsTask> =
         registerGenerateTestsTask("generateTestsCli", forIde = false) {
@@ -271,17 +283,17 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 rootArgs,
                 delimiter = ";",
             )
+            inputs
+                .file(collectTestData.map { it.targetFile })
+                .withPropertyName("testDataFilesList")
+                .withPathSensitivity(PathSensitivity.RELATIVE)
 
             testAgainst.configureEach {
                 if (this.forIde != forIde) return@configureEach
                 test {
                     val outputDir = generatedTestsDir.dir(targetName)
                     generatedTestsDirs.add(outputDir)
-                    this as AbstractKotlinSourceSet
-                    val inputFiles =
-                        files(
-                            provider { withDependsOnClosure.map { it.resources.sourceDirectories } }
-                        )
+                    val inputFiles = files(provider { allResourceDirectories })
 
                     rootArgs.add(filesCommandLineArgumentProvider(inputFiles, outputDir))
                 }

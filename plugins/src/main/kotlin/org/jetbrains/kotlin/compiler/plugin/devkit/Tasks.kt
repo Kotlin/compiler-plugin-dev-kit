@@ -2,16 +2,22 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.io.File
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectories
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.options.Option
 import org.gradle.api.tasks.testing.Test
@@ -40,12 +46,51 @@ public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
     }
 }
 
-public abstract class GenerateTestsTask : JavaExec() {
-    @get:OutputDirectories public abstract val generatedTestsDirs: ListProperty<Directory>
+internal abstract class GenerateTestsTask : JavaExec() {
+    @get:OutputDirectories abstract val generatedTestsDirs: ListProperty<Directory>
 
     override fun exec() {
         generatedTestsDirs.get().forEach { it.asFile.deleteRecursively() }
         super.exec()
+    }
+}
+
+/**
+ * A task that scans provided testData directories and writes a list of relative .kt files into
+ * build/testDataInfo/testDataFilesList.txt
+ */
+internal abstract class CollectTestDataTask : DefaultTask() {
+    @get:Input abstract val rootDirPath: Property<String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val testDataFiles: ConfigurableFileCollection
+
+    @get:OutputFile abstract val targetFile: RegularFileProperty
+
+    @get:Input abstract val filePatterns: ListProperty<String>
+
+    @get:Input abstract val excludeFilePatterns: ListProperty<String>
+
+    @TaskAction
+    fun run() {
+        val files = testDataFiles.asFileTree
+        val rootDir = File(rootDirPath.get())
+        val outFile = targetFile.get().asFile
+        outFile.parentFile.mkdirs()
+
+        val text =
+            files
+                .matching {
+                    include(filePatterns.get())
+                    exclude(excludeFilePatterns.get())
+                }
+                .sorted()
+                .joinToString("\n") {
+                    it.relativeTo(rootDir).path.replace('\\', '/')
+                }
+
+        outFile.writeText(text)
     }
 }
 
