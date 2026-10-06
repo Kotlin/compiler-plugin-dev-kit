@@ -787,6 +787,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             api(kotlin("stdlib"))
             api(kotlin("test-junit5"))
             api(kotlin("compiler-internal-test-framework"))
+            runtimeOnly(kotlin("scripting-jvm"))
             api(kotlin("compiler"))
             runtimeOnly("junit:junit:4.13.2")
 
