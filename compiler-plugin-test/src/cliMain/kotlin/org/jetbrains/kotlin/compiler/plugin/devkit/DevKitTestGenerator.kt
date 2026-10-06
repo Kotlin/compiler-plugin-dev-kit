@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.generators.dsl.TestGroup.TestClass
 import org.jetbrains.kotlin.generators.dsl.getDefaultSuiteTestClassName
 import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.model.AnnotationModel
-import org.jetbrains.kotlin.generators.model.SimpleTestClassModel
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 
 public class DevKitTestGroup(public val underlying: TestGroup, public val sourceSetName: String) {
@@ -65,11 +64,8 @@ public class DevKitTestGroup(public val underlying: TestGroup, public val source
             baseTestClassName,
             suiteTestClassName.withPackage(suiteTestClassPackage),
             annotations,
-        ) {
-            init()
-            val model = testModels.lastOrNull() as? SimpleTestClassModel ?: return@testClass
-            if (!model.rootFile.exists()) testModels.remove(model)
-        }
+            init,
+        )
     }
 }
 
@@ -85,7 +81,7 @@ public fun generateDevKitTestsWithJUnit5(
     init: DevKitTestGroup.() -> Unit,
 ) {
     generateTestGroupSuiteWithJUnit5(
-        arrayOf("allowGenerationOnTeamCity", "skipTestAllFilesCheck"),
+        arrayOf("allowGenerationOnTeamCity", "skipTestAllFilesCheck", "tolerateEmptyModels"),
         mainClassName = mainClassName,
     ) {
         System.getProperty(rootsProp)?.split(';')?.let(::parseRoots)?.forEach {
