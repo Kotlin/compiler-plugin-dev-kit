@@ -229,7 +229,7 @@ the way and is therefore the one that can still fail after something has been up
 
 ```bash
 for build in . plugins version-resolution; do
-  DEVKIT_PUBLISH_VERSION=0.0.2-dev-$(git rev-parse --short=7 HEAD) \
+  DEVKIT_PUBLISH_VERSION=0.0.2-dev-$(git rev-list --count --first-parent HEAD) \
     ./gradlew --project-dir $build publishAllPublicationsToDevKitSpaceRepository
 done
 ```
@@ -273,9 +273,10 @@ done
 - **A release overrides that version through the `DEVKIT_PUBLISH_VERSION` environment variable**, honoured by the
   `versionCatalogs { }` block of all three builds' settings scripts. An environment variable rather than a property,
   because it has to reach every build no matter which one is invoked. `.github/workflows/publish.yml` sets it to
-  `<devkit-version without -SNAPSHOT>-dev-<7-char sha>` and publishes every commit on `main`; the checked-in
-  `-SNAPSHOT` value is what local and IDE builds keep using. In the root build the catalog is *already* imported from
-  the conventional path, so its `create("libs")` must not call `from` again.
+  `<devkit-version without -SNAPSHOT>-dev-<first-parent commit count>` and publishes every commit on `main`; each
+  published commit also gets a prerelease GitHub Release tagged `v<version>`. The checked-in `-SNAPSHOT` value is what
+  local and IDE builds keep using. In the root build the catalog is *already* imported from the conventional path, so
+  its `create("libs")` must not call `from` again.
 
 ## Recipe: support a new Kotlin version
 

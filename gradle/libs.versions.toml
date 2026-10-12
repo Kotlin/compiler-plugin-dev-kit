@@ -1,7 +1,7 @@
 [versions]
 # The dev kit's own coordinates; the only place they exist, since all three builds read this file.
 devkit-group = "org.jetbrains.kotlin.compiler.plugin.devkit"
-devkit-version = "0.0.3-SNAPSHOT"
+devkit-version = "0.0.4-SNAPSHOT"
 # https://github.com/JetBrains/kotlin
 kotlin = "2.4.10"
 animal-sniffer = "2.0.1"
