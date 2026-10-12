@@ -97,6 +97,7 @@
 262.10315.69=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.3 (stable)
 # Android Studio Rabbit 2 | 2026.2.2 Canary 3 (canary)
+# Android Studio Rabbit 2 | 2026.2.2 Canary 4 (canary)
 262.10968.63=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2 (eap)
 262.4852.50=2.4.20-dev-1435
@@ -146,3 +147,5 @@
 263.5701.42=2.5.0-dev-7866
 # IntelliJ IDEA 2026.3 (eap)
 263.6259.32=2.5.0-dev-8355
+# IntelliJ IDEA 2026.3 (eap)
+263.6800.24=2.5.0-dev-9507
