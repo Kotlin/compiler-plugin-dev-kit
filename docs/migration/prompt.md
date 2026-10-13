@@ -1,0 +1,1 @@
+Using the migration guide, migrate the project to use devkit version "0.0.3-dev-0d29bbc". Follow the migration guide closely, one by one, and refer back to them often. The migration guide has all that you need! It is the source of truth! The guide is split into steps. Do not read ahead. Read a step, then apply it, verifying that you did it correctly, then move to the next step.
