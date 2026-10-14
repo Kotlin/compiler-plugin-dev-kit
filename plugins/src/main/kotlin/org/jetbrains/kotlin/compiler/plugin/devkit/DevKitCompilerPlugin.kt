@@ -183,7 +183,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     init {
         registerSupportedVersions()
-        if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion)
+        if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion, forIde = false)
     }
 
     private val entryPointCompilation =
