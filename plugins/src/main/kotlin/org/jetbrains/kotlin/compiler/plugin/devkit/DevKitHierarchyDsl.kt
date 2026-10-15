@@ -113,7 +113,7 @@ public interface DevKitHierarchyBuilder {
     public fun postDev(
         major: Int,
         minor: Int,
-        name: String = "pre${kotlinVersionGroupName(major, minor)}",
+        name: String = "post${kotlinVersionGroupName(major, minor)}",
     ) {
         postDev(KotlinVersion(major, minor), name)
     }
@@ -122,7 +122,7 @@ public interface DevKitHierarchyBuilder {
         major: Int,
         minor: Int,
         patch: Int,
-        name: String = "pre${kotlinVersionGroupName(major, minor, patch)}",
+        name: String = "post${kotlinVersionGroupName(major, minor, patch)}",
     ) {
         postDev(KotlinVersion(major, minor, patch), name)
     }
