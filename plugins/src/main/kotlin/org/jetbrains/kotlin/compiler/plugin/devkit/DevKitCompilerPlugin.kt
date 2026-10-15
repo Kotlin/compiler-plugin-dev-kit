@@ -864,7 +864,6 @@ private fun Project.applyNeededPlugins() {
         apply("com.github.gmazzo.buildconfig")
         apply("com.github.node-gradle.node")
         apply("idea")
-        apply("maven-publish")
         apply("$DEV_KIT_GROUP.functional-test-publishing")
         apply(D8Plugin::class.java)
     }
