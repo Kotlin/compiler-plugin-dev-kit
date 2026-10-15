@@ -2,13 +2,13 @@
 
 ## Kotlin version
 
-The DevKit needs a minimum of Kotlin 2.3.20, so please upgrade and ensure your plugin works aptly before proceeding with
-the rest of the migration.
-There's no reason to upgrade to a version higher than 2.3.20 during the setup.
+The DevKit needs Kotlin 2.3.20 or higher. Upgrade to 2.3.20 and make sure that your plugin works. Then continue with the
+migration.
+You don't need a version higher than 2.3.20 for the migration.
 
 ## Settings (`settings.gradle.kts`)
 
-Because the DevKit is still highly experimental, you'll need to add:
+The DevKit is experimental. Add its EAP repository to the plugin repositories:
 
 ```kotlin
 pluginManagement {
@@ -21,8 +21,8 @@ pluginManagement {
 }
 ```
 
-Apply the plugin (you can find the latest DevKit version in
-the [Releases page](https://github.com/Kotlin/compiler-plugin-dev-kit/releases/latest)):
+Apply the settings plugin. Replace `<devkit-version>` with the latest version from the
+[Releases page](https://github.com/Kotlin/compiler-plugin-dev-kit/releases/latest):
 
 ```kotlin
 plugins {
@@ -30,7 +30,7 @@ plugins {
 }
 ```
 
-Also add:
+To resolve the DevKit dependencies, also add the repository to the dependency repositories:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -42,37 +42,37 @@ dependencyResolutionManagement {
 }
 ```
 
-so you get the DevKit dependencies!
-
-You can remove manually-added `dev`, `bootstrap`, and `intellij-dependencies` repositories because the settings plugin
-adds them for you.
+If you added the `dev`, `bootstrap`, or `intellij-dependencies` repositories, remove them. The settings plugin adds them.
 
 [comment]: # (TODO #55)
 
-Find your plugin ID. If you're using the pre-DevKit template, you'll have `build-config` setup that explicitly passes
-the plugin ID. Configure it in the settings directly:
+Find your plugin ID. In the pre-DevKit template, the `build-config` setup passes the plugin ID explicitly. Set the plugin
+ID in the settings:
 
 ```kotlin
 pluginDevKit { pluginPackage("my.plugin.id") }
 ```
 
-If you have "companion" libraries, i.e. libraries that your compiler plugin always expects to exist, and thus should be
-added by the Gradle plugin and be available in tests, add them:
+The DevKit uses this value as the plugin ID and as the package of the classes that it generates. If you don't set it,
+the DevKit uses the project group.
+
+A companion library is a library that your compiler plugin always expects to be present. The Gradle plugin adds it to
+the user's project, and the DevKit adds it to the tests. Add your companion libraries:
 
 ```kotlin
 pluginDevKit {
-    // project reference (if it's a project in the same build)
+    // project path, for a project in the same build
     companionLibrary(":my-plugin-annotations")
-    // name (if it's under the same group and version, e.g. if it's in an included build)
+    // artifact name, for a library with the same group and version (for example, in an included build)
     companionLibrary("my-plugin-annotations")
     // dependency notation
     companionLibrary("com.example:some-library:1.0.0")
 }
 ```
 
-In the pre-DevKit template, `:plugin-annotations` is the companion library you should add.
+In the pre-DevKit template, the companion library is `:plugin-annotations`.
 
-Don't configure any version support ranges for now.
-Your project should still build and run successfully.
+Don't configure version support ranges in this step.
+Make sure that your project still builds and runs.
 
-Go on to [Gradle Support Plugin](2-gradle-support-plugin.md)
+Go on to [Gradle support plugin](2-gradle-support-plugin.md)

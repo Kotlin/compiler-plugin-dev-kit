@@ -1,8 +1,8 @@
-# Compiler Plugin
+# Compiler plugin
 
 ## `build.gradle.kts`
 
-Apply the DevKit plugin:
+Apply the DevKit plugin for compiler plugins:
 
 ```kotlin
 plugins {
@@ -10,32 +10,29 @@ plugins {
 }
 ```
 
-Remove the following:
+Remove these items:
 
-- Applications of `build-config`, `node-gradle`, `idea`, D8, and `test-fixtures` plugins, since the DevKit applies them,
-  or, in the case of `test-fixtures`, has its own implementation
-- `kotlin("jvm")`, and use `kotlin("multiplatform")` instead because the DevKit sets up individual Kotlin versions as
-  separate "platforms" (more on this in the multiversioning guide)
-- Any `generateTests` task or similar should be removed, as well as its configuration, since test generation is handled
-  automatically by the DevKit
-- `Configuration`s that solely bring in `testArtifacts` should be removed (the pre-DevKit template used
-  `setLibraryProperty` in this case).
-- `Configuration`s that solely bring in companion libraries; you already declared them with `companionLibrary()`
-  in [step 1](1-initial-setup.md).
-- Test configuration of `internal-test-framework` properties, e.g. `idea.ignore.disabled.plugins`, `idea.home.path`,
-  `javascript.engine.path.V8`, `javascript.engine.path.repl`, `kotlin.js.test.root.out.dir`
-- `repl.js`, if you have it, since the DevKit bundles it on its own
-- Dependencies on `kotlin("compiler")`, `kotlin("compiler-internal-test-framework")`, and `junit5`
-- GradleUp's Shadow plugin, since the DevKit embeds dependencies in a special way to avoid dependency conflicts
-    - Similarly, any custom `embedded` configuration should be removed, and instead use the default dependency
-      configurations
-- Opt-ins for `ExperimentalCompilerApi` and `UnsafeDuringIrConstructionAPI`
-- Delete service files for `CommandLineProcessor` and `CompilerPluginRegistrar` (found in
-  `resources/META-INF/services`). Instead, configure the same information in `pluginDevKit {}` under
-  `commandLineProcessor` and `componentRegistrar` respectively.
+- The `build-config`, `node-gradle`, `idea`, and D8 plugins. The DevKit applies them.
+- The `test-fixtures` plugin. The DevKit has its own implementation.
+- `kotlin("jvm")`. Apply `kotlin("multiplatform")` instead, because the DevKit sets up each Kotlin version as a
+  separate target. The [multiversioning guide](../multiversioning/0-multiversioning.md) tells more about the targets.
+- The `generateTests` task, or a similar task, and its configuration. The DevKit generates the tests.
+- `Configuration`s that only bring in `testArtifacts`. The pre-DevKit template uses `setLibraryProperty` for them.
+- `Configuration`s that only bring in companion libraries. You declared these libraries with `companionLibrary()` in
+  [Initial setup](1-initial-setup.md).
+- The `internal-test-framework` properties in the test configuration, for example `idea.ignore.disabled.plugins`,
+  `idea.home.path`, `javascript.engine.path.V8`, `javascript.engine.path.repl`, and `kotlin.js.test.root.out.dir`.
+- `repl.js`. The DevKit bundles it.
+- The dependencies on `kotlin("compiler")`, `kotlin("compiler-internal-test-framework")`, and `junit5`.
+- GradleUp's Shadow plugin. The DevKit embeds dependencies in a way that prevents dependency conflicts.
+    - Custom `embedded` configurations. Use the default dependency configurations instead.
+- The opt-ins for `ExperimentalCompilerApi` and `UnsafeDuringIrConstructionAPI`.
+- The service files for `CommandLineProcessor` and `CompilerPluginRegistrar` in `resources/META-INF/services`. Set the
+  same class names in `pluginDevKit {}`, as `commandLineProcessor` and `componentRegistrar`.
 
-If you have some companion libraries that should be **conditionally** applied, you can use the `testDataLibraries` DSL,
-which passes the necessary classpath to test runtime, and generates build-config to wire it:
+If only **some** tests use a library, register it with the `testDataLibraries` DSL. The DevKit passes the library
+classpath to the test runtime. It also generates a `TestDataLibraries` object with a property that has the same name as
+the library:
 
 ```kotlin
 pluginDevKit {
@@ -50,9 +47,8 @@ pluginDevKit {
 
 [comment]: # (TODO #50 so we can suggest adding `useSimplifiedSourceSetLayout`)
 
-The pre-DevKit template comes with manual configuration of source set directories. Since the source set names have
-changed, you need to e.g. use `commonMain` instead of `main`. The following code should set up the configuration as it
-previously was:
+The pre-DevKit template sets the source set directories manually. The DevKit uses other source set names, for example
+`commonMain` instead of `main`. This code keeps the directories of the pre-DevKit template:
 
 ```kotlin
 kotlin {
@@ -74,18 +70,25 @@ kotlin {
 }
 ```
 
-Alternatively, you can move the relevant files into the default source set directories (`src/commonMain/kotlin`,
-`src/commonTestFixtures/kotlin`, `src/commonTest/data`).
+As an alternative, move the files into the default source set directories:
 
-The Gradle configuration should look like the following, and any extra configuration should be clearly related to your
-specific plugin and build setup:
+| Pre-DevKit template directory | DevKit directory                |
+|-------------------------------|---------------------------------|
+| `src`                         | `src/commonMain/kotlin`         |
+| `test-fixtures`               | `src/commonTestFixtures/kotlin` |
+| `test`                        | `src/commonTest/kotlin`         |
+| `testData`                    | `src/commonTest/data`           |
+| `generateTests`               | `src/generateTests/kotlin`      |
+
+The result looks like this. Keep other configuration only if it is specific to your plugin or your build:
 
 ```kotlin
 plugins {
+    kotlin("multiplatform")
     pluginDevKit("compiler-plugin")
 }
 
-/* flat source set configuration from above, if it was in use already */
+/* the source set configuration from above, if you keep the old directories */
 
 pluginDevKit {
     testDataLibraries { /* `register`ing conditional libraries */ }
@@ -98,9 +101,10 @@ pluginDevKit {
 
 ## Command line processor
 
-Extend the `DevKitCLP` interface and remove `override val pluginId: String`. `processOption` and `pluginOptions` should
-work just as before.
-It should look like:
+Replace `CommandLineProcessor` with the `DevKitCLP` interface. Remove `override val pluginId: String`. `processOption`
+and `pluginOptions` don't change.
+
+Example:
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCLP
@@ -119,14 +123,14 @@ class MyCommandLineProcessor : DevKitCLP {
 }
 ```
 
-## Plugin Registrar
+## Plugin registrar
 
-Extend the `DevKitComponentRegistrar` interface and remove `override val pluginId: String` and
-`override val supportsK2: Boolean`.
-Because you're no longer extending `CompilerPluginRegistrar` directly, you'll need to use
-`CompilerPluginRegistrar.ExtensionStorage` when overriding `registerExtensions`.
+Replace `CompilerPluginRegistrar` with the `DevKitComponentRegistrar` interface. Remove `override val pluginId: String`
+and `override val supportsK2: Boolean`.
+Your class doesn't extend `CompilerPluginRegistrar`, so change the receiver of `registerExtensions` from
+`ExtensionStorage` to `CompilerPluginRegistrar.ExtensionStorage`.
 
-It should look like:
+Example:
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitComponentRegistrar
@@ -141,4 +145,4 @@ class MyComponentRegistrar : DevKitComponentRegistrar {
 }
 ```
 
-Go on to [Compiler Plugin Tests](4-compiler-plugin-tests.md)
+Go on to [Compiler plugin tests](4-compiler-plugin-tests.md)

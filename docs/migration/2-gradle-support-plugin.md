@@ -1,13 +1,15 @@
-# Gradle Support Plugin
+# Gradle support plugin
 
-You likely have a Gradle support plugin for your compiler plugin.
-The DevKit generates the info you need for implementing `KotlinCompilerPluginSupportPlugin` in a `PluginInfo`, which has
-your plugin ID, your `SubpluginArtifact`, and any companion libraries you wish to add.
-It also simplifies functional/integration testing for your Gradle plugin.
+If your compiler plugin has a Gradle support plugin, do this step. If it doesn't, go on to
+[Compiler plugin](3-compiler-plugin.md).
 
-In its `build.gradle.kts`:
+The DevKit generates `PluginInfo`, which holds the data that `KotlinCompilerPluginSupportPlugin` needs:
 
-Apply the DevKit plugin for Gradle plugins:
+- the plugin ID
+- the `SubpluginArtifact`
+- the companion libraries
+
+In the `build.gradle.kts` of your Gradle plugin, apply the DevKit plugin for Gradle plugins:
 
 ```kotlin
 plugins {
@@ -15,15 +17,15 @@ plugins {
 }
 ```
 
-You can remove application of `build-config` and `java-gradle-plugin` plugins because the DevKit applies them itself.
-It also adds a dependency on Kotlin Gradle Plugin (KGP), so remove that if it's explicitly set.
+Remove the `build-config` and `java-gradle-plugin` plugins, because the DevKit applies them.
+The DevKit also adds a `compileOnly` dependency on `kotlin("gradle-plugin-api")`. If you declare this dependency, remove
+it.
 
-## Use DevKitSupportPlugin
+## Use `DevKitSupportPlugin`
 
-In `build.gradle.kts`, remove any build-config fields you have for Plugin ID, coordinates, or
-annotation/support/companion library.
+In `build.gradle.kts`, remove the `build-config` fields for the plugin ID, the coordinates, and the companion libraries.
 
-Configure the following (`PluginInfo` won't be generated properly otherwise!!):
+Set `compilerPlugin` to your compiler plugin project:
 
 [comment]: # (TODO #56)
 
@@ -35,30 +37,30 @@ pluginDevKit {
 }
 ```
 
-`PluginInfo` will have `null` fields if you don't configure `compilerPlugin`.
+If you don't set `compilerPlugin`, `PluginInfo` has `null` fields.
 
-Note: The DevKit does not have its own `Project` type. References to `Project` in this section are to
-`org.gradle.api.Project`.
+In this section, `Project` is `org.gradle.api.Project`.
 
 [comment]: # (TODO #60)
 
-Follow the following steps to migrate your `KotlinCompilerPluginSupportPlugin`:
+To migrate your `KotlinCompilerPluginSupportPlugin`, do these steps:
 
-1. Locate your support plugin (its fully qualified name is in `gradlePlugin.plugins.create(...).implementationClass`)
-2. Replace `: KotlinCompilerPluginSupportPlugin` with `: DevKitSupportPlugin(PluginInfo.PLUGIN_INFO)` (The `PluginInfo`
-   class is in `pluginPackage` which you set earlier)
-3. If you override `isApplicable` returning `true`, remove it
-4. Remove `getCompilerPluginId` and `getPluginArtifact`
-5. If you have some `shouldAddRuntimeDependency` property on your Gradle extension (which is good practice), wire it:
+1. Find your support plugin. Its fully qualified name is in `gradlePlugin.plugins.create(...).implementationClass`.
+2. Replace `: KotlinCompilerPluginSupportPlugin` with `: DevKitSupportPlugin(PluginInfo.PLUGIN_INFO)`. `PluginInfo` is
+   in the `pluginPackage` that you set in [Initial setup](1-initial-setup.md).
+3. If you override `isApplicable` to return `true`, remove the override.
+4. Remove `getCompilerPluginId` and `getPluginArtifact`.
+5. If your Gradle extension has a `shouldAddRuntimeDependency` property, override `shouldAddRuntimeDependency` to read
+   it:
     ```kotlin
     override fun Project.shouldAddRuntimeDependency(): Boolean =
         extensions.getByType(MyGradleExtension::class.java).shouldAddRuntimeDependency.get()
     ```
-6. Replace `override fun applyToCompilation` with `override fun Project.applyToCompilation`
-7. If your `applyToCompilation` adds dependencies covered by `companionLibrary`, remove them; leave such code if it's
-   conditional; for instance, if it's based on some flag other than a general `shouldAddRuntimeDependency`
+6. Replace `override fun applyToCompilation` with `override fun Project.applyToCompilation`.
+7. If `applyToCompilation` adds dependencies that `companionLibrary` already adds, remove that code. If the code adds
+   them conditionally, keep it. An example is a condition on a flag other than `shouldAddRuntimeDependency`.
 
-Your plugin should now look something like:
+Your plugin now looks similar to this:
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitSupportPlugin
@@ -85,5 +87,6 @@ class MySupportPlugin : DevKitSupportPlugin(PluginInfo.PLUGIN_INFO) {
 }
 ```
 
-Your Gradle plugin users will need to add the DevKit EAP repository as well.
-Go on to [Compiler Plugin](3-compiler-plugin.md)
+The users of your Gradle plugin must also add the DevKit EAP repository.
+
+Go on to [Compiler plugin](3-compiler-plugin.md)

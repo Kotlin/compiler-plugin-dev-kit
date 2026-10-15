@@ -1,40 +1,42 @@
-# Initial Setup done
+# Initial setup done
 
 ## Workflows
 
-You can simply copy the workflows from compiler-plugin-template. They should "just work".
+You can copy the workflows from the DevKit-based compiler-plugin-template. They work without changes.
 
-If you have pre-existing workflows, change the task names as follows:
+If you keep your own workflows, change the task names:
 
-| Old task                          | New task                                       |
-|-----------------------------------|------------------------------------------------|
-| `my-compiler-plugin:test`         | `my-compiler-plugin:allTests`                  |
-| `my-gradle-plugin:functionalTest` | `my-gradle-plugin:allVersionedFunctionalTests` |
+| Old task                           | New task                                        |
+|------------------------------------|-------------------------------------------------|
+| `:my-compiler-plugin:test`         | `:my-compiler-plugin:allTests`                  |
+| `:my-gradle-plugin:functionalTest` | `:my-gradle-plugin:allVersionedFunctionalTests` |
 
-`check` and `build` don't need to be changed.
+`check` and `build` don't change.
 
-If you use `mikepenz/action-junit-report` or similar, change `report_paths` to `'**/build/test-results/**/TEST-*.xml'`
-so results from all versioned tests show up.
+If you use `mikepenz/action-junit-report` or a similar action, set `report_paths` to
+`'**/build/test-results/**/TEST-*.xml'`. This path includes the results of all versioned tests.
 
 ## Cleanup
 
-Delete any unused versions, libraries, etc in libs.versions.toml.
+Delete the unused entries in `libs.versions.toml`.
 
 ## Optional: Set up functional tests
 
 [comment]: # (TODO #58)
-The DevKit provides a convenient setup for integration/functional testing of your Gradle plugin.
-The post-DevKit template has the necessary setup, but for completion's sake, it boils down to creating a
-`open class MyProject: AbstractDevKitGradleProject()`, specifying the `pluginUnderTest`.
-Then, create a normal JUnit5 test that looks like:
 
-```kotlin
-import com.autonomousapps.kit.GradleBuilder.build
+If you have a Gradle support plugin, you can use the DevKit setup for its functional and integration tests. The
+DevKit-based template already uses this setup. To set it up yourself, do these steps in the `functionalTest` source set:
 
-val project = object : MyProject() {
-    override fun sources() = listOf(source("..."))
-}.gradleProject
-val result = build(project.rootDir, "someTaskName")
-// make assertions on the result, e.g.:
-result.assertOutputContains("foo-bar-baz")
-```
+1. Declare `open class MyProject : AbstractDevKitGradleProject()` and override `pluginUnderTest`.
+2. Write a JUnit 5 test like this one:
+
+    ```kotlin
+    import com.autonomousapps.kit.GradleBuilder.build
+
+    val project = object : MyProject() {
+        override fun sources() = listOf(source("..."))
+    }.gradleProject
+    val result = build(project.rootDir, "someTaskName")
+    // assertions on the result, for example:
+    result.assertOutputContains("foo-bar-baz")
+    ```

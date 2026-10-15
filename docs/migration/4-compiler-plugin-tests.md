@@ -1,75 +1,78 @@
-# Compiler Plugin Tests
+# Compiler plugin tests
 
-Any pre-existing non-`internal-test-framework` tests can stay as-is.
+Tests that don't use `internal-test-framework` don't change.
 
-Always use `TestConfigurationBuilder`. Don't use `NonGroupingStageTestConfigurationBuilder` or any other synonyms for
-it.
+Always use `TestConfigurationBuilder`. Don't use `NonGroupingStageTestConfigurationBuilder` or any other alias of it.
 
-No test data changes are needed for this migration. By the end, your test data should remain unaffected.
+This migration needs no changes to the test data. At the end, the test data must be the same as before.
 
-For `internal-test-framework` base test classes, the DevKit provides a few with reasonable defaults.
-DevKit test bases do all their configuration in configuration lambdas passed to the constructor.
+## Test bases
 
-The ready-to-use DevKit test bases correspond to `internal-test-framework` test bases as follows:
+The DevKit has its own test bases with defaults. A DevKit test base takes its configuration as a lambda in its
+constructor.
 
-| `internal-test-framework` base            | DevKitTest base           |
+Replace each `internal-test-framework` test base with its DevKit test base:
+
+| `internal-test-framework` base            | DevKit test base          |
 |-------------------------------------------|---------------------------|
 | `AbstractJsTest`                          | `DevKitJsBoxTest`         |
 | `AbstractJsDiagnosticWithBackendTestBase` | `DevKitJsDiagnosticTest`  |
 | `AbstractFirBlackBoxCodegenTestBase`      | `DevKitJvmBoxTest`        |
 | `AbstractFirPhasedDiagnosticTest`         | `DevKitJvmDiagnosticTest` |
 
-These test bases add some default directives. If they're in `defaultDirectives`, remove them:
+These test bases add default directives. Remove these directives from your `defaultDirectives`:
 
 - `DevKit*DiagnosticTest`: `FIR_DUMP` and `DISABLE_GENERATED_FIR_TAGS`
 - `DevKit*BoxTest`: `FIR_DUMP` and `DUMP_IR`
 - `DevKitJvm*Test`: `FULL_JDK` and `IGNORE_DEXING`
 
-For instance, if your `Abstract*BoxTest` *currently* does not have `DUMP_IR`, and now you're having it extend
-`DevKit*BoxTest`, then you **need** to add `defaultDirectives { -DUMP_IR }` in a configuration lambda to preserve
-behavior. Avoid using directives that disable the dump handler itself.
+If your old test base doesn't have one of these directives, disable it in the configuration lambda. For example, if
+your `Abstract*BoxTest` doesn't have `DUMP_IR`, you **must** add `defaultDirectives { -DUMP_IR }`. Don't use directives
+that disable the dump handler itself.
 
-If you see **new dump files** being generated, remove directives as stated above, then delete the new dump files, and
-run the tests.
+If the tests write **new dump files**, disable the matching directive as shown above. Then delete the new dump files and
+run the tests again.
 
-Note that `DevKitJsBoxTest` requires no configuration of `pathToTestDir` or `testGroupOutputDirPrefix`.
+`DevKitJsBoxTest` doesn't need `pathToTestDir` or `testGroupOutputDirPrefix`.
 
-All `DevKitTest`s set up `KotlinStandardLibrariesPathProvider`, so don't override
+`DevKitTest` and its subclasses set up `KotlinStandardLibrariesPathProvider`, so don't override
 `createKotlinStandardLibrariesPathProvider`.
 
 [comment]: # (TODO #59)
 
-If you're using `DevKitTest` directly, or one of the `Backported*` test bases, then please apply
-`TestConfigurationBuilder.devKitDefaults()` so you get versioned dump files and other goodies.
-Don't use it if you're using the ready-to-use DevKit test bases (`DevKit{Jvm|Js}{Box|Diagnostic}Test`), since they apply
-it automatically.
+If you use `DevKitTest` directly or a `Backported*` test base, call `TestConfigurationBuilder.devKitDefaults()`. It
+sets up versioned dump files and other defaults. The ready-to-use test bases (`DevKit{Jvm|Js}{Box|Diagnostic}Test`)
+already call it, so don't call it with them.
 
-If you have an `ExtensionRegistrarConfigurator: EnvironmentConfigurator` that configures your plugin, check if it's
-using your plugin registrar directly (e.g. by calling `with(registrar) { registerExtensions() }`). If it is, **delete**
-it and instead use `configurePlugin(MyComponentRegistrar())`.
-If it's doing more complicated configuration (e.g. passing arguments), you can leave it as-is.
+## Plugin configuration
 
-If you have a `PluginAnnotationsProvider: EnvironmentConfigurator` and/or a
-`PluginAnnotationsClasspathProvider: RuntimeClasspathProvider`, first check if it adds the apt libraries
-indiscriminately.
-If it does, then use `configureDefaultTestDataLibraries()` (`configurePlugin` already calls this method, and it only
-needs to be called once).
-If it's conditional, then make sure you've `register`ed it in `build.gradle.kts` under `pluginDevKit.testDataLibraries`.
-You should have a generated `object TestDataLibraries` that has the aptly-named library.
-You can configure it as follows:
+If you have an `ExtensionRegistrarConfigurator: EnvironmentConfigurator` that configures your plugin:
+
+- If it only calls your plugin registrar, for example with `with(registrar) { registerExtensions() }`, **delete** it.
+  Use `configurePlugin(MyComponentRegistrar())` instead.
+- If it does more, for example passes arguments, you can keep it.
+
+If you have a `PluginAnnotationsProvider: EnvironmentConfigurator` or a
+`PluginAnnotationsClasspathProvider: RuntimeClasspathProvider`, check which tests get the libraries:
+
+- If every test gets them, delete the provider. `configurePlugin` adds the companion libraries to every test. If you
+  don't call `configurePlugin`, call `configureDefaultTestDataLibraries()`.
+- If only some tests get a library, use the library that you registered with `testDataLibraries` in
+  [Compiler plugin](3-compiler-plugin.md). Give its `TestDataLibraries` property to `configureTestDataLibrary`, as in
+  the example below.
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureTestDataLibrary
 
-// Assuming you have a `TestConfigurationBuilder` as a receiver, e.g. in a constructor lambda to `DevKitTest`
-configureTestDataLibrary(TestDataLibraries.someConditionalLibraryName) { module: TestModule ->
+// The receiver is a `TestConfigurationBuilder`, for example in the constructor lambda of `DevKitTest`
+configureTestDataLibrary(TestDataLibraries.someConditionalLibrary) { module: TestModule ->
     module.directives.contains(
         SOME_DIRECTIVE
     )
 }
 ```
 
-If your code follows the pre-DevKit template closely, your `Abstract*Test` classes should now look like:
+If your code follows the pre-DevKit template, your `Abstract*Test` classes now look like this:
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
@@ -78,20 +81,17 @@ import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitJvmBoxTest
 open class AbstractJvmBoxTest : DevKitJvmBoxTest({ configurePlugin(MyComponentRegistrar()) })
 ```
 
-For test generation, you **must** move the test generator `main` into `generateTests` source set.
-If you don't move it, you'll get runtime binary incompatibility errors. You've been warned!
-Do **not** have duplicate generate test files. Your only test generator **must** be in the `generateTests` source set.
+## Test generator
 
-Replace your usage of `generateTestGroupSuiteWithJUnit5` with `generateDevKitTestsWithJUnit5`, which automatically calls
-`testGroup`, so remove that call as well.
-You **must** use `generateDevKitTestsWithJUnit5`. Do not bypass it to use the underlying
-`generateTestGroupSuiteWithJUnit5`.
+1. Move the test generator `main` into the `generateTests` source set. If you don't, the tests fail at runtime with
+   binary incompatibility errors.
+2. Delete all other test generators.
+3. Replace `generateTestGroupSuiteWithJUnit5` with `generateDevKitTestsWithJUnit5`.
+4. Remove the `testGroup` call. `generateDevKitTestsWithJUnit5` calls it.
+5. Delete the code that passes arguments to the test generator. The DevKit passes no arguments to `main`. It gives the
+   generator its inputs as system properties.
 
-Your setup might've passed arguments to the test generator. That's no longer necessary. The `generateTests` task passes
-no arguments to your `main`. The DevKit passes the necessary information using system properties. Thus, please delete
-any `args` wiring you have. `generateDevKitTestsWithJUnit5` does not need any such arguments.
-
-It should look like:
+The test generator now looks like this:
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.generateDevKitTestsWithJUnit5
@@ -113,12 +113,12 @@ fun main() = generateDevKitTestsWithJUnit5 {
         model("box")
     }
 }
-
 ```
 
-The DevKit expects your test generator to be at `<pluginPackage>.GenerateTestsKt`. You can configure it using
+By default, the DevKit runs the test generator class `<pluginPackage>.GenerateTestsKt`. To use another class, set
 `pluginDevKit { generateTestsClass = "my.generator.ClassKt" }`.
 
-You should now run your compiler plugin tests (e.g. using `check` or `:my-compiler-plugin:allTests`) and verify that
-everything passes.
-Go on to [Initial Setup done](5-initial-setup-done.md)
+Run the compiler plugin tests, for example with `check` or `:my-compiler-plugin:allTests`. Make sure that all tests
+pass.
+
+Go on to [Initial setup done](5-initial-setup-done.md)
