@@ -799,6 +799,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
             api(kotlin("stdlib"))
             api(kotlin("test-junit5"))
             api(kotlin("compiler-internal-test-framework"))
+            // TODO only add it for versions in "2.5.0-dev-9992"..<"2.5.20-dev-1201", i.e. b2c5e0d until 4125732
             runtimeOnly(kotlin("scripting-jvm"))
             api(kotlin("compiler"))
             runtimeOnly("junit:junit:4.13.2")
