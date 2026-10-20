@@ -12,7 +12,6 @@ public open class DevKitJvmDiagnosticTest(
     BackportedFirPhasedDiagnosticTest(
         parser,
         {
-            devKitDefaults()
             defaultDirectives {
                 diagnosticTestDefaults()
                 jvmDefaults()

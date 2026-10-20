@@ -13,7 +13,6 @@ public open class DevKitJvmBoxTest(
     BackportedFirBlackBoxCodegenTestSpecBase(
         parser,
         {
-            devKitDefaults()
             defaultDirectives {
                 boxTestDefaults()
                 jvmDefaults()

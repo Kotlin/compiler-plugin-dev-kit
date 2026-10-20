@@ -1,5 +1,8 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.firIdenticalCompat
+import org.jetbrains.kotlin.compiler.plugin.devkit.services.DevKitTestConfigurator
+import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
@@ -50,6 +53,7 @@ public abstract class DevKitTest(
 
     @TestInfrastructureInternals
     final override fun configureInternal(builder: TestConfigurationBuilder) {
+        builder.devKitDefaultConfig()
         super.configureInternal(builder)
         targetBackend?.let { myTargetBackend ->
             builder.globalDefaults {
@@ -65,4 +69,21 @@ public abstract class DevKitTest(
             }
         }
     }
+}
+
+@Deprecated(
+    "Applied by default in DevKitTest",
+    replaceWith = ReplaceWith("Unit"),
+    level = DeprecationLevel.ERROR,
+)
+public fun TestConfigurationBuilder.devKitDefaults() {
+    devKitDefaultConfig()
+}
+
+private fun TestConfigurationBuilder.devKitDefaultConfig() {
+    defaultDirectives {
+        versionDumpClassifier()
+        firIdenticalCompat()
+    }
+    useMetaTestConfigurators(::DevKitTestConfigurator)
 }

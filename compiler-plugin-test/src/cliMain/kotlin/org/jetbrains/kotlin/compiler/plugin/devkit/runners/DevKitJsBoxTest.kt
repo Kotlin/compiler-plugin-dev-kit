@@ -33,7 +33,6 @@ public open class DevKitJsBoxTest(
 ) :
     MultiVersionJsTest(
         {
-            devKitDefaults()
             defaultDirectives {
                 boxTestDefaults()
             }

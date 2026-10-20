@@ -10,7 +10,6 @@ public open class DevKitJsDiagnosticTest(
     BackportedJsDiagnosticWithBackendTestBase(
         parser,
         {
-            devKitDefaults()
             defaultDirectives {
                 diagnosticTestDefaults()
             }
