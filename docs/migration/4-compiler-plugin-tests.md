@@ -8,7 +8,7 @@ This migration needs no changes to the test data. At the end, the test data must
 
 ## Test bases
 
-The DevKit has its own test bases. A DevKit test base takes its configuration as a lambda in its constructor.
+The DevKit has its own test bases. A DevKit test base takes its configuration as `vararg` lambdas in its constructor
 
 Replace each `internal-test-framework` test base with its DevKit test base:
 
@@ -56,9 +56,15 @@ If your code follows the pre-DevKit template, your `Abstract*Test` classes now l
 
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
-import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitJvmBoxTest
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.BackportedFirBlackBoxCodegenTestSpecBase
 
-open class AbstractJvmBoxTest : DevKitJvmBoxTest({ configurePlugin(MyComponentRegistrar()) })
+open class AbstractJvmBoxTest : BackportedFirBlackBoxCodegenTestSpecBase(parser = FirParser.LightTree, { 
+    defaultDirectives {
+        ...
+    }
+
+    configurePlugin(MyComponentRegistrar())
+})
 ```
 
 ## Test generator

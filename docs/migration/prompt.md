@@ -1,4 +1,4 @@
-Use the migration guide to migrate the project to DevKit version "0.0.4-dev-302". The guide has one file for each step.
+Use the migration guide to migrate the project to DevKit version "0.0.4-dev-309". The guide has one file for each step.
 Do the steps in order:
 
 1. Read one step. Don't read ahead.
