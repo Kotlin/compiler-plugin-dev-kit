@@ -109,6 +109,7 @@ kotlin-compiler-fir-for-ide=kotlin-compiler-fir-for-ide
 kotlin-compiler-for-ide=kotlin-compiler-for-ide
 kotlin-compiler-internal-test-framework=kotlin-compiler-tests-for-ide
 kotlin-compiler-ir-for-ide=kotlin-compiler-ir-for-ide
+kotlin-compiler-plugin-api=UNSUPPORTED
 kotlin-compiler-runner=kotlin-compiler-runner
 kotlin-compiler-testdata-for-ide=kotlin-compiler-testdata-for-ide
 kotlin-compiler-tests-for-ide=kotlin-compiler-tests-for-ide
