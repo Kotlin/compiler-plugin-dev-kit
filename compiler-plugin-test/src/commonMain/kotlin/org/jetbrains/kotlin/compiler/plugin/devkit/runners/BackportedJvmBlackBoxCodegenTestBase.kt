@@ -31,8 +31,8 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
 import org.jetbrains.kotlin.test.services.sourceProviders.MainFunctionForBlackBoxTestsSourceProvider
 
 public abstract class BackportedJvmBlackBoxCodegenTestBase(
-    parser: FirParser,
     vararg config: TestConfigurationBuilder.() -> Unit,
+    parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
         {

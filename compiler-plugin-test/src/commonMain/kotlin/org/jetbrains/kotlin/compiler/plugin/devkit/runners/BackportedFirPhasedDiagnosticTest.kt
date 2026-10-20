@@ -41,8 +41,8 @@ import org.jetbrains.kotlin.test.services.TestPhase
 import org.jetbrains.kotlin.utils.bind
 
 public abstract class BackportedFirPhasedDiagnosticTest(
-    parser: FirParser,
     vararg config: TestConfigurationBuilder.() -> Unit,
+    parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
         {

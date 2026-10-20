@@ -58,9 +58,8 @@ private class IdeMultiVersionDependencyResolver(private val resolver: IdeBinaryD
                 /**
                  * Without disambiguation by [version] IDE incorrectly creates one Library per GAV
                  * with one of the resolution artifacts from the multi-version jar and reuses it in
-                 * inappropriate IDE Modules
-                 * TODO this might not trigger if our version is different from the resolved version
-                 *  we should just go with the version from the jar's name.
+                 * inappropriate IDE Modules TODO this might not trigger if our version is different
+                 * from the resolved version we should just go with the version from the jar's name.
                  */
                 if (artifact.file.nameWithoutExtension.endsWith("-mv-$version")) {
                     it.copy(

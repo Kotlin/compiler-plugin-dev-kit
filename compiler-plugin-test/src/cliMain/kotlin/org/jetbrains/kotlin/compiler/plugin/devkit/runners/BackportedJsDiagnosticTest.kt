@@ -28,8 +28,8 @@ import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
 import org.jetbrains.kotlin.test.services.TestPhase
 
 public abstract class BackportedJsDiagnosticTestBase(
-    parser: FirParser,
     vararg config: TestConfigurationBuilder.() -> Unit,
+    parser: FirParser = FirParser.LightTree,
 ) :
     DevKitTest(
         {
@@ -67,11 +67,10 @@ public abstract class BackportedJsDiagnosticTestBase(
     )
 
 public abstract class BackportedJsDiagnosticWithBackendTestBase(
-    parser: FirParser,
     vararg config: TestConfigurationBuilder.() -> Unit,
+    parser: FirParser = FirParser.LightTree,
 ) :
     BackportedJsDiagnosticTestBase(
-        parser,
         {
             klibArtifactsHandlersStep {
                 useHandlers(::KlibBackendDiagnosticsHandler)
@@ -81,4 +80,5 @@ public abstract class BackportedJsDiagnosticWithBackendTestBase(
             }
         },
         *config,
+        parser = parser,
     )

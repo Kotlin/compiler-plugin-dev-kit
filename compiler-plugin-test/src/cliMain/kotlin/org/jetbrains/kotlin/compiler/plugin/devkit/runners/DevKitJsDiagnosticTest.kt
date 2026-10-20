@@ -8,11 +8,11 @@ public open class DevKitJsDiagnosticTest(
     parser: FirParser = FirParser.LightTree,
 ) :
     BackportedJsDiagnosticWithBackendTestBase(
-        parser,
         {
             defaultDirectives {
                 diagnosticTestDefaults()
             }
         },
         *config,
+        parser = parser,
     )

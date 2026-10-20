@@ -8,13 +8,9 @@ import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
 public open class MultiVersionJsTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
-    public val parser: FirParser = FirParser.LightTree,
+    parser: FirParser = FirParser.LightTree,
 ) :
     BackportedJsTest(
-        "",
-        "box/js",
-        targetBackend,
-        parser,
         {
             // give each JS box test its own output directory, so no race conditions happen
             defaultDirectives {
@@ -24,6 +20,10 @@ public open class MultiVersionJsTest(
             }
         },
         *config,
+        pathToTestDir = "",
+        testGroupOutputDirPrefix = "box/js",
+        targetBackend = targetBackend,
+        parser = parser,
     )
 
 public open class DevKitJsBoxTest(

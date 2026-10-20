@@ -11,7 +11,6 @@ public open class DevKitJvmBoxTest(
     parser: FirParser = FirParser.LightTree,
 ) :
     BackportedFirBlackBoxCodegenTestSpecBase(
-        parser,
         {
             defaultDirectives {
                 boxTestDefaults()
@@ -19,6 +18,7 @@ public open class DevKitJvmBoxTest(
             }
         },
         *config,
+        parser = parser,
     )
 
 internal fun RegisteredDirectivesBuilder.boxTestDefaults() {

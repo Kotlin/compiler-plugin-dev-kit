@@ -19,11 +19,10 @@ import org.jetbrains.kotlin.test.services.sourceProviders.SpecHelpersSourceFiles
 import org.jetbrains.kotlin.utils.bind
 
 public abstract class BackportedFirBlackBoxCodegenTestSpecBase(
-    parser: FirParser,
     vararg config: TestConfigurationBuilder.() -> Unit,
+    parser: FirParser = FirParser.LightTree,
 ) :
     BackportedJvmBlackBoxCodegenTestBase(
-        parser,
         {
             defaultDirectives {
                 +SPEC_HELPERS
@@ -39,4 +38,5 @@ public abstract class BackportedFirBlackBoxCodegenTestSpecBase(
             )
         },
         *config,
+        parser = parser,
     )

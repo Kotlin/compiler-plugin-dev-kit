@@ -10,7 +10,6 @@ public open class DevKitJvmDiagnosticTest(
     parser: FirParser = FirParser.LightTree,
 ) :
     BackportedFirPhasedDiagnosticTest(
-        parser,
         {
             defaultDirectives {
                 diagnosticTestDefaults()
@@ -18,6 +17,7 @@ public open class DevKitJvmDiagnosticTest(
             }
         },
         *config,
+        parser = parser,
     )
 
 internal fun RegisteredDirectivesBuilder.diagnosticTestDefaults() {

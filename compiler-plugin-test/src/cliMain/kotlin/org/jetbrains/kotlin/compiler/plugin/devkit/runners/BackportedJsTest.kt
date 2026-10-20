@@ -27,11 +27,11 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
 import org.jetbrains.kotlin.test.services.configuration.JsEnvironmentConfigurator
 
 public open class BackportedJsTest(
+    vararg config: TestConfigurationBuilder.() -> Unit,
     pathToTestDir: String = "${JsEnvironmentConfigurator.TEST_DATA_DIR_PATH}/box/",
     testGroupOutputDirPrefix: String,
     targetBackend: TargetBackend = TargetBackend.JS_IR,
     parser: FirParser = FirParser.Psi,
-    vararg config: TestConfigurationBuilder.() -> Unit,
 ) :
     DevKitTest(
         object :

@@ -8,7 +8,8 @@ This migration needs no changes to the test data. At the end, the test data must
 
 ## Test bases
 
-The DevKit has its own test bases. A DevKit test base takes its configuration as `vararg` lambdas in its constructor
+The constructor of a DevKit test base takes its configuration lambdas first, as a `vararg`. Put the other arguments,
+such as `parser`, after the lambdas, as named arguments.
 
 Replace each `internal-test-framework` test base with its DevKit test base:
 
@@ -21,7 +22,7 @@ Replace each `internal-test-framework` test base with its DevKit test base:
 
 `MultiVersionJsTest` doesn't need `pathToTestDir` or `testGroupOutputDirPrefix`.
 
-`DevKitTest` and its subclasses set up `KotlinStandardLibrariesPathProvider`, so don't override
+Every DevKit test base sets up `KotlinStandardLibrariesPathProvider`, so don't override
 `createKotlinStandardLibrariesPathProvider`.
 
 ## Plugin configuration
@@ -33,7 +34,7 @@ If you have an `ExtensionRegistrarConfigurator: EnvironmentConfigurator` that co
 - If it does more, for example passes arguments, you can keep it.
 
 If you have a `PluginAnnotationsProvider: EnvironmentConfigurator` or a
-`PluginAnnotationsClasspathProvider: RuntimeClasspathProvider`, check which tests get the libraries:
+`PluginAnnotationsClasspathProvider: RuntimeClasspathProvider`, check which tests get the companion libraries:
 
 - If every test gets them, delete the provider. `configurePlugin` adds the companion libraries to every test. If you
   don't call `configurePlugin`, call `configureDefaultTestDataLibraries()`.
@@ -44,11 +45,9 @@ If you have a `PluginAnnotationsProvider: EnvironmentConfigurator` or a
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureTestDataLibrary
 
-// The receiver is a `TestConfigurationBuilder`, for example in the constructor lambda of `DevKitTest`
+// The receiver is a `TestConfigurationBuilder`, for example in a configuration lambda of a DevKit test base.
 configureTestDataLibrary(TestDataLibraries.someConditionalLibrary) { module: TestModule ->
-    module.directives.contains(
-        SOME_DIRECTIVE
-    )
+    SOME_DIRECTIVE in module.directives
 }
 ```
 
@@ -57,14 +56,15 @@ If your code follows the pre-DevKit template, your `Abstract*Test` classes now l
 ```kotlin
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configurePlugin
 import org.jetbrains.kotlin.compiler.plugin.devkit.runners.BackportedFirBlackBoxCodegenTestSpecBase
+import org.jetbrains.kotlin.test.FirParser
 
-open class AbstractJvmBoxTest : BackportedFirBlackBoxCodegenTestSpecBase(parser = FirParser.LightTree, { 
+open class AbstractJvmBoxTest : BackportedFirBlackBoxCodegenTestSpecBase({
     defaultDirectives {
         ...
     }
 
     configurePlugin(MyComponentRegistrar())
-})
+}, parser = FirParser.LightTree)
 ```
 
 ## Test generator
