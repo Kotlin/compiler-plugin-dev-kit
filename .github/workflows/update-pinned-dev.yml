@@ -1,0 +1,120 @@
+name: Update pinned dev
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: update-pinned-dev
+  cancel-in-progress: true
+
+permissions:
+  # contents pushes the bump, actions dispatches Publish with it.
+  contents: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute latest dev version
+        id: latest
+        shell: bash
+        env:
+          METADATA_URL: https://redirector.kotlinlang.org/maven/dev/org/jetbrains/kotlin/kotlin-compiler/maven-metadata.xml
+        run: |
+          set -euo pipefail
+          # The same metadata LatestDevVersion reads, so that the pin and useLatestDev agree.
+          # The key sorts exactly as KotlinToolingVersion does: base version first, then build
+          # number, both numeric. Fixed width, so plain sort compares them numerically.
+          latest=$(
+            curl -fsSL "$METADATA_URL" |
+              sed -nE 's/.*<version>([^<]+)<\/version>.*/\1/p' |
+              grep -E -- '-dev(-[0-9]+)?$' |
+              awk -F'[-.]' '{ printf "%08d%08d%08d%08d %s\n", $1, $2, $3, $5, $0 }' |
+              LC_ALL=C sort |
+              tail -n1 |
+              cut -d' ' -f2-
+          )
+          if [ -z "$latest" ]; then
+            echo "::error::$METADATA_URL lists no dev build"
+            exit 1
+          fi
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Bump pinned version
+        id: bump
+        shell: bash
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+        run: |
+          set -euo pipefail
+          pinned=$(
+            sed -nE 's/^kotlin\.compiler\.plugin\.devkit\.pinnedDevVersion=([^[:space:]#]+).*/\1/p' gradle.properties
+          )
+          if [ -z "$pinned" ]; then
+            echo "::error file=gradle.properties::no pinnedDevVersion entry found"
+            exit 1
+          fi
+          newest=$(
+            printf '%s\n' "$pinned" "$LATEST" |
+              awk -F'[-.]' '{ printf "%08d%08d%08d%08d %s\n", $1, $2, $3, $5, $0 }' |
+              LC_ALL=C sort |
+              tail -n1 |
+              cut -d' ' -f2-
+          )
+          if [ "$newest" = "$pinned" ]; then
+            echo "up-to-date=true" >> "$GITHUB_OUTPUT"
+            echo "The pin ($pinned) already covers the newest dev build ($LATEST)."
+            exit 0
+          fi
+          tmp=$(mktemp)
+          sed -E "s/^(kotlin\.compiler\.plugin\.devkit\.pinnedDevVersion)=.*/\1=$LATEST/" gradle.properties > "$tmp"
+          mv "$tmp" gradle.properties
+          echo "up-to-date=false" >> "$GITHUB_OUTPUT"
+          echo "previous=$pinned" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.bump.outputs.up-to-date == 'false'
+        shell: bash
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gradle.properties
+          git commit -m "Pin Kotlin $LATEST for the next published release"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+
+      # No event created with the default token triggers another workflow, except
+      # workflow_dispatch
+      # (https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow),
+      # so Publish is dispatched explicitly on the ref just pushed.
+      - name: Dispatch Publish
+        if: steps.bump.outputs.up-to-date == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run publish.yml --ref main
+
+      - name: Summarize
+        if: steps.bump.outputs.up-to-date == 'false'
+        shell: bash
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+          PREVIOUS: ${{ steps.bump.outputs.previous }}
+        run: |
+          set -euo pipefail
+          echo "Pinned \`$LATEST\` (was \`$PREVIOUS\`). [Publish](https://github.com/$GITHUB_REPOSITORY/actions/workflows/publish.yml) was dispatched for the new commit." \
+            >> "$GITHUB_STEP_SUMMARY"
