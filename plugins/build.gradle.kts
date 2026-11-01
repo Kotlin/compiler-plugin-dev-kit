@@ -33,6 +33,8 @@ dependencies {
     implementation(libs.animal.sniffer)
     implementation(libs.testkit.plugin)
     api("$group:version-resolution:$version")
+
+    testImplementation(kotlin("test"))
 }
 
 gradlePlugin {

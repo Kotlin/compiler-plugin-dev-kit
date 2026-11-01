@@ -271,13 +271,17 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         }
     }
 
+    /**
+     * The JS artifacts of every registered [testDataLibraries] entry, a klib for each library that
+     * has a JS variant. [companionLibrariesKotlinVersion] reads the compiler version out of them.
+     */
+    private val klibs = objects.fileCollection()
+
     /** Libraries that all test data files can use, including [COMPANION_LIBRARIES_PROPERTY]'s */
     public val testDataLibraries: DevKitTestDataLibraries =
         objects.newInstance<DevKitTestDataLibrariesImpl>(this).also {
             register(it, "defaultTestDataLibraries", addToBuildConfig = false)
         }
-
-    private var hasIncludedCompanionBuilds = false
 
     init {
         registerCompanionLibraries()
@@ -287,7 +291,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         testDataLibraries {
             when {
                 dependencyNotationOrSiblingName.isIncludedBuildPath -> {
-                    hasIncludedCompanionBuilds = true
                     common(siblingDependency(Path(dependencyNotationOrSiblingName).name))
                 }
 
@@ -306,17 +309,15 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
      * The highest Kotlin version every library in [testDataLibraries] was built using. This is used
      * to filter KMP tests for lower versions because KLIBS are not backwards compatible.
      *
-     * If there are any [testDataLibraries] that come from included bulids, this defaults to the
-     * minimum supported version, thus assuming that included builds are used for KLIB compatibility
-     * Else, the current Kotlin bulid version is using, assuming that the libraries are built on it
+     * The default is the highest `compiler_version` the libraries' klib manifests record, which
+     * also covers external libraries. A library without a JS variant has no klib to read, so when
+     * no library has one, the default is the minimum registered version.
      */
     public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
         objects.property(
             provider {
-                // TODO work out using a more sophisticated method
-                //  e.g. using kotlin-tooling-metadata.json
-                if (hasIncludedCompanionBuilds) testAgainst.minOf { it.version }
-                else kotlinToolingVersion
+                klibs.files.mapNotNull(::klibCompilerVersion).maxOrNull()
+                    ?: testAgainst.minOf { it.version }
             }
         )
 
@@ -357,6 +358,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
                 }
             }
+        klibs.from(jsConfiguration)
         testAgainst.configureEach {
             testTask {
                 setClasspathProperty(jvmClasspath, jvmConfiguration)

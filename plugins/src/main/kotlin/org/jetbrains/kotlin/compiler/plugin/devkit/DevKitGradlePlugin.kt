@@ -11,6 +11,9 @@ import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.attributes.AttributeContainer
+import org.gradle.api.attributes.Usage
+import org.gradle.api.file.FileCollection
 import org.gradle.api.project.IsolatedProject
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -18,6 +21,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
+import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.domainObjectContainer
 import org.gradle.kotlin.dsl.getByType
@@ -31,6 +35,10 @@ import org.gradle.kotlin.dsl.the
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
+import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetAttribute
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
@@ -125,6 +133,56 @@ public open class GradlePluginConfigExtension(project: Project) :
     /** Libraries that this Gradle plugin adds to its users */
     public val companionLibraries: ListProperty<String> = objects.listProperty()
 
+    private val companionLibrariesClasspath =
+        configurations.dependencyScope("companionLibrariesClasspath")
+
+    /**
+     * The klibs of [companionLibraries] in every variant the functional tests can compile: JS,
+     * wasmJs, and the host's Kotlin/Native target, the only native target compilable without a
+     * cross-compilation toolchain. [companionLibrariesKotlinVersion] reads the compiler version out
+     * of them.
+     *
+     * Each view is lenient, because a library without a klib in a variant has nothing to
+     * contribute, and the version default must not fail the build over it.
+     */
+    private val companionLibraryKlibs: FileCollection =
+        objects
+            .fileCollection()
+            .from(
+                companionKlibs("companionLibrariesJs") {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
+                },
+                companionKlibs("companionLibrariesWasmJs") {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
+                    attribute(
+                        KotlinWasmTargetAttribute.wasmTargetAttribute,
+                        KotlinWasmTargetAttribute.js,
+                    )
+                },
+                companionKlibs("companionLibrariesNativeHost") {
+                    // Native klibs are published under `kotlin-api` and per konan target
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
+                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.native)
+                    attribute(KotlinNativeTarget.konanTargetAttribute, hostKonanTarget())
+                },
+            )
+
+    private fun companionKlibs(
+        name: String,
+        attributes: AttributeContainer.() -> Unit,
+    ): FileCollection =
+        configurations
+            .resolvable(name) {
+                extendsFrom(companionLibrariesClasspath)
+                attributes { attributes() }
+            }
+            .get()
+            .incoming
+            .artifactView { lenient(true) }
+            .files
+
     /**
      * Indicate that [project] is used within `functionalTest` suite. By default, includes
      * [compilerPlugin] and [companionLibraries].
@@ -146,6 +204,7 @@ public open class GradlePluginConfigExtension(project: Project) :
             siblingDependencyGav(project.isolated.name, group?.toString(), version?.toString())
         )
         functionalTestProject(project)
+        dependencies { companionLibrariesClasspath(project(project.isolated.path)) }
     }
 
     override fun companionLibrary(dependencyNotationOrSiblingName: String) {
@@ -161,7 +220,10 @@ public open class GradlePluginConfigExtension(project: Project) :
                 else -> siblingDependencyGav(dependencyNotationOrSiblingName)
             }
         companionLibraries.add(dependencyNotation)
-        dependencies { functionalTest.runtimeOnlyConfigurationName(dependencyNotation) }
+        dependencies {
+            functionalTest.runtimeOnlyConfigurationName(dependencyNotation)
+            companionLibrariesClasspath(dependencyNotation)
+        }
     }
 
     /**
@@ -219,17 +281,15 @@ public open class GradlePluginConfigExtension(project: Project) :
      * The highest Kotlin version every library in [companionLibraries] was built using. This is
      * used to filter KMP tests for lower versions because KLIBS are not backwards compatible.
      *
-     * If there are any [companionLibraries] that come from included bulids, this defaults to the
-     * minimum supported version, thus assuming that included builds are used for KLIB compatibility
-     * Else, the current Kotlin bulid version is using, assuming that the libraries are built on it
+     * The default is the highest `compiler_version` the libraries' klib manifests record, which
+     * also covers external libraries. A library without a klib in any variant the tests compile has
+     * nothing to read, so when none of them has one, the default is the minimum registered version
      */
     public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
         objects.property(
             provider {
-                // TODO work out using a more sophisticated method
-                //  e.g. using kotlin-tooling-metadata.json
-                if (includedBuildProjects().isNotEmpty()) testAgainst.minOf { it.version }
-                else kotlinToolingVersion
+                companionLibraryKlibs.files.mapNotNull(::klibCompilerVersion).maxOrNull()
+                    ?: testAgainst.minOf { it.version }
             }
         )
 
@@ -396,6 +456,24 @@ public open class GradlePluginConfigExtension(project: Project) :
         configureDependencies()
         configureTestTasks()
         configurePlugins()
+    }
+}
+
+/**
+ * The konan name of the host's Kotlin/Native target, e.g. `macos_arm64`, matching the
+ * [KotlinNativeTarget.konanTargetAttribute] klib variants are published per. Kotlin/Native compiles
+ * no other target without a cross-compilation toolchain, so only the host's klib can ever be
+ * compiled, by the functional tests or anywhere else in this build.
+ */
+private fun hostKonanTarget(): String {
+    val os = System.getProperty("os.name").orEmpty().lowercase()
+    val arch = System.getProperty("os.arch").orEmpty().lowercase()
+    val isArm64 = arch == "aarch64" || arch == "arm64"
+    return when {
+        os.contains("mac") || os.contains("darwin") -> if (isArm64) "macos_arm64" else "macos_x64"
+        os.contains("windows") -> "mingw_x64"
+        os.contains("linux") -> if (isArm64) "linux_arm64" else "linux_x64"
+        else -> "linux_x64"
     }
 }
 

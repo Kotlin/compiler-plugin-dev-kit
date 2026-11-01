@@ -175,9 +175,12 @@ One build limits the range of [versions](#version) for these reasons:
         4. A [sibling dependency](#sibling-dependency).
 - `companionLibrariesKotlinVersion` skips KMP tests for incompatible [versions](#version). The reason is in
   [Expected build structure](#expected-build-structure).
-    - The default is the `kotlinToolingVersion` of KGP (to change to `kotlin.compilerVersion`, #52).
-    - If the build adds an included build [companion library](#companion-library), the default changes to the lowest
-      registered [version](#version), so the DevKit skips no tests (can be improved, #51).
+    - The default is the highest `compiler_version` the libraries' klib manifests record, so it also covers
+      external [companion libraries](#companion-library), which the fallbacks below can't see. For
+      `pluginDevKit("gradle-plugin")` libraries, the klib is read from every variant that the functional tests can
+      compile: JS, wasmJs, and the native target of the host. For `testDataLibraries`, the JS klib is enough, because
+      compiler test data never uses other platforms.
+    - If no library has a klib, the default is the lowest registered [version](#version), so the DevKit skips no tests.
 
 ### Settings plugin
 
