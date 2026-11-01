@@ -23,7 +23,7 @@ internal abstract class KotlinCompilerVersion : Serializable, Named {
 
         context(_: HasProject)
         operator fun invoke(version: KotlinToolingVersion?) =
-            objects.named(KotlinCompilerVersion::class.java, version?.versionString ?: NO_VERSION)
+            objects.named(KotlinCompilerVersion::class.java, version?.toString() ?: NO_VERSION)
     }
 }
 
@@ -46,7 +46,7 @@ internal abstract class FakeKotlinCompilerVersion : Serializable, Named {
         operator fun invoke(version: KotlinToolingVersion?) =
             objects.named(
                 FakeKotlinCompilerVersion::class.java,
-                version?.versionString ?: "noVersion",
+                version?.toString() ?: "noVersion",
             )
     }
 }

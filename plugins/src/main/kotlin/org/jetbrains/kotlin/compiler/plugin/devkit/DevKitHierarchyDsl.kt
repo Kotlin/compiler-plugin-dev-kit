@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 private val String.kotlinToolingVersionGroupName
     get() = replace(".", "").split("-").joinToString("") { it.capitalizeAsciiOnly() }
 private val KotlinToolingVersion.groupName
-    get() = versionString.kotlinToolingVersionGroupName
+    get() = toString().kotlinToolingVersionGroupName
 
 private fun kotlinVersionGroupName(major: Int, minor: Int, patch: Int = 0) =
     "$major$minor${if (patch != 0) patch else ""}Dev"

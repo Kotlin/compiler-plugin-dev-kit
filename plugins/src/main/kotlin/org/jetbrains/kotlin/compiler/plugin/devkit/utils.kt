@@ -9,7 +9,6 @@ import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
-import org.gradle.kotlin.dsl.extra
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
@@ -28,13 +27,13 @@ internal val String.isProjectPath: Boolean
 internal val String.isDependencyNotation: Boolean
     get() = contains(':')
 
-internal val KotlinToolingVersion.versionString: String
-    get() = toString()
+internal val String.isIncludedBuildPath: Boolean
+    get() = startsWith('.') || startsWith('/')
 
 // Uses same convention as Metro
 // https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
 public val KotlinToolingVersion.baseVersionName: String
-    get() = versionString.replace(".", "").replace("-", "_").lowercase()
+    get() = toString().replace(".", "").replace("-", "_").lowercase()
 public val KotlinToolingVersion.versionName: String
     get() = "k$baseVersionName"
 
@@ -159,14 +158,16 @@ internal fun siblingDependency(
     siblingDependencyGav(name, group, version).map { dependencies.create(it) {} }
 
 context(_: HasProject)
-internal fun extOrGradleProperty(propertyName: String): Provider<String> = provider {
-    providers.gradleProperty(propertyName).orNull
-        ?: if (project.extra.has(propertyName)) project.extra[propertyName].toString() else null
-}
+internal fun gradleProperty(propertyName: String): Provider<String> =
+    providers.gradleProperty(propertyName)
+
+private val entrySeparators = Regex("[,\\s]+")
 
 context(_: HasProject)
-internal fun listFromExtOrGradleProperty(property: String): List<String> =
-    providers.listFromGradleProperty(property).ifEmpty { project.extra.list(property) }
+internal fun listFromGradleProperty(property: String): List<String> =
+    providers.gradleProperty(property).getOrElse("").split(entrySeparators).filter {
+        it.isNotEmpty()
+    }
 
 internal val KotlinSourceSet.allResourceDirectories
     get() =

@@ -42,7 +42,6 @@ gradlePlugin {
 
 kotlin {
     explicitApi()
-    compilerOptions { optIn.add("$group.DevKitInternal") }
 }
 
 buildConfig {

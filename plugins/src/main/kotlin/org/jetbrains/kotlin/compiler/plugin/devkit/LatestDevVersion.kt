@@ -40,6 +40,6 @@ internal abstract class LatestDevVersion : ValueSource<String, LatestDevVersion.
                 .map { KotlinToolingVersion(it.groupValues[1]) }
                 .filter { it.classifier?.startsWith("dev") == true }
                 .maxOrNull()
-        return requireNotNull(latest) { "$url lists no dev build" }.versionString
+        return requireNotNull(latest) { "$url lists no dev build" }.toString()
     }
 }

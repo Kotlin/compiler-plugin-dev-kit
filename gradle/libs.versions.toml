@@ -29,7 +29,7 @@ tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
 gradle-public-api = { group = "org.gradle.experimental", name = "gradle-public-api", version.ref = "gradle" }
-node-gradle = { group = "com.github.node-gradle", name = "gradle-node-plugin", version.ref = "node-gradle" }
+node-gradle = { group = "com.github.node-gradle.node", name = "com.github.node-gradle.node.gradle.plugin", version.ref = "node-gradle" }
 testkit-plugin = { group = "com.autonomousapps", name = "gradle-testkit-plugin", version.ref = "testkit-plugin" }
 testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support" }
 testkit-truth = { group = "com.autonomousapps", name = "gradle-testkit-truth", version.ref = "testkit-truth" }

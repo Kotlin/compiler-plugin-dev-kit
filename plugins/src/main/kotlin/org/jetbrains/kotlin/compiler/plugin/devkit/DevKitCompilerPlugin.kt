@@ -52,32 +52,24 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8EnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.d8.D8Plugin
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 
 @OptIn(ExperimentalWasmDsl::class)
-public abstract class DevKitCompilerConfigExtension
-internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVersionsDsl(project) {
+public open class DevKitCompilerConfigExtension
+internal constructor(project: Project, private val isPlugin: Boolean) :
+    DevKitPropertiesDsl<DevKitTarget>(project, DevKitTarget::class) {
     private val buildConfig: BuildConfigExtension = project.the()
     private val kotlinExtension: KotlinMultiplatformExtension = project.the()
     private val idea: IdeaModel = project.the()
     private val d8EnvSpec: D8EnvSpec = project.the()
 
-    @get:Inject internal abstract val archiveOperations: ArchiveOperations
+    internal open class Injected @Inject constructor(val archiveOperations: ArchiveOperations)
+
+    internal val archiveOperations: ArchiveOperations =
+        objects.newInstance<Injected>().archiveOperations
 
     private val commonMain = kotlinExtension.run { sourceSets.commonMain.get() }
     private val commonTestFixtures = kotlinExtension.sourceSets.create("commonTestFixtures")
     private val commonGenerateTests = kotlinExtension.sourceSets.create("generateTests")
-
-    /**
-     * The package used by convention for BuildConfig generation and where [generateTestsClass]
-     * resides. It's also assumed to be the plugin ID. Defaults to [PLUGIN_PACKAGE_PROPERTY], else
-     * [Project.getGroup]
-     */
-    public val pluginPackage: Property<String> =
-        objects.property(
-            extOrGradleProperty(PLUGIN_PACKAGE_PROPERTY)
-                .orElse(provider { project.group.toString() })
-        )
 
     /** The fq-name of the class that implements `DevKitComponentRegistrar` */
     public val componentRegistrar: Property<String> =
@@ -115,7 +107,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
      * Versions that this plugin should be tested against. By default, it includes the Kotlin
      * version applied to this build and everything listed in [TEST_AGAINST_PROPERTY].
      */
-    public val testAgainst: NamedDomainObjectCollection<DevKitTarget> =
+    public override val testAgainst: NamedDomainObjectCollection<DevKitTarget> =
         kotlinExtension.targets.withType<DevKitTarget>()
 
     /**
@@ -183,7 +175,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
 
     init {
         registerSupportedVersions()
-        if (testAgainst.isEmpty()) testAgainst(kotlinToolingVersion, forIde = false)
     }
 
     private val entryPointCompilation =
@@ -220,46 +211,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         tasks.named<Jar>(surrogateTarget.artifactsTaskName) {
             from(entryPointCompilation.output.allOutputs)
         }
-
-    override fun registerVersion(version: KotlinToolingVersion, forIde: Boolean) {
-        testAgainst(version, forIde = forIde)
-    }
-
-    /**
-     * Which registered [testAgainst] version the generic `test` task delegates to. Defaults to
-     * [DEFAULT_TEST_VERSION_PROPERTY], the Kotlin version applied to the build, or an arbitrary
-     * target otherwise
-     *
-     * @see [defaultTestVersion] to set this using a version instead
-     */
-    public val defaultTestTarget: Property<DevKitTarget> =
-        objects.property(
-            extOrGradleProperty(DEFAULT_TEST_VERSION_PROPERTY).orNull?.let(::testAgainst)
-                ?: testAgainst.findByName(kotlinToolingVersion.versionName)
-                ?: testAgainst.last()
-        )
-
-    /**
-     * Sets the [testAgainst] version the generic `test` task delegates to. Defaults to the Kotlin
-     * version applied to this build. This is identical to setting [defaultTestTarget] with the
-     * target corresponding to [version]. You can change this version multiple times.
-     *
-     * @see [defaultTestTarget]
-     */
-    public fun defaultTestVersion(version: KotlinToolingVersion) {
-        defaultTestVersion(version.versionString)
-    }
-
-    /**
-     * Sets the [testAgainst] version the generic `test` task delegates to. Defaults to the Kotlin
-     * version applied to this build. This is identical to setting [defaultTestTarget] with the
-     * target corresponding to [version]. You can change this version multiple times.
-     *
-     * @see [defaultTestTarget]
-     */
-    public fun defaultTestVersion(version: String) {
-        defaultTestTarget.set(testAgainst(version))
-    }
 
     /** Creates a JS Repl for use by the testing framework */
     public val createJsRepl: TaskProvider<JsReplGeneratorTask> =
@@ -318,19 +269,26 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
     private var hasIncludedCompanionBuilds = false
 
     init {
-        listFromExtOrGradleProperty(COMPANION_LIBRARIES_PROPERTY).forEach {
-            testDataLibraries {
-                when {
-                    it.isProjectPath -> common(project(it))
-                    it.isIncludedBuildPath -> {
-                        hasIncludedCompanionBuilds = true
-                        common(siblingDependency(Path(it).name))
-                    }
-                    it.isDependencyNotation -> common(it)
-                    else -> common(siblingDependency(it))
+        registerCompanionLibraries()
+    }
+
+    override fun companionLibrary(dependencyNotationOrSiblingName: String) {
+        testDataLibraries {
+            when {
+                dependencyNotationOrSiblingName.isIncludedBuildPath -> {
+                    hasIncludedCompanionBuilds = true
+                    common(siblingDependency(Path(dependencyNotationOrSiblingName).name))
                 }
+
+                dependencyNotationOrSiblingName.isDependencyNotation ->
+                    common(dependencyNotationOrSiblingName)
+                else -> common(siblingDependency(dependencyNotationOrSiblingName))
             }
         }
+    }
+
+    override fun companionLibrary(project: Project, group: Any?, version: Any?) {
+        testDataLibraries { common(project(project.path)) }
     }
 
     /**
@@ -407,11 +365,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
         }
     }
 
-    /** Declares a version that the plugin should be tested against. This method is idempotent. */
-    public fun testAgainst(
+    override fun testAgainst(
         version: KotlinToolingVersion,
-        forIde: Boolean = version.isDev,
-        action: DevKitTarget.() -> Unit = {},
+        forIde: Boolean,
+        action: DevKitTarget.() -> Unit,
     ): DevKitTarget {
         val target =
             testAgainst.findByName(version.versionName)
@@ -432,13 +389,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                     }
         return target.apply(action)
     }
-
-    /** Declares a version that the plugin should be tested against. This method is idempotent. */
-    public fun testAgainst(
-        version: String,
-        forIde: Boolean = KotlinToolingVersion(version).isDev,
-        action: DevKitTarget.() -> Unit = {},
-    ): DevKitTarget = testAgainst(KotlinToolingVersion(version), forIde, action)
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     public fun versionHierarchy(template: DevKitHierarchyBuilder.() -> Unit) {
@@ -691,7 +641,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) : DevKitVe
                 // Regenerate golden files: ./gradlew :compiler-plugin:test -PupdateTestData=true
                 +StringSystemPropertyArgumentProvider(
                     "kotlin.test.update.test.data",
-                    provider { extOrGradleProperty("updateTestData").isPresent.toString() },
+                    provider { gradleProperty("updateTestData").isPresent.toString() },
                 )
                 +StringSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.versions",

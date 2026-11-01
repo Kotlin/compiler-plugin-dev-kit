@@ -68,14 +68,15 @@ public const val GENERATE_TESTS_CLI_SOURCE_SET_NAME: String = "generateTestsCli"
 
 public class DevKitTarget(
     delegate: Delegate,
-    public val version: KotlinToolingVersion,
+    override val version: KotlinToolingVersion,
     private val isSurrogate: Boolean,
     public val forIde: Boolean,
 ) :
     DecoratedExternalKotlinTarget(delegate),
     HasConfigurableKotlinCompilerOptions<KotlinJvmCompilerOptions>,
     Named,
-    KotlinTargetWithTests<JvmClasspathTestRunSource, DevKitTestRun> {
+    KotlinTargetWithTests<JvmClasspathTestRunSource, DevKitTestRun>,
+    DevKitTestTarget {
 
     @Suppress("UNCHECKED_CAST")
     override val compilations: NamedDomainObjectContainer<DevKitCompilation> =

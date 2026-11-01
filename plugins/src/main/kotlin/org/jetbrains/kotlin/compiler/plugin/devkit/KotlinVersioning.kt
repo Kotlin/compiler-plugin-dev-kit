@@ -117,7 +117,7 @@ internal fun KotlinCompilation<*>.forceKotlinVersion(
 context(_: HasProject)
 internal fun DependencyHandler.registerMultiReleasePluginTransform(version: KotlinToolingVersion) {
     registerTransform(MultiReleasePluginTransform::class.java) {
-        parameters { kotlinVersion.set(version.versionString) }
+        parameters { kotlinVersion.set(version.toString()) }
         from.attribute(KotlinCompilerVersion.attribute, noVersion)
         to.attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion(version))
     }
