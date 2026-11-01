@@ -7,12 +7,19 @@ import org.gradle.api.provider.Property
 import org.gradle.kotlin.dsl.property
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 public interface DevKitTestTarget {
     public val version: KotlinToolingVersion
 }
+
+/**
+ * Whether the IDE track publishes this version: an `-ij` build, or a `dev` build some IDE line
+ * ships. The renamed for-IDE modules of `kotlin-modules.txt` are published only at those versions.
+ */
+internal val KotlinToolingVersion.isPublishedForIde: Boolean
+    get() =
+        isIdeBuild || CompilerVersionAliases.BUILT_IN_COMPILER_VERSION_ALIASES.containsValue(this)
 
 public abstract class DevKitPropertiesDsl<Target : DevKitTestTarget>
 internal constructor(final override val project: Project, targetClass: KClass<Target>) :
@@ -38,17 +45,29 @@ internal constructor(final override val project: Project, targetClass: KClass<Ta
 
     public abstract val testAgainst: NamedDomainObjectCollection<Target>
 
-    /** Declares a version that the plugin should be tested against. This method is idempotent. */
+    /**
+     * Declares a version that the plugin should be tested against. This method is idempotent.
+     *
+     * @param forIde whether the for-IDE module renames of `kotlin-modules.txt` apply. Defaults to
+     *   true only for versions the IDE track publishes: an `-ij` build, or a `dev` build an IDE
+     *   line ships.
+     */
     public abstract fun testAgainst(
         version: KotlinToolingVersion,
-        forIde: Boolean = version.isDev,
+        forIde: Boolean = version.isPublishedForIde,
         action: Target.() -> Unit = {},
     ): Target?
 
-    /** Declares a version that the plugin should be tested against. This method is idempotent. */
+    /**
+     * Declares a version that the plugin should be tested against. This method is idempotent.
+     *
+     * @param forIde whether the for-IDE module renames of `kotlin-modules.txt` apply. Defaults to
+     *   true only for versions the IDE track publishes: an `-ij` build, or a `dev` build an IDE
+     *   line ships.
+     */
     public fun testAgainst(
         version: String,
-        forIde: Boolean = KotlinToolingVersion(version).isDev,
+        forIde: Boolean = KotlinToolingVersion(version).isPublishedForIde,
         action: Target.() -> Unit = {},
     ): Target? = testAgainst(KotlinToolingVersion(version), forIde, action)
 
