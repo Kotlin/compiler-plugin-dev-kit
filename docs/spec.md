@@ -153,8 +153,8 @@ One build limits the range of [versions](#version) for these reasons:
       is used. In practice, only the latest EAP of a [version](#ide-version) is used (known problem, #70).
     - The name is misleading, because it also adds Android Studio versions. In practice, Android Studio uses a stable
       IntelliJ IDEA release as its base.
-- `useLatestDev` gets the latest Kotlin [version](#cli-version) from the `dev` repository and adds it as a
-  [CLI version](#cli-version). It is mainly for CI.
+- `useLatestDev`/`useLatestBootstrap` gets the latest Kotlin [version](#cli-version) from the `dev`/`bootstrap`
+  repository and adds it as a [CLI version](#cli-version). They are mainly for CI.
 - `defaultTestVersion("2.x.y")` sets the [version](#version) that the `default*Test` tasks run against (possibly not
   useful, #71).
     - If the other properties don't add this [version](#version), `defaultTestVersion` adds it like `testAgainst` does.

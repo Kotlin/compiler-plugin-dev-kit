@@ -118,6 +118,12 @@ public abstract class DevKitSettingsExtension(private val settings: Settings) :
         }
     }
 
+    override fun useLatestBootstrap() {
+        settings.gradle.beforeProject {
+            extra[USE_LATEST_BOOTSTRAP_PROPERTY] = "true"
+        }
+    }
+
     public fun defaultTestVersion(version: KotlinToolingVersion) {
         settings.gradle.beforeProject {
             extra[DEFAULT_TEST_VERSION_PROPERTY] = version.toString()

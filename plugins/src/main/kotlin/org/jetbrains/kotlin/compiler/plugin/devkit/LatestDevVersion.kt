@@ -1,12 +1,13 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.net.URI
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 
-private const val DEV_REPOSITORY = "https://redirector.kotlinlang.org/maven/dev"
+internal const val DEV_REPOSITORY = "https://redirector.kotlinlang.org/maven/dev"
+internal const val BOOTSTRAP_REPOSITORY = "https://redirector.kotlinlang.org/maven/bootstrap"
 
 private const val METADATA_PATH = "org/jetbrains/kotlin/kotlin-compiler/maven-metadata.xml"
 
@@ -21,13 +22,19 @@ private val VERSION_ELEMENT = Regex("<version>([^<]+)</version>")
  * pinning whatever build was newest when the entry was stored - which for a canary would defeat the
  * point. It only runs when [DevKitCompilerConfigExtension.useLatestDev] asks for it.
  */
-internal abstract class LatestDevVersion : ValueSource<String, ValueSourceParameters.None> {
+internal abstract class LatestDevVersion : ValueSource<String, LatestDevVersion.Parameters> {
+    interface Parameters : ValueSourceParameters {
+        val repository: Property<String>
+    }
+
     override fun obtain(): String {
-        val url = "$DEV_REPOSITORY/$METADATA_PATH"
+        val url = "${parameters.repository.get()}/$METADATA_PATH"
         val metadata = runCatching {
             URI(url).toURL().readText()
         }
-            .getOrElse { error("$USE_LATEST_DEV_PROPERTY could not read $url: $it") }
+            .getOrElse {
+                error("$USE_LATEST_DEV_PROPERTY/useLatestBootstrap could not read $url: $it")
+            }
         val latest =
             VERSION_ELEMENT.findAll(metadata)
                 .map { KotlinToolingVersion(it.groupValues[1]) }

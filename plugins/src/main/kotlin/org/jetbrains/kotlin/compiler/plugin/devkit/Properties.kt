@@ -37,6 +37,10 @@ public const val INCLUDE_IDEA_EAP_PROPERTY: String = "kotlin.compiler.plugin.dev
 /** @see DevKitVersionsProperties.useLatestDev */
 public const val USE_LATEST_DEV_PROPERTY: String = "kotlin.compiler.plugin.devkit.useLatestDev"
 
+/** @see DevKitVersionsProperties.useLatestBootstrap */
+public const val USE_LATEST_BOOTSTRAP_PROPERTY: String =
+    "kotlin.compiler.plugin.devkit.useLatestBootstrap"
+
 /**
  * Gradle property holding the version that the generic `test`/`functionalTest` task delegates to.
  * The version is registered if [TEST_AGAINST_PROPERTY] didn't already list it.

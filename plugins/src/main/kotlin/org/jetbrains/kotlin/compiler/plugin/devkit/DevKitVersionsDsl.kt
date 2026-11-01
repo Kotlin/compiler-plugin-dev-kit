@@ -104,8 +104,17 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
     }
 
     override fun useLatestDev() {
-        val latestDev = providers.of(LatestDevVersion::class.java) {}.get()
+        val latestDev = providers.of(LatestDevVersion::class.java) {
+            parameters { repository.set(DEV_REPOSITORY) }
+        }.get()
         registerVersion(KotlinToolingVersion(latestDev), forIde = false)
+    }
+
+    override fun useLatestBootstrap() {
+        val latestBootstrap = providers.of(LatestDevVersion::class.java) {
+            parameters { repository.set(BOOTSTRAP_REPOSITORY) }
+        }.get()
+        registerVersion(KotlinToolingVersion(latestBootstrap), forIde = false)
     }
 
     /**
@@ -149,5 +158,6 @@ public abstract class DevKitVersionsDsl internal constructor(final override val 
                 extOrGradleProperty(INCLUDE_IDEA_EAP_PROPERTY).isTrue(),
             )
         if (extOrGradleProperty(USE_LATEST_DEV_PROPERTY).isTrue()) useLatestDev()
+        if (extOrGradleProperty(USE_LATEST_BOOTSTRAP_PROPERTY).isTrue()) useLatestBootstrap()
     }
 }

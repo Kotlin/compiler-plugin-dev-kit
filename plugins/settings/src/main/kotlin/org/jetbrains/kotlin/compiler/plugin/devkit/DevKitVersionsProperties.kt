@@ -63,4 +63,7 @@ public interface DevKitVersionsProperties {
 
     /** Adds the latest Kotlin dev version. This is useful for reacting early to breaking changes */
     public fun useLatestDev()
+
+    /** Adds the latest Kotlin bootstrap version. This is useful for reacting early to breaking changes */
+    public fun useLatestBootstrap()
 }
