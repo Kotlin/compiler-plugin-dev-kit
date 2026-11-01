@@ -748,6 +748,11 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         commonTestFixtures.dependencies {
             api(kotlin("stdlib"))
             api(kotlin("test-junit5"))
+            // kotlin-test-junit5 pins junit-jupiter-api 5.10.1. The test framework of Kotlin
+            // 2.4.0 and later calls AssertionsKt.fail_nonNullableLambda, which junit-jupiter 5.12
+            // added. Because the test tasks run with useJUnitPlatform(), the BOM also aligns the
+            // engine and the launcher.
+            api(dependencies.platform("org.junit:junit-bom:5.14.4"))
             api(kotlin("compiler-internal-test-framework"))
             // TODO only add it for versions in "2.5.0-dev-9992"..<"2.5.20-dev-1201", i.e. b2c5e0d
             // until 4125732
