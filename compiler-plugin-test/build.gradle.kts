@@ -31,6 +31,12 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
+    // A trunk `dev` build has no for-IDE modules to resolve, unlike an `-ij` build, so the pinned
+    // version is a CLI target.
+    providers.gradleProperty("kotlin.compiler.plugin.devkit.pinnedDevVersion").orNull?.let {
+        testAgainst(it, forIde = false)
+    }
+
     versionHierarchy {
         split("2.5.0-dev-5676")
         split("2420Dev7600") {
