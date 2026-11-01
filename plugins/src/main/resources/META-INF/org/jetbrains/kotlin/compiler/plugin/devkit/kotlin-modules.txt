@@ -176,8 +176,15 @@ kotlin-objcexport-header-generator-for-ide=kotlin-objcexport-header-generator-fo
 kotlin-osgi-bundle=UNSUPPORTED
 kotlin-parcelize-compiler=kotlin-parcelize-compiler
 kotlin-parcelize-runtime=kotlin-parcelize-runtime
+# new, so check later JIC it's not getting published on ij versions, but it should be
+kotlin-parcelize-runtime-androidnativearm32=kotlin-parcelize-runtime-androidnativearm32
+kotlin-parcelize-runtime-androidnativearm64=kotlin-parcelize-runtime-androidnativearm64
+kotlin-parcelize-runtime-androidnativex64=kotlin-parcelize-runtime-androidnativex64
+kotlin-parcelize-runtime-androidnativex86=kotlin-parcelize-runtime-androidnativex86
 kotlin-parcelize-runtime-iosarm64=kotlin-parcelize-runtime-iosarm64
 kotlin-parcelize-runtime-iossimulatorarm64=kotlin-parcelize-runtime-iossimulatorarm64
+# new, so check later JIC it's not getting published on ij versions, but it should be
+kotlin-parcelize-runtime-iosx64=kotlin-parcelize-runtime-iosx64
 kotlin-parcelize-runtime-js=kotlin-parcelize-runtime-js
 kotlin-parcelize-runtime-jvm=kotlin-parcelize-runtime-jvm
 kotlin-parcelize-runtime-linuxarm64=kotlin-parcelize-runtime-linuxarm64
