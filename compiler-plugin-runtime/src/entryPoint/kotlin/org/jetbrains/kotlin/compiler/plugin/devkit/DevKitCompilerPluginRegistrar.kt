@@ -11,6 +11,7 @@ public abstract class DevKitCompilerPluginRegistrar(registrarClass: String) :
                 this@DevKitCompilerPluginRegistrar.javaClass,
                 pluginId,
             )
+        loader ?: return@lazy { _, _ -> }
         val registrar = loader.loadClass(registrarClass).getDeclaredConstructor().newInstance()
         val method =
             registrar.javaClass.getMethod(
@@ -20,6 +21,9 @@ public abstract class DevKitCompilerPluginRegistrar(registrarClass: String) :
             );
         { storage: ExtensionStorage, configuration: CompilerConfiguration ->
             method.invoke(registrar, storage, configuration)
+            storage.registerDisposable {
+                loader.close()
+            }
         }
     }
 

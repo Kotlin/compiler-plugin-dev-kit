@@ -13,9 +13,9 @@ import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public object VersionedPluginClassLoading {
-    private val cache = ConcurrentHashMap<String, ClassLoader>()
+    private val cache = ConcurrentHashMap<String, URLClassLoader>()
 
-    public fun resolve(anchor: Class<*>, id: String): ClassLoader {
+    public fun resolve(anchor: Class<*>, id: String): URLClassLoader? {
         val parent = anchor.classLoader
         val currentVersion =
             KotlinCompilerVersion.getVersion()
@@ -30,7 +30,7 @@ public object VersionedPluginClassLoading {
                     method.invoke(parent) as? Iterable<URL>
                 }
                     .getOrNull()
-        if (currentVersion == null || urls == null) return parent
+        if (currentVersion == null || urls == null) return null
         return cache.getOrPut(id) { resolveUncached(parent, id, urls, currentVersion) }
     }
 
@@ -39,7 +39,7 @@ public object VersionedPluginClassLoading {
         id: String,
         urls: Iterable<URL>,
         currentVersion: KotlinToolingVersion,
-    ): ClassLoader {
+    ): URLClassLoader {
         val paths = buildList {
             urls.forEach { addOverlayAndDependencies(id, it.toURI().toPath(), currentVersion) }
         }
@@ -48,7 +48,15 @@ public object VersionedPluginClassLoading {
             // Disable caching for our directory-in-jar urls so hot reloading works
             if (url.protocol == "jar") url.withHandler(DisableCachesStreamHandler) else url
         }
-        return URLClassLoader(urls.toTypedArray(), parent.parent)
+        return PluginClassLoader(id, urls.toTypedArray(), parent.parent)
+    }
+
+    private class PluginClassLoader(val id: String, urls: Array<URL>, parent: ClassLoader) :
+        URLClassLoader(urls, parent) {
+        override fun close() {
+            super.close()
+            cache.remove(id, this)
+        }
     }
 
     private object DisableCachesStreamHandler : URLStreamHandler() {
