@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 public class DevKitSettingsPlugin : Plugin<Settings> {
     override fun apply(target: Settings): Unit = target.run {
-        pluginManagement.repositories.kotlinDevRepositories()
         gradle.settingsEvaluated {
             dependencyResolutionManagement.repositories.kotlinDevRepositories()
         }
