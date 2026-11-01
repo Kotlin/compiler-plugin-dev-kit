@@ -16,7 +16,7 @@ public class DevKitSettingsPlugin : Plugin<Settings> {
             dependencyResolutionManagement.repositories.kotlinDevRepositories()
         }
         gradle.lifecycle.beforeProject {
-            pluginManager.apply("$DEV_KIT_GROUP.functional-test-publishing")
+            pluginManager.apply(DevKitFunctionalTestPublishingPlugin::class.java)
         }
         extensions.create("pluginDevKit", DevKitSettingsExtension::class.java, this)
     }
