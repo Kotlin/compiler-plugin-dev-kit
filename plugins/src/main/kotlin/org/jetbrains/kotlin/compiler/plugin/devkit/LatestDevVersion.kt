@@ -31,7 +31,7 @@ internal abstract class LatestDevVersion : ValueSource<String, ValueSourceParame
         val latest =
             VERSION_ELEMENT.findAll(metadata)
                 .map { KotlinToolingVersion(it.groupValues[1]) }
-                .filter { it.isDev }
+                .filter { it.classifier?.startsWith("dev") == true }
                 .maxOrNull()
         return requireNotNull(latest) { "$url lists no dev build" }.versionString
     }
