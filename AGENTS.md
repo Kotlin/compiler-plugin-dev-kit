@@ -146,8 +146,9 @@ those dependencies normally (a *library*, like `compiler-plugin-runtime` and `co
 
   `generateTests` is just the lifecycle task those two hang off, and it is itself `enabled = false` — a disabled task
   still runs its dependencies, so **`tasks.generateTests { enabled = false }` alone suppresses nothing**; a module that
-  wants no generated tests has to disable `generateTestsCli` and `generateTestsIde` too. Every version's
-  `compileJava`/`compileKotlin` depends on `generateTests`.
+  wants no generated tests sets `generateTestsEnabled = false` in `pluginDevKit { }` instead (default: true for a
+  compiler plugin, false for a compiler library). Every version's `compileJava`/`compileKotlin` depends on
+  `generateTests`.
 - The internal test framework's JS/Wasm half wants a pile of `-D` paths — hence the per-version
   `testArtifacts`/`testArtifactsWasm` resolution, the d8 executable and the generated `repl.js`.
 - `testDataLibraries { }` entries reach test data as `<name>.jvm.classpath` / `<name>.js.classpath` system properties
@@ -187,9 +188,10 @@ tests than by compiler tests. JVM and JS runners are named apart (`DevKitJvmBoxT
 reason.
 
 Everything here is *library* code that consumers' tests run against — the `@Test`s in `DevKitTest.kt` are part of that
-published surface, not a suite of this module's own. It has no test source set, no test data, and all three
-`generateTests*` tasks disabled, and nothing in the repo calls `DevKitTestGenerator`. So the test machinery this module
-exists to serve is exercised only downstream; see **Commands** for what that means for verifying a change.
+published surface, not a suite of this module's own. It has no test source set, no test data, test generation off
+through the `compiler-library` default of `generateTestsEnabled`, and nothing in the repo calls `DevKitTestGenerator`.
+So the test machinery this module exists to serve is exercised only downstream; see **Commands** for what that means
+for verifying a change.
 
 ### `version-resolution`
 

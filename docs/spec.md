@@ -271,6 +271,8 @@ One build limits the range of [versions](#version) for these reasons:
     - The DevKit generates the [entry point classes](#entry-point) into a separate `entry-point` compilation of the
       surrogate target.
 - Generates tests with `generateTestsClass` into `generatedTestsDir`:
+    - The `generateTestsEnabled` property turns generation off. Default is true for `compiler-plugin`, and false for
+      `compiler-library`.
     - The test generator must be in the `generateTests` source set. This source set uses the newest known Kotlin
       version, to get the latest improvements to the test generator.
     - `internal-test-framework` isn't published for [IDE versions](#ide-version). IDE versions use

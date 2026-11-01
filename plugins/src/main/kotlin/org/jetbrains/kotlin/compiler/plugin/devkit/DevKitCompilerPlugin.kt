@@ -104,6 +104,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     public val addRuntimeDependency: Property<Boolean> = objects.property(true)
 
     /**
+     * Whether to generate tests. Defaults to true for compiler plugins and false for compiler
+     * libraries.
+     */
+    public val generateTestsEnabled: Property<Boolean> = objects.property(isPlugin)
+
+    /**
      * Versions that this plugin should be tested against. By default, it includes the Kotlin
      * version applied to this build and everything listed in [TEST_AGAINST_PROPERTY].
      */
@@ -224,8 +230,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         name: String,
         forIde: Boolean,
         action: GenerateTestsTask.() -> Unit,
-    ): TaskProvider<GenerateTestsTask> =
-        tasks.register<GenerateTestsTask>(name) {
+    ): TaskProvider<GenerateTestsTask> {
+        val generateTestsEnabled = this.generateTestsEnabled
+        return tasks.register<GenerateTestsTask>(name) {
             mainClass.set(generateTestsClass)
             workingDir = rootDir
             val rootArgs = objects.listProperty<CommandLineArgumentProvider>()
@@ -249,9 +256,13 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     rootArgs.add(filesCommandLineArgumentProvider(inputFiles, outputDir))
                 }
             }
+            // createGenerateTestsCompilation enables the task later, so the property has to gate
+            // it at execution time for late DSL overrides to work.
+            onlyIf { generateTestsEnabled.get() }
             enabled = false
             action()
         }
+    }
 
     init {
         testAgainst.configureEach {

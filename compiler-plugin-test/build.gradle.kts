@@ -48,12 +48,6 @@ pluginDevKit {
     }
 }
 
-tasks.generateTests { enabled = false }
-
-tasks.generateTestsCli { enabled = false }
-
-tasks.generateTestsIde { enabled = false }
-
 publishing {
     repositories {
         maven {
