@@ -232,7 +232,7 @@ internal constructor(final override val project: Project, targetClass: KClass<Ta
             gradleProperty(INCLUDE_BETA_AND_RC_PROPERTY)
                 .orNull
                 ?.let(String::uppercase)
-                ?.let(BetaAndRc::valueOf) ?: BetaAndRc.NONE
+                ?.let(BetaAndRc::valueOf) ?: BetaAndRc.LATEST
         if (minCliVersion != null) cliVersions(minCliVersion, maxCliVersion, betaAndRc)
         val minIdeaVersion = gradleProperty(MIN_IDEA_VERSION_PROPERTY).orNull?.let(::IdeBuildNumber)
         val maxIdeaVersion =
