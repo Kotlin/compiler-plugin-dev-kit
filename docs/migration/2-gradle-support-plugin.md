@@ -17,9 +17,8 @@ plugins {
 }
 ```
 
-Remove the `build-config` and `java-gradle-plugin` plugins, because the DevKit applies them.
-The DevKit also adds a `compileOnly` dependency on `kotlin("gradle-plugin-api")`. If you declare this dependency, remove
-it.
+Remove the `build-config` and `java-gradle-plugin` plugins, because the DevKit applies them. The DevKit also adds a
+`compileOnly` dependency on `kotlin("gradle-plugin-api")`. If you declare this dependency, remove it.
 
 ## Use `DevKitSupportPlugin`
 
@@ -57,8 +56,8 @@ To migrate your `KotlinCompilerPluginSupportPlugin`, do these steps:
         extensions.getByType(MyGradleExtension::class.java).shouldAddRuntimeDependency.get()
     ```
 6. Replace `override fun applyToCompilation` with `override fun Project.applyToCompilation`.
-7. If `applyToCompilation` adds dependencies that `companionLibrary` already adds, remove that code. If the code adds
-   them conditionally, keep it. An example is a condition on a flag other than `shouldAddRuntimeDependency`.
+7. If `applyToCompilation` adds companion libraries as dependencies, remove that code. If the code adds them
+   conditionally, keep it. An example is a condition on a flag other than `shouldAddRuntimeDependency`.
 
 Your plugin now looks similar to this:
 

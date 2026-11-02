@@ -14,11 +14,11 @@ Remove these items:
 
 - The `build-config`, `node-gradle`, `idea`, and D8 plugins. The DevKit applies them.
 - The `test-fixtures` plugin. The DevKit has its own implementation.
-- `kotlin("jvm")`. Apply `kotlin("multiplatform")` instead, because the DevKit sets up each Kotlin version as a
-  separate target. The [multiversioning guide](../multiversioning/0-multiversioning.md) tells more about the targets.
+- `kotlin("jvm")`. Apply `kotlin("multiplatform")` instead, because the DevKit sets up each Kotlin version as a separate
+  target. The [multiversioning guide](../multiversioning/0-multiversioning.md) tells more about the targets.
 - The `generateTests` task, or a similar task, and its configuration. The DevKit generates the tests.
 - `Configuration`s that only bring in `testArtifacts`. The pre-DevKit template uses `setLibraryProperty` for them.
-- `Configuration`s that only bring in companion libraries. You declared these libraries with `companionLibrary()` in
+- `Configuration`s that only bring in companion libraries. You declared these libraries in
   [Initial setup](1-initial-setup.md).
 - The `internal-test-framework` properties in the test configuration, for example `idea.ignore.disabled.plugins`,
   `idea.home.path`, `javascript.engine.path.V8`, `javascript.engine.path.repl`, and `kotlin.js.test.root.out.dir`.
@@ -126,9 +126,8 @@ class MyCommandLineProcessor : DevKitCLP {
 ## Plugin registrar
 
 Replace `CompilerPluginRegistrar` with the `DevKitComponentRegistrar` interface. Remove `override val pluginId: String`
-and `override val supportsK2: Boolean`.
-Your class doesn't extend `CompilerPluginRegistrar`, so change the receiver of `registerExtensions` from
-`ExtensionStorage` to `CompilerPluginRegistrar.ExtensionStorage`.
+and `override val supportsK2: Boolean`. Your class doesn't extend `CompilerPluginRegistrar`, so change the receiver of
+`registerExtensions` from `ExtensionStorage` to `CompilerPluginRegistrar.ExtensionStorage`.
 
 Example:
 

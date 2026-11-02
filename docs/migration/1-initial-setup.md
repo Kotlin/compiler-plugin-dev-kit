@@ -47,30 +47,30 @@ If you added the `dev`, `bootstrap`, or `intellij-dependencies` repositories, re
 [comment]: # (TODO #55)
 
 Find your plugin ID. In the pre-DevKit template, the `build-config` setup passes the plugin ID explicitly. Set the plugin
-ID in the settings:
+ID in `gradle.properties`:
 
-```kotlin
-pluginDevKit { pluginPackage("my.plugin.id") }
+```properties
+kotlin.compiler.plugin.devkit.pluginPackage=my.plugin.id
 ```
 
 The DevKit uses this value as the plugin ID and as the package of the classes that it generates. If you don't set it,
 the DevKit uses the project group.
 
 A companion library is a library that your compiler plugin always expects to be present. The Gradle plugin adds it to
-the user's project, and the DevKit adds it to the tests. Add your companion libraries:
+the user's project, and the DevKit adds it to the tests. Add your companion libraries in `gradle.properties`. Each entry
+of the `companionLibraries` property is one of these:
 
-```kotlin
-pluginDevKit {
-    // project path, for a project in the same build
-    companionLibrary(":my-plugin-annotations")
-    // artifact name, for a library with the same group and version (for example, in an included build)
-    companionLibrary("my-plugin-annotations")
-    // dependency notation
-    companionLibrary("com.example:some-library:1.0.0")
-}
+- a project path, for example `:my-plugin-annotations`, for a project in the same build
+- an artifact name, for example `my-plugin-annotations`, for a library with the same group and version (for example, in
+  an included build)
+- a dependency notation, for example `com.example:some-library:1.0.0`
+
+Separate the entries with commas or whitespace. In the pre-DevKit template, the companion library is
+`:plugin-annotations`:
+
+```properties
+kotlin.compiler.plugin.devkit.companionLibraries=:plugin-annotations
 ```
-
-In the pre-DevKit template, the companion library is `:plugin-annotations`.
 
 Don't configure version support ranges in this step.
 Make sure that your project still builds and runs.
