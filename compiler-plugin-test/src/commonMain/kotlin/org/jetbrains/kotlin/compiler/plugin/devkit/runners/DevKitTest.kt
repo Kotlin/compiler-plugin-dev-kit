@@ -2,6 +2,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.compiler.plugin.devkit.firIdenticalCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.DevKitTestConfigurator
+import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureDefaultTestDataLibraries
 import org.jetbrains.kotlin.compiler.plugin.devkit.versionDumpClassifier
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
@@ -51,9 +52,10 @@ public abstract class DevKitTest(
         config.forEach { it(builder) }
     }
 
+    @OptIn(DevKitTestInternals::class)
     @TestInfrastructureInternals
     final override fun configureInternal(builder: TestConfigurationBuilder) {
-        builder.devKitDefaultConfig()
+        builder.devKitDefaults()
         super.configureInternal(builder)
         targetBackend?.let { myTargetBackend ->
             builder.globalDefaults {
@@ -71,19 +73,14 @@ public abstract class DevKitTest(
     }
 }
 
-@Deprecated(
-    "Applied by default in DevKitTest",
-    replaceWith = ReplaceWith("Unit"),
-    level = DeprecationLevel.ERROR,
-)
-public fun TestConfigurationBuilder.devKitDefaults() {
-    devKitDefaultConfig()
-}
+@RequiresOptIn("Applied by default in DevKitTest") public annotation class DevKitTestInternals
 
-private fun TestConfigurationBuilder.devKitDefaultConfig() {
+@DevKitTestInternals
+public fun TestConfigurationBuilder.devKitDefaults() {
     defaultDirectives {
         versionDumpClassifier()
         firIdenticalCompat()
     }
+    configureDefaultTestDataLibraries()
     useMetaTestConfigurators(::DevKitTestConfigurator)
 }

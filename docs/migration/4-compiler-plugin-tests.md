@@ -36,8 +36,7 @@ If you have an `ExtensionRegistrarConfigurator: EnvironmentConfigurator` that co
 If you have a `PluginAnnotationsProvider: EnvironmentConfigurator` or a
 `PluginAnnotationsClasspathProvider: RuntimeClasspathProvider`, check which tests get the companion libraries:
 
-- If every test gets them, delete the provider. `configurePlugin` adds the companion libraries to every test. If you
-  don't call `configurePlugin`, call `configureDefaultTestDataLibraries()`.
+- If every test gets them, delete the provider. Every DevKit test base adds the companion libraries to every test.
 - If only some tests get a library, use the library that you registered with `testDataLibraries` in
   [Compiler plugin](3-compiler-plugin.md). Give its `TestDataLibraries` property to `configureTestDataLibrary`, as in
   the example below.

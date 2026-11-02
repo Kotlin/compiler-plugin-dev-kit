@@ -328,10 +328,12 @@ The `compiler-plugin` and `compiler-library` plugins add it as an `api` dependen
 The test bases are in the package `org.jetbrains.kotlin.compiler.plugin.devkit.runners`:
 
 - `DevKitTest` is the base of every other DevKit test base:
-    - Its constructor takes configuration lambdas first, as a `vararg`, then `targetBackend` as a named argument.
-    - Its second constructor wraps an `AbstractKotlinCompilerTest`, for example an `internal-test-framework` runner. It
-      takes the configuration and the target backend of that test.
-    - Every test gets the [version classifier](#classified-dumps), `firIdenticalCompat()`, and `DevKitTestConfigurator`.
+    - Its constructors take configuration lambdas as a `vararg`, alongside other arguments like `targetBackend` or an
+      `AbstractKotlinCompilerTest` to wrap
+    - Every test gets the [version classifier](#classified-dumps), `firIdenticalCompat()`,
+      `configureDefaultTestDataLibraries()`, and `DevKitTestConfigurator`.
+        - `DevKitTestConfigurator` skips KLIB-based tests on unsupported versions (because KLIBs lack forward
+          compatibility)
     - It reads the standard library paths from the system properties that the `<target>Test` task sets.
     - `configure(builder)` is final. A subclass adds configuration through the constructor or the protected `configure`
       functions.
@@ -351,8 +353,7 @@ The test bases are in the package `org.jetbrains.kotlin.compiler.plugin.devkit.r
 
 The services are in the package `org.jetbrains.kotlin.compiler.plugin.devkit.services`:
 
-- `configurePlugin(registrar)` registers the extensions of a `DevKitComponentRegistrar` in every test module. It also
-  calls `configureDefaultTestDataLibraries()`.
+- `configurePlugin(registrar)` registers the extensions of a `DevKitComponentRegistrar`.
 - `configureDefaultTestDataLibraries()` adds the default libraries of `testDataLibraries` to every module. They include
   the [companion libraries](#companion-library).
 - `configureTestDataLibrary(library) { module -> condition }` adds a `TestDataLibrary` to the compile and runtime

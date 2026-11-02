@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.services
 import java.io.File
 import java.util.Collections.emptyList
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
+import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitTestInternals
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.platform.isJs
@@ -30,6 +31,7 @@ public class TestDataLibrary(
         )
 }
 
+@DevKitTestInternals
 public fun TestConfigurationBuilder.configureDefaultTestDataLibraries() {
     configureTestDataLibrary(defaultTestDataLibrary) { true }
 }

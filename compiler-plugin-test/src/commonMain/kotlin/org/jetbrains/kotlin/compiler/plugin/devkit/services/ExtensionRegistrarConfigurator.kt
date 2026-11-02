@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.test.services.TestServices
 
 public fun TestConfigurationBuilder.configurePlugin(registrar: DevKitComponentRegistrar) {
     useConfigurators(registrar::ExtensionRegistrarConfigurator)
-    configureDefaultTestDataLibraries()
 }
 
 private fun DevKitComponentRegistrar.ExtensionRegistrarConfigurator(testServices: TestServices) =
