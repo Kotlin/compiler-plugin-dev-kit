@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
 public abstract class DevKitCommandLineProcessor(processorClass: String) : CommandLineProcessor {
-    private typealias ProcessOption = (AbstractCliOption, String, CompilerConfiguration) -> Unit
+    private typealias ProcessOption = (AbstractCliOption, String, CompilerConfiguration) -> Any?
 
     private val versionedProcessor:
         Pair<ProcessOption, () -> Collection<AbstractCliOption>> by lazy {
@@ -23,7 +23,7 @@ public abstract class DevKitCommandLineProcessor(processorClass: String) : Comma
         val pluginOptions = clp.javaClass.getMethod("getPluginOptions")
         return@lazy { option: AbstractCliOption, value: String, configuration: CompilerConfiguration
             ->
-            processOption.invoke(clp, option, value, configuration) as Unit
+            processOption.invoke(clp, option, value, configuration)
         } to
             {
                 @Suppress("UNCHECKED_CAST")
