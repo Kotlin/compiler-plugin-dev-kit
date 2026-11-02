@@ -171,7 +171,7 @@ public object VersionResolution {
         when {
             !exists() -> false
             extension == "jar" ->
-                newFileSystem(this).use {
+                newFileSystem(this, null as ClassLoader?).use {
                     block(it.rootDirectories.single())
                     true
                 }

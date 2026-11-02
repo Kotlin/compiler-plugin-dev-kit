@@ -66,5 +66,6 @@ public object VersionedPluginClassLoading {
 
     private fun Path.toURL(): URL = URI(toUri().toString() + "/").toURL()
 
-    private fun URL.withHandler(handler: URLStreamHandler?) = URL.of(toURI(), handler)
+    @Suppress("DEPRECATION") // deprecated on JVM 20+, but we need to support older JVMs
+    private fun URL.withHandler(handler: URLStreamHandler?) = URL(null, toURI().toString(), handler)
 }

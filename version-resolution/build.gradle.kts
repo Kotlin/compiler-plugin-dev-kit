@@ -32,6 +32,7 @@ publishing {
 
 tapmoc {
     gradle(libs.versions.gradle.get())
+    java(8)
     checkDependencies(Severity.ERROR)
     checkKotlinStdlibs(Severity.ERROR)
 }

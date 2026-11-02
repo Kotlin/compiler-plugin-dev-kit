@@ -4,15 +4,14 @@ plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
     id("com.vanniktech.maven.publish") version libs.versions.publish
+    alias(libs.plugins.tapmoc)
 }
 
 group = libs.versions.devkit.group.get()
 
 version = libs.versions.devkit.version.get()
 
-java {
-    targetCompatibility = JavaVersion.VERSION_17
-}
+tapmoc { java(8) }
 
 kotlin {
     explicitApi()
