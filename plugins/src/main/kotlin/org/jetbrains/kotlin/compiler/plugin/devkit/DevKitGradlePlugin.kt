@@ -277,15 +277,7 @@ public open class GradlePluginConfigExtension(project: Project) :
     /** properties to place inside gradle.properties for the `functionalTest` suite. */
     public val functionalTestProperties: ListProperty<String> = objects.listProperty<String>()
 
-    /**
-     * The highest Kotlin version every library in [companionLibraries] was built using. This is
-     * used to filter KMP tests for lower versions because KLIBS are not backwards compatible.
-     *
-     * The default is the highest `compiler_version` the libraries' klib manifests record, which
-     * also covers external libraries. A library without a klib in any variant the tests compile has
-     * nothing to read, so when none of them has one, the default is the minimum registered version
-     */
-    public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
+    override val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
         objects.property(
             provider {
                 companionLibraryKlibs.files.mapNotNull(::klibCompilerVersion).maxOrNull()

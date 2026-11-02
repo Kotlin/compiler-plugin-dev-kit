@@ -305,15 +305,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         testDataLibraries { common(project(project.path)) }
     }
 
-    /**
-     * The highest Kotlin version every library in [testDataLibraries] was built using. This is used
-     * to filter KMP tests for lower versions because KLIBS are not backwards compatible.
-     *
-     * The default is the highest `compiler_version` the libraries' klib manifests record, which
-     * also covers external libraries. A library without a JS variant has no klib to read, so when
-     * no library has one, the default is the minimum registered version.
-     */
-    public val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
+    override val companionLibrariesKotlinVersion: Property<KotlinToolingVersion> =
         objects.property(
             provider {
                 klibs.files.mapNotNull(::klibCompilerVersion).maxOrNull()

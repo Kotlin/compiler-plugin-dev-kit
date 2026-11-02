@@ -209,6 +209,16 @@ internal constructor(final override val project: Project, targetClass: KClass<Ta
      */
     public abstract fun companionLibrary(project: Project, group: Any? = null, version: Any? = null)
 
+    /**
+     * The highest Kotlin version every companion library was built using. This is used to filter
+     * KMP tests for lower versions because KLIBS are not forwards compatible.
+     *
+     * The default is the highest `compiler_version` the libraries' klib manifests record; if all
+     * companion libraries are JVM only, the default is the minimum registered [testAgainst]
+     * version.
+     */
+    public abstract val companionLibrariesKotlinVersion: Property<KotlinToolingVersion>
+
     protected fun registerSupportedVersions() {
         listFromGradleProperty(TEST_AGAINST_PROPERTY).forEach {
             testAgainst(KotlinToolingVersion(it))
