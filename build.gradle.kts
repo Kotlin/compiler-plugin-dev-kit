@@ -1,6 +1,7 @@
 plugins {
     base
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.tapmoc) apply false
     alias(libs.plugins.spotless)
 }
 

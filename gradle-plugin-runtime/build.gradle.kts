@@ -59,6 +59,6 @@ publishing {
 
 tapmoc {
     gradle(minGradleVersion)
-    checkDependencies(Severity.ERROR)
+    checkDependencies(Severity.WARNING) // gradleTestKit sadly forces the local version
     checkKotlinStdlibs(Severity.ERROR)
 }
