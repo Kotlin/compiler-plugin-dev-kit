@@ -23,26 +23,18 @@ import org.gradle.api.tasks.options.Option
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.kotlin.dsl.withType
-import org.gradle.plugins.ide.api.GeneratorTask
-import org.gradle.plugins.ide.internal.generator.generator.Generator
 
-public abstract class JsReplGeneratorTask : GeneratorTask<String>() {
+public abstract class JsReplGeneratorTask : DefaultTask() {
     @get:Input @get:Optional public abstract val defaultRepl: Property<String>
 
-    init {
-        generator =
-            object : Generator<String> {
-                override fun read(inputFile: File?): String? =
-                    defaultRepl.orNull ?: inputFile?.readText()
+    @get:OutputFile public abstract val outputFile: RegularFileProperty
 
-                override fun defaultInstance(): String? = defaultRepl.orNull
-
-                override fun configure(`object`: String?) {}
-
-                override fun write(`object`: String?, outputFile: File?) {
-                    if (`object` != null && outputFile != null) outputFile.writeText(`object`)
-                }
-            }
+    @TaskAction
+    public fun generate() {
+        val file = outputFile.get().asFile
+        val content = defaultRepl.orNull ?: return
+        file.parentFile.mkdirs()
+        file.writeText(content)
     }
 }
 

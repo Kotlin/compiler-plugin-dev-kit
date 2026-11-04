@@ -223,7 +223,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         tasks.register("createJsRepl", JsReplGeneratorTask::class) {
             description = "Creates a JS Repl for use by the testing framework"
             defaultRepl.convention(javaClass.classLoader.getResource("repl.js")?.readText())
-            outputFile = layout.buildDirectory.file("js-test-repl/repl.js").get().asFile
+            outputFile.set(layout.buildDirectory.file("js-test-repl/repl.js"))
         }
 
     private fun registerGenerateTestsTask(
@@ -636,7 +636,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 )
                 +FileSystemPropertyArgumentProvider(
                     "javascript.engine.path.repl",
-                    createJsRepl.map { it.outputFile },
+                    createJsRepl.map { it.outputFile.get().asFile },
                 )
                 +FileSystemPropertyArgumentProvider(
                     "kotlin.js.test.root.out.dir",
