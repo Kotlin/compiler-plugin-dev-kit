@@ -189,6 +189,7 @@ public open class GradlePluginConfigExtension(project: Project) :
         configurations
             .resolvable("companionLibrariesJvm") {
                 extendsFrom(companionLibrariesClasspath)
+                extendsFrom(configurations.named(functionalTest.runtimeClasspathConfigurationName))
                 attributes {
                     attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
                 }
