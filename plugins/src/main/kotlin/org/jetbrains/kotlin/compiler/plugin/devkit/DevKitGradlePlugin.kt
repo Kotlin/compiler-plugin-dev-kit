@@ -123,18 +123,36 @@ public open class GradlePluginConfigExtension(project: Project) :
      */
     public val compilerPlugin: Property<ProjectOrGav> = objects.property()
 
+    /**
+     * The compiler plugin project that this Gradle plugin applies. Defaults to the project at the
+     * path in [COMPILER_PLUGIN_PROPERTY], if that is set.
+     */
+    public fun compilerPlugin(project: Project) {
+        compilerPlugin.set(ProjectOrGav.LocalProject(project.isolated))
+    }
+
+    /**
+     * The compiler plugin project that this Gradle plugin applies. Defaults to the project at the
+     * path in [COMPILER_PLUGIN_PROPERTY], if that is set.
+     */
+    public fun compilerPlugin(siblingNameOrGav: String) {
+        compilerPlugin.set(
+            when {
+                siblingNameOrGav.isDependencyNotation -> {
+                    val dep = dependencies.create(siblingNameOrGav) {}
+                    ProjectOrGav.External(dep.group, dep.name, dep.version)
+                }
+                else -> ProjectOrGav.Sibling(siblingNameOrGav)
+            }
+        )
+    }
+
     init {
         gradleProperty(COMPILER_PLUGIN_PROPERTY).orNull?.let {
-            compilerPlugin.convention(
-                when {
-                    it.isProjectPath -> ProjectOrGav.LocalProject(project.project(it).isolated)
-                    it.isDependencyNotation -> {
-                        val dep = dependencies.create(it) {}
-                        ProjectOrGav.External(dep.group, dep.name, dep.version)
-                    }
-                    else -> ProjectOrGav.Sibling(it)
-                }
-            )
+            when {
+                it.isProjectPath -> compilerPlugin(project.project(it))
+                else -> compilerPlugin(it)
+            }
         }
     }
 

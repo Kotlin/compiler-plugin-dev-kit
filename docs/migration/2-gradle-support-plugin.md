@@ -26,13 +26,9 @@ In `build.gradle.kts`, remove the `build-config` fields for the plugin ID, the c
 
 Set `compilerPlugin` to your compiler plugin project:
 
-[comment]: # (TODO #56)
-
 ```kotlin
-import org.jetbrains.kotlin.compiler.plugin.devkit.ProjectOrGav
-
 pluginDevKit {
-    compilerPlugin = ProjectOrGav.LocalProject(project(":my-compiler-plugin").isolated)
+    compilerPlugin(project(":my-compiler-plugin"))
 }
 ```
 
