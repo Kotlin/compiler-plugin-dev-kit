@@ -1,5 +1,6 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.configureTestPhaseCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.firIdenticalCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.DevKitTestConfigurator
 import org.jetbrains.kotlin.compiler.plugin.devkit.services.configureDefaultTestDataLibraries
@@ -83,4 +84,5 @@ public fun TestConfigurationBuilder.devKitDefaults() {
     }
     configureDefaultTestDataLibraries()
     useMetaTestConfigurators(::DevKitTestConfigurator)
+    configureTestPhaseCompat()
 }

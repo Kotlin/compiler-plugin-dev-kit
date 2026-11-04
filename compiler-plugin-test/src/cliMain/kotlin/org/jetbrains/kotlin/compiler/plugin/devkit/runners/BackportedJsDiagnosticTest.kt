@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.backendTestPhase
 import org.jetbrains.kotlin.compiler.plugin.devkit.libraryProviderCtor
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
@@ -25,7 +26,6 @@ import org.jetbrains.kotlin.test.directives.TestPhaseDirectives
 import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
-import org.jetbrains.kotlin.test.services.TestPhase
 
 public abstract class BackportedJsDiagnosticTestBase(
     vararg config: TestConfigurationBuilder.() -> Unit,
@@ -76,7 +76,7 @@ public abstract class BackportedJsDiagnosticWithBackendTestBase(
                 useHandlers(::KlibBackendDiagnosticsHandler)
             }
             defaultDirectives {
-                TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE with TestPhase.entries.last()
+                TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE with backendTestPhase
             }
         },
         *config,

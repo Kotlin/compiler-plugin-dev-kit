@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.compiler.plugin.devkit.FirDistinctSourceElementsHandler
+import org.jetbrains.kotlin.compiler.plugin.devkit.backendTestPhase
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.setupJvmPipelineSteps
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
@@ -37,7 +38,6 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.NonSourceErrorMessagesHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.PsiLightTreeMetaInfoProcessor
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
-import org.jetbrains.kotlin.test.services.TestPhase
 import org.jetbrains.kotlin.utils.bind
 
 public abstract class BackportedFirPhasedDiagnosticTest(
@@ -47,7 +47,7 @@ public abstract class BackportedFirPhasedDiagnosticTest(
     DevKitTest(
         {
             defaultDirectives {
-                LATEST_PHASE_IN_PIPELINE with TestPhase.entries.last()
+                LATEST_PHASE_IN_PIPELINE with backendTestPhase
                 LANGUAGE + "+EnableDfaWarningsInK2"
                 DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "-$it" }
             }
