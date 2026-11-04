@@ -5,8 +5,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import java.io.File
 import javax.inject.Inject
-import kotlin.io.path.Path
-import kotlin.io.path.name
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
@@ -290,10 +288,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     override fun companionLibrary(dependencyNotationOrSiblingName: String) {
         testDataLibraries {
             when {
-                dependencyNotationOrSiblingName.isIncludedBuildPath -> {
-                    common(siblingDependency(Path(dependencyNotationOrSiblingName).name))
-                }
-
                 dependencyNotationOrSiblingName.isDependencyNotation ->
                     common(dependencyNotationOrSiblingName)
                 else -> common(siblingDependency(dependencyNotationOrSiblingName))

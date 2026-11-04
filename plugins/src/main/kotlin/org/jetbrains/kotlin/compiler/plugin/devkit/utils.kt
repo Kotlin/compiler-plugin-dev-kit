@@ -27,9 +27,6 @@ internal val String.isProjectPath: Boolean
 internal val String.isDependencyNotation: Boolean
     get() = contains(':')
 
-internal val String.isIncludedBuildPath: Boolean
-    get() = startsWith('.') || startsWith('/')
-
 // Uses same convention as Metro
 // https://github.com/ZacSweers/metro/tree/7e38de5535d66ea5491e155711fd9830c564924a/compiler-compat#version-naming-convention
 public val KotlinToolingVersion.baseVersionName: String

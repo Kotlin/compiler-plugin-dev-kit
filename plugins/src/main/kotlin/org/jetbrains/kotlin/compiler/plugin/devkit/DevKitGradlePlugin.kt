@@ -3,14 +3,15 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
-import kotlin.io.path.Path
-import kotlin.io.path.name
+import java.io.File
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.attributes.AttributeContainer
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.FileCollection
@@ -21,9 +22,9 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
-import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.domainObjectContainer
+import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
@@ -33,6 +34,7 @@ import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.language.base.plugins.LifecycleBasePlugin
+import org.gradle.util.Path
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -90,11 +92,17 @@ private val ProjectOrGav.version: String?
             is Sibling -> project.version.toString()
         }
 
-// GradleTestKitSupportExtension doesn't expose it publicly
+// GradleTestKitSupportExtension doesn't expose them publicly
 private const val FUNCTIONAL_TEST = "functionalTest"
+private const val INSTALL_FOR_FUNCTIONAL_TEST = "installForFunctionalTest"
+private const val FUNCTIONAL_TEST_REPO_DIR = "build/functionalTestRepo"
 
-private val FUNCTIONAL_TEST_ARGUMENT_PROVIDERS =
-    setOf("RepoAndVersionArgumentProvider", "IncludeBuildReposArgumentProvider")
+// Testkit's argument providers are internal, so match them by simple name
+private const val REPO_AND_VERSION_ARGUMENT_PROVIDER = "RepoAndVersionArgumentProvider"
+private const val TESTKIT_INCLUDE_BUILD_REPOS_PROVIDER = "IncludeBuildReposArgumentProvider"
+
+private const val INCLUDED_BUILD_REPOS_SYSTEM_PROPERTY =
+    "com.autonomousapps.plugin-under-test.repos-included"
 
 public open class GradlePluginConfigExtension(project: Project) :
     DevKitPropertiesDsl<DevKitGradlePluginTestTarget>(
@@ -136,52 +144,102 @@ public open class GradlePluginConfigExtension(project: Project) :
     private val companionLibrariesClasspath =
         configurations.dependencyScope("companionLibrariesClasspath")
 
+    private val companionKlibViews: List<Configuration> =
+        listOf(
+            companionKlibs("companionLibrariesJs") {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
+            },
+            companionKlibs("companionLibrariesWasmJs") {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
+                attribute(
+                    KotlinWasmTargetAttribute.wasmTargetAttribute,
+                    KotlinWasmTargetAttribute.js,
+                )
+            },
+            companionKlibs("companionLibrariesNativeHost") {
+                // Native klibs are published under `kotlin-api` and per konan target
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
+                attribute(KotlinPlatformType.attribute, KotlinPlatformType.native)
+                attribute(KotlinNativeTarget.konanTargetAttribute, hostKonanTarget())
+            },
+        )
+
     /**
-     * The klibs of [companionLibraries] in every variant the functional tests can compile: JS,
-     * wasmJs, and the host's Kotlin/Native target, the only native target compilable without a
-     * cross-compilation toolchain. [companionLibrariesKotlinVersion] reads the compiler version out
-     * of them.
+     * The klibs of [companionLibraries]. [companionLibrariesKotlinVersion] reads the compiler
+     * version out of them.
      *
-     * Each view is lenient, because a library without a klib in a variant has nothing to
-     * contribute, and the version default must not fail the build over it.
+     * Each view is lenient.
      */
     private val companionLibraryKlibs: FileCollection =
         objects
             .fileCollection()
             .from(
-                companionKlibs("companionLibrariesJs") {
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-                },
-                companionKlibs("companionLibrariesWasmJs") {
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
-                    attribute(
-                        KotlinWasmTargetAttribute.wasmTargetAttribute,
-                        KotlinWasmTargetAttribute.js,
-                    )
-                },
-                companionKlibs("companionLibrariesNativeHost") {
-                    // Native klibs are published under `kotlin-api` and per konan target
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.native)
-                    attribute(KotlinNativeTarget.konanTargetAttribute, hostKonanTarget())
-                },
+                companionKlibViews.map { view ->
+                    view.incoming.artifactView { lenient(true) }.files
+                }
             )
+
+    /**
+     * The JVM runtime variants of [companionLibraries]. [detectedIncludedBuildProjects] also reads
+     * this view.
+     */
+    private val companionLibrariesJvm: Configuration =
+        configurations
+            .resolvable("companionLibrariesJvm") {
+                extendsFrom(companionLibrariesClasspath)
+                attributes {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+                }
+            }
+            .get()
+
+    /**
+     * The included build projects that [companionLibraries] resolve to, as (build path, project
+     * path) pairs of [Path]s. The build path is relative to this build, for example `("lib",
+     * ":sub")`.
+     */
+    private val detectedIncludedBuildProjects: Provider<List<Pair<Path, Path>>> = provider {
+        val views = companionKlibViews + listOf(companionLibrariesJvm)
+        val ownBuildPath =
+            Path.path(
+                (views.first().incoming.resolutionResult.root.id as? ProjectComponentIdentifier)
+                    ?.build
+                    ?.buildPath ?: ":"
+            )
+        views
+            .flatMap { view -> view.incoming.resolutionResult.allComponents }
+            .mapNotNull { component ->
+                val id = component.id as? ProjectComponentIdentifier ?: return@mapNotNull null
+                if (!component.selectionReason.isCompositeSubstitution) return@mapNotNull null
+                // the resolution names builds relative to the composite's root, so subtract
+                // this build's own path to name a directly included build like
+                // Gradle.getIncludedBuild does. A path outside this build's subtree stays
+                // absolute, so it can never collide with the name of a build this build
+                // includes itself.
+                ownBuildPath.relativePath(Path.path(id.build.buildPath)) to
+                    Path.path(id.projectPath)
+            }
+            .distinct()
+    }
+
+    /** The functional test repository of every included build, keyed by build name. */
+    private val includedBuildRepoDirs: Map<String, String> =
+        project.gradle.includedBuilds.associate { build ->
+            build.name to File(build.projectDir, FUNCTIONAL_TEST_REPO_DIR).absolutePath
+        }
 
     private fun companionKlibs(
         name: String,
         attributes: AttributeContainer.() -> Unit,
-    ): FileCollection =
+    ): Configuration =
         configurations
             .resolvable(name) {
                 extendsFrom(companionLibrariesClasspath)
                 attributes { attributes() }
             }
             .get()
-            .incoming
-            .artifactView { lenient(true) }
-            .files
 
     /**
      * Indicate that [project] is used within `functionalTest` suite. By default, includes
@@ -209,15 +267,10 @@ public open class GradlePluginConfigExtension(project: Project) :
 
     override fun companionLibrary(dependencyNotationOrSiblingName: String) {
         val dependencyNotation =
-            when {
-                dependencyNotationOrSiblingName.isIncludedBuildPath -> {
-                    val name = Path(dependencyNotationOrSiblingName).name
-                    includedBuildProjects.add(name)
-                    siblingDependencyGav(name)
-                }
-                dependencyNotationOrSiblingName.isDependencyNotation ->
-                    provider { dependencyNotationOrSiblingName }
-                else -> siblingDependencyGav(dependencyNotationOrSiblingName)
+            if (dependencyNotationOrSiblingName.isDependencyNotation) {
+                provider { dependencyNotationOrSiblingName }
+            } else {
+                siblingDependencyGav(dependencyNotationOrSiblingName)
             }
         companionLibraries.add(dependencyNotation)
         dependencies {
@@ -225,13 +278,6 @@ public open class GradlePluginConfigExtension(project: Project) :
             companionLibrariesClasspath(dependencyNotation)
         }
     }
-
-    /**
-     * Lists the included builds that should be passed to
-     * [GradleTestKitSupportExtension.withIncludedBuildProjects]. The test-kit extension only allows
-     * setting this once, so we collect them and only set them in [Project.afterEvaluate]
-     */
-    public val includedBuildProjects: ListProperty<String> = objects.listProperty()
 
     init {
         registerCompanionLibraries()
@@ -329,11 +375,17 @@ public open class GradlePluginConfigExtension(project: Project) :
                     "$DEV_KIT_PROPERTY_PREFIX.test.gradle-properties",
                     functionalTestProperties,
                 )
+                val functionalTestTask = tasks.getByName<Test>(FUNCTIONAL_TEST)
+                // Hacky: testkit publishes none of its argument providers, so read them off
+                // its own test task
                 +NestedArgumentProvider(
-                    (tasks.getByName(FUNCTIONAL_TEST) as Test)
-                        .jvmArgumentProviders
-                        // Hacky: pick up repo and included-build repos from functionalTest
-                        .filter { it.javaClass.simpleName in FUNCTIONAL_TEST_ARGUMENT_PROVIDERS }
+                    functionalTestTask.jvmArgumentProviders.filter {
+                        it.javaClass.simpleName == REPO_AND_VERSION_ARGUMENT_PROVIDER
+                    }
+                )
+                +OptionalStringSystemPropertyArgumentProvider(
+                    INCLUDED_BUILD_REPOS_SYSTEM_PROPERTY,
+                    includedBuildReposPropertyValue(functionalTestTask),
                 )
                 +OptionalStringSystemPropertyArgumentProvider(KMP_TARGET_PROPERTY, kmpTarget)
             }
@@ -362,20 +414,73 @@ public open class GradlePluginConfigExtension(project: Project) :
         }
     }
 
+    /**
+     * The repositories of [detectedIncludedBuildProjects] plus the ones registered with
+     * [GradleTestKitSupportExtension.withIncludedBuildProjects].
+     */
+    private fun includedBuildReposPropertyValue(functionalTestTask: Test): Provider<String> =
+        provider {
+            val testKitRepos =
+                functionalTestTask.jvmArgumentProviders
+                    .filter { it.javaClass.simpleName == TESTKIT_INCLUDE_BUILD_REPOS_PROVIDER }
+                    .flatMap { it.asArguments() }
+                    .filter { it.startsWith("-D$INCLUDED_BUILD_REPOS_SYSTEM_PROPERTY=") }
+                    .flatMap {
+                        it.removePrefix("-D$INCLUDED_BUILD_REPOS_SYSTEM_PROPERTY=").split(",")
+                    }
+            val detectedRepos =
+                detectedIncludedBuildProjects().mapNotNull { (buildPath, _) ->
+                    // the install task warns about every build without a repo here: one
+                    // outside this build's subtree is absolute, and a nested included build
+                    // has several segments
+                    if (buildPath.isAbsolute || buildPath.segmentCount() > 1) null
+                    else includedBuildRepoDirs[buildPath.asString()]
+                }
+            (testKitRepos + detectedRepos).distinct().takeIf { it.isNotEmpty() }?.joinToString(",")
+        }
+
     private fun configurePlugins() {
         gradleTestKitSupport.apply {
             withClasspaths(functionalTestProjectsClasspath.name)
-            // TODO find another way to allow user to configure included builds here without
-            //  afterEvaluate
-            project.afterEvaluate {
-                with(ProviderFlatMap.Unsafe) {
-                    val includedBuildProjects = includedBuildProjects()
-                    if (includedBuildProjects.isNotEmpty())
-                        withIncludedBuildProjects(
-                            *includedBuildProjects.map { ":$it:" }.toTypedArray()
-                        )
+        }
+
+        tasks.named(INSTALL_FOR_FUNCTIONAL_TEST) {
+            dependsOn(
+                detectedIncludedBuildProjects.map { detected ->
+                    detected.mapNotNull { (buildPath, projectPath) ->
+                        when {
+                            buildPath.isAbsolute -> {
+                                // the build is outside this build's subtree
+                                project.logger.warn(
+                                    """
+                                        |Builds this build doesn't include can't be accessed in Gradle,
+                                        |so the companion library at '$buildPath$projectPath' can't be
+                                        |automatically published for the functional tests.
+                                        |Please include its build directly!"""
+                                        .trimMargin()
+                                )
+                                null
+                            }
+                            buildPath.segmentCount() > 1 -> {
+                                // nested included builds aren't accessible
+                                project.logger.warn(
+                                    """
+                                        |Nested included builds cannot be accessed in Gradle,
+                                        |so the companion library at '$buildPath$projectPath' can't be
+                                        |automatically published for the functional tests.
+                                        |Please include its build directly!"""
+                                        .trimMargin()
+                                )
+                                null
+                            }
+                            else ->
+                                project.gradle
+                                    .includedBuild(buildPath.asString())
+                                    .task(projectPath.child(INSTALL_FOR_FUNCTIONAL_TEST).asString())
+                        }
+                    }
                 }
-            }
+            )
         }
 
         buildConfig {
