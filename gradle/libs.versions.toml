@@ -12,8 +12,8 @@ node-gradle = "7.0.2"
 publish = "0.37.0"
 spotless = "8.8.0"
 tapmoc = "0.4.2"
-testkit-plugin = "0.19"
-testkit-support = "0.27"
+testkit-plugin = "0.21"
+testkit-support = "0.30"
 testkit-truth = "1.7.1"
 truth = "1.4.5"
 diff-utils = "4.12"
@@ -24,6 +24,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
+testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit-plugin" }
 
 [libraries]
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }

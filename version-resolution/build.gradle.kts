@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.maven.publish)
     alias(libs.plugins.tapmoc)
+    alias(libs.plugins.testkit)
 }
 
 group = libs.versions.devkit.group.get()

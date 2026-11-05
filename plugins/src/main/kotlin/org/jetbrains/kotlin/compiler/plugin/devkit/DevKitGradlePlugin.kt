@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 import com.autonomousapps.GradleTestKitSupportExtension
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
-import java.io.File
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.NamedDomainObjectProvider
@@ -15,6 +14,7 @@ import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.attributes.AttributeContainer
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.FileCollection
+import org.gradle.api.initialization.IncludedBuild
 import org.gradle.api.project.IsolatedProject
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -215,38 +215,31 @@ public open class GradlePluginConfigExtension(project: Project) :
             .get()
 
     /**
-     * The included build projects that [companionLibraries] resolve to, as (build path, project
-     * path) pairs of [Path]s. The build path is relative to this build, for example `("lib",
-     * ":sub")`.
+     * The included build projects that [companionLibraries] resolve to, as (build, project path)
+     * pairs.
      */
-    private val detectedIncludedBuildProjects: Provider<List<Pair<Path, Path>>> = provider {
-        val views = companionKlibViews + listOf(companionLibrariesJvm)
-        val ownBuildPath =
-            Path.path(
-                (views.first().incoming.resolutionResult.root.id as? ProjectComponentIdentifier)
-                    ?.build
-                    ?.buildPath ?: ":"
-            )
-        views
-            .flatMap { view -> view.incoming.resolutionResult.allComponents }
-            .mapNotNull { component ->
-                val id = component.id as? ProjectComponentIdentifier ?: return@mapNotNull null
-                if (!component.selectionReason.isCompositeSubstitution) return@mapNotNull null
-                // the resolution names builds relative to the composite's root, so subtract
-                // this build's own path to name a directly included build like
-                // Gradle.getIncludedBuild does. A path outside this build's subtree stays
-                // absolute, so it can never collide with the name of a build this build
-                // includes itself.
-                ownBuildPath.relativePath(Path.path(id.build.buildPath)) to
-                    Path.path(id.projectPath)
-            }
-            .distinct()
-    }
-
-    /** The functional test repository of every included build, keyed by build name. */
-    private val includedBuildRepoDirs: Map<String, String> =
-        project.gradle.includedBuilds.associate { build ->
-            build.name to File(build.projectDir, FUNCTIONAL_TEST_REPO_DIR).absolutePath
+    private val detectedIncludedBuildProjects: Provider<List<Pair<IncludedBuild, Path>>> =
+        provider {
+            val views = companionKlibViews + listOf(companionLibrariesJvm)
+            val includedBuildsByPath = project.gradle.root().includedBuildsByPath()
+            views
+                .flatMap { view -> view.incoming.resolutionResult.allComponents }
+                .mapNotNull { component ->
+                    val id = component.id as? ProjectComponentIdentifier ?: return@mapNotNull null
+                    if (!component.selectionReason.isCompositeSubstitution) return@mapNotNull null
+                    val projectPath = Path.path(id.projectPath)
+                    val build =
+                        includedBuildsByPath[Path.path(id.build.buildPath)]
+                            ?: error(
+                                """
+                                |Included build ${id.build.buildPath} not found,
+                                |so $projectPath can't be installed for functional tests automatically
+                                """
+                                    .trimMargin()
+                            )
+                    build to projectPath
+                }
+                .distinct()
         }
 
     private fun companionKlibs(
@@ -448,12 +441,8 @@ public open class GradlePluginConfigExtension(project: Project) :
                         it.removePrefix("-D$INCLUDED_BUILD_REPOS_SYSTEM_PROPERTY=").split(",")
                     }
             val detectedRepos =
-                detectedIncludedBuildProjects().mapNotNull { (buildPath, _) ->
-                    // the install task warns about every build without a repo here: one
-                    // outside this build's subtree is absolute, and a nested included build
-                    // has several segments
-                    if (buildPath.isAbsolute || buildPath.segmentCount() > 1) null
-                    else includedBuildRepoDirs[buildPath.asString()]
+                detectedIncludedBuildProjects().map { (build, _) ->
+                    build.projectDir.resolve(FUNCTIONAL_TEST_REPO_DIR).absolutePath
                 }
             (testKitRepos + detectedRepos).distinct().takeIf { it.isNotEmpty() }?.joinToString(",")
         }
@@ -466,37 +455,8 @@ public open class GradlePluginConfigExtension(project: Project) :
         tasks.named(INSTALL_FOR_FUNCTIONAL_TEST) {
             dependsOn(
                 detectedIncludedBuildProjects.map { detected ->
-                    detected.mapNotNull { (buildPath, projectPath) ->
-                        when {
-                            buildPath.isAbsolute -> {
-                                // the build is outside this build's subtree
-                                project.logger.warn(
-                                    """
-                                        |Builds this build doesn't include can't be accessed in Gradle,
-                                        |so the companion library at '$buildPath$projectPath' can't be
-                                        |automatically published for the functional tests.
-                                        |Please include its build directly!"""
-                                        .trimMargin()
-                                )
-                                null
-                            }
-                            buildPath.segmentCount() > 1 -> {
-                                // nested included builds aren't accessible
-                                project.logger.warn(
-                                    """
-                                        |Nested included builds cannot be accessed in Gradle,
-                                        |so the companion library at '$buildPath$projectPath' can't be
-                                        |automatically published for the functional tests.
-                                        |Please include its build directly!"""
-                                        .trimMargin()
-                                )
-                                null
-                            }
-                            else ->
-                                project.gradle
-                                    .includedBuild(buildPath.asString())
-                                    .task(projectPath.child(INSTALL_FOR_FUNCTIONAL_TEST).asString())
-                        }
+                    detected.map { (build, projectPath) ->
+                        build.task(projectPath.child(INSTALL_FOR_FUNCTIONAL_TEST).asString())
                     }
                 }
             )

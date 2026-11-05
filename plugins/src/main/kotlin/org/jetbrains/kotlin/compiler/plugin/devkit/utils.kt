@@ -4,12 +4,16 @@ import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
+import org.gradle.api.initialization.IncludedBuild
+import org.gradle.api.invocation.Gradle
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
+import org.gradle.internal.composite.IncludedBuildInternal
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.property
+import org.gradle.util.Path
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
@@ -171,3 +175,29 @@ internal val KotlinSourceSet.allResourceDirectories
         (this as AbstractKotlinSourceSet).withDependsOnClosure.map {
             it.resources.sourceDirectories
         }
+
+// Internal Gradle APIs :<
+
+internal val IncludedBuild.gradle: Gradle?
+    get() = (this as? IncludedBuildInternal)?.target?.mutableModel
+
+internal tailrec fun Gradle.root(): Gradle =
+    when (val parent = parent) {
+        null -> this
+        else -> parent.root()
+    }
+
+internal val IncludedBuild.buildPath: Path?
+    get() = (this as? IncludedBuildInternal)?.target?.identityPath
+
+internal fun Gradle.includedBuildsByPath(): Map<Path, IncludedBuild> = buildMap {
+    val visited = HashSet<Gradle>()
+    val visitBuildTree = DeepRecursiveFunction { build ->
+        if (!visited.add(build)) return@DeepRecursiveFunction
+        for (included in build.includedBuilds) {
+            put(included.buildPath ?: continue, included)
+            included.gradle?.let { callRecursive(it) }
+        }
+    }
+    visitBuildTree(this@includedBuildsByPath)
+}

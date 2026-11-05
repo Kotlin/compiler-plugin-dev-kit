@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.maven.publish)
     alias(libs.plugins.tapmoc)
+    alias(libs.plugins.testkit)
 }
 
 group = libs.versions.devkit.group.get()
@@ -35,6 +36,13 @@ dependencies {
     api("$group:version-resolution:$version")
 
     testImplementation(kotlin("test"))
+
+    functionalTestImplementation(kotlin("test-junit"))
+}
+
+gradleTestKitSupport {
+    withSupportLibrary()
+    withIncludedBuildProjects("version-resolution:")
 }
 
 gradlePlugin {
@@ -57,6 +65,7 @@ gradlePlugin {
 
 kotlin {
     explicitApi()
+
     compilerOptions {
         freeCompilerArgs.addAll(
             "-Xcontext-sensitive-resolution",
