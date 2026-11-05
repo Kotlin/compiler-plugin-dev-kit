@@ -7,13 +7,13 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
  */
 public const val TEST_AGAINST_PROPERTY: String = "kotlin.compiler.plugin.devkit.testAgainst"
 
-/** @see DevKitVersionsProperties.cliVersions */
+/** @see DevKitPropertiesDsl.cliVersions */
 public const val MIN_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minCliVersion"
 
-/** @see DevKitVersionsProperties.cliVersions */
+/** @see DevKitPropertiesDsl.cliVersions */
 public const val MAX_CLI_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.maxCliVersion"
 
-/** @see DevKitVersionsProperties.cliVersions */
+/** @see DevKitPropertiesDsl.cliVersions */
 public const val INCLUDE_BETA_AND_RC_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.includeBetaAndRc"
 
@@ -21,7 +21,7 @@ public const val INCLUDE_BETA_AND_RC_PROPERTY: String =
  * The IDE builds this plugin supports. They decide both the compiler versions it is built against
  * and the IDEs its IDE tests run in.
  *
- * @see DevKitVersionsProperties.ideaVersions
+ * @see DevKitPropertiesDsl.ideaVersions
  */
 public const val MIN_IDEA_VERSION_PROPERTY: String = "kotlin.compiler.plugin.devkit.minIdeaVersion"
 
@@ -34,10 +34,10 @@ public const val INCLUDE_IDEA_RC_PROPERTY: String = "kotlin.compiler.plugin.devk
 /** @see MIN_IDEA_VERSION_PROPERTY */
 public const val INCLUDE_IDEA_EAP_PROPERTY: String = "kotlin.compiler.plugin.devkit.includeIdeaEap"
 
-/** @see DevKitVersionsProperties.useLatestDev */
+/** @see DevKitPropertiesDsl.useLatestDev */
 public const val USE_LATEST_DEV_PROPERTY: String = "kotlin.compiler.plugin.devkit.useLatestDev"
 
-/** @see DevKitVersionsProperties.useLatestBootstrap */
+/** @see DevKitPropertiesDsl.useLatestBootstrap */
 public const val USE_LATEST_BOOTSTRAP_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.useLatestBootstrap"
 
@@ -47,6 +47,10 @@ public const val USE_LATEST_BOOTSTRAP_PROPERTY: String =
  */
 public const val DEFAULT_TEST_VERSION_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.defaultTestVersion"
+
+/** @see DevKitCompilerConfigExtension.classifiedDumpVersions */
+public const val CLASSIFIED_DUMP_VERSIONS_PROPERTY: String =
+    "kotlin.compiler.plugin.devkit.classifiedDumpVersions"
 
 /** Gradle property holding the plugin package, and with it the plugin ID. */
 public const val PLUGIN_PACKAGE_PROPERTY: String = "kotlin.compiler.plugin.devkit.pluginPackage"

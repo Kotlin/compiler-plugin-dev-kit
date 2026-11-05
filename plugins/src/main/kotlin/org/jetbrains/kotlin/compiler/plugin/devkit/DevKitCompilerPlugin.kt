@@ -16,6 +16,7 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
 import org.gradle.api.java.archives.internal.DefaultManifest
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.PathSensitivity
@@ -121,6 +122,21 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
      */
     public val preferredVersionForSharedSourceSetsInIde: Property<KotlinToolingVersion> =
         objects.property()
+
+    /**
+     * The Kotlin versions to classify dumps with. By default, [CLASSIFIED_DUMP_VERSIONS_PROPERTY]
+     * if set, or the [testAgainst] versions.
+     */
+    public val classifiedDumpVersions: ListProperty<KotlinToolingVersion> =
+        objects
+            .listProperty<KotlinToolingVersion>()
+            .convention(provider { testAgainst.map { it.version } })
+
+    init {
+        val versions = listFromGradleProperty(CLASSIFIED_DUMP_VERSIONS_PROPERTY)
+        if (versions.isNotEmpty())
+            classifiedDumpVersions.convention(versions.map(::KotlinToolingVersion))
+    }
 
     private val genServicesDir =
         layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
@@ -644,7 +660,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 )
                 +StringSystemPropertyArgumentProvider(
                     "$DEV_KIT_PROPERTY_PREFIX.versions",
-                    provider { testAgainst.joinToString(",") { "${it.version}" } },
+                    classifiedDumpVersions.map { it.joinToString(",") },
                 )
                 systemProperty("$DEV_KIT_PROPERTY_PREFIX.test.kotlin-version", version)
                 +StringSystemPropertyArgumentProvider(
