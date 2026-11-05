@@ -5,11 +5,9 @@ import com.github.gmazzo.buildconfig.BuildConfigExtension
 import com.github.gmazzo.buildconfig.BuildConfigType
 import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectCollection
-import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.DependencyScopeConfiguration
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.attributes.AttributeContainer
 import org.gradle.api.attributes.Usage
@@ -110,7 +108,6 @@ public open class GradlePluginConfigExtension(project: Project) :
         DevKitGradlePluginTestTarget::class,
     ) {
     private val buildConfig: BuildConfigExtension = project.the()
-    private val gradleTestKitSupport: GradleTestKitSupportExtension = project.the()
     private val sourceSets: SourceSetContainer = project.the()
     private val main = sourceSets.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
     private val functionalTest = sourceSets.getByName(FUNCTIONAL_TEST)
@@ -265,10 +262,6 @@ public open class GradlePluginConfigExtension(project: Project) :
         dependencies { functionalTest.runtimeOnlyConfigurationName(project(path)) }
     }
 
-    private val functionalTestProjectsClasspath:
-        NamedDomainObjectProvider<DependencyScopeConfiguration> =
-        configurations.dependencyScope("functionalTestProjectsClasspath")
-
     override fun companionLibrary(project: Project, group: Any?, version: Any?) {
         companionLibraries.add(
             siblingDependencyGav(project.isolated.name, group?.toString(), version?.toString())
@@ -345,7 +338,7 @@ public open class GradlePluginConfigExtension(project: Project) :
 
     private fun configureDependencies() = dependencies {
         main.compileOnlyConfigurationName(kotlin("gradle-plugin-api"))
-        functionalTestProjectsClasspath(
+        functionalTest.runtimeOnlyConfigurationName(
             compilerPlugin.map { plugin ->
                 when (plugin) {
                     is Sibling,
@@ -448,10 +441,6 @@ public open class GradlePluginConfigExtension(project: Project) :
         }
 
     private fun configurePlugins() {
-        gradleTestKitSupport.apply {
-            withClasspaths(functionalTestProjectsClasspath.name)
-        }
-
         tasks.named(INSTALL_FOR_FUNCTIONAL_TEST) {
             dependsOn(
                 detectedIncludedBuildProjects.map { detected ->
