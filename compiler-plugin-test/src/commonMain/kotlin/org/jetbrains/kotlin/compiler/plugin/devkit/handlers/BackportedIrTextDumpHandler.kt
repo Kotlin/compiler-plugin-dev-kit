@@ -19,12 +19,10 @@ import org.jetbrains.kotlin.ir.util.dumpTreesFromLineNumber
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.test.backend.handlers.AbstractIrHandler
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler.Companion.DUMP_EXTENSION
-import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler.Companion.DUMP_EXTENSION2
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler.Companion.groupWithTestFiles
 import org.jetbrains.kotlin.test.backend.handlers.IrTextDumpHandler.Companion.isHiddenDeclaration
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
-import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.CHECK_BYTECODE_LISTING
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.DUMP_EXTERNAL_CLASS
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.DUMP_IR
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.EXTERNAL_FILE
@@ -56,12 +54,7 @@ public class BackportedIrTextDumpHandler(
 
     private val baseDumper = MultiModuleInfoDumper()
 
-    private var byteCodeListingEnabled = false
-
     override fun processModule(module: TestModule, info: IrBackendInput) {
-        byteCodeListingEnabled =
-            byteCodeListingEnabled || CHECK_BYTECODE_LISTING in module.directives
-
         if (directive !in module.directives) return
 
         pathRelativizer.addModule(module)
@@ -138,7 +131,7 @@ public class BackportedIrTextDumpHandler(
     }
 
     private fun getBaseDumpExtension(): String {
-        return customExtension ?: (if (byteCodeListingEnabled) DUMP_EXTENSION2 else DUMP_EXTENSION)
+        return customExtension ?: DUMP_EXTENSION
     }
 
     private fun getDumpExtension(): String {

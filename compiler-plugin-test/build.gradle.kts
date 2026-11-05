@@ -24,6 +24,9 @@ kotlin {
         api(kotlin("compiler"))
         implementation(libs.diff.utils)
     }
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 }
 
 pluginDevKit {
@@ -37,6 +40,7 @@ pluginDevKit {
     }
 
     versionHierarchy {
+        split("2.5.20-dev-3434")
         split("250Dev8142") {
             it < KotlinToolingVersion("2.5.0-dev-8142") || it == KotlinToolingVersion("2.5.0-Beta1")
         }

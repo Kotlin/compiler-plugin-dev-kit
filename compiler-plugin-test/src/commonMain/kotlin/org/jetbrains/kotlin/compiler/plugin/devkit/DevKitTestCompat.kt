@@ -5,6 +5,9 @@ import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
+import org.jetbrains.kotlin.test.directives.model.SimpleDirective
+import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
+import org.jetbrains.kotlin.test.directives.model.StringDirective
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
@@ -63,3 +66,43 @@ public expect fun FirDistinctSourceElementsHandler(testServices: TestServices): 
 public expect val libraryProviderCtor: Constructor<TestService>?
 
 public expect val backendTestPhase: TestPhase
+
+public expect object JvmCodegenDirectivesCompat : SimpleDirectivesContainer {
+    public val JAVAC_OPTIONS: StringDirective
+
+    public val CHECK_BYTECODE_TEXT: SimpleDirective
+
+    public val CHECK_BYTECODE_LISTING: SimpleDirective
+
+    // public val CHECK_JVM_FLAGS: SimpleDirective
+
+    public val WITH_SIGNATURES: SimpleDirective
+
+    public val IGNORE_ANNOTATIONS: SimpleDirective
+
+    public val DONT_SORT_DECLARATIONS: SimpleDirective
+
+    public val RUN_DEX_CHECKER: SimpleDirective
+
+    public val IGNORE_DEXING: SimpleDirective
+
+    // public val IGNORE_VALHALLA: SimpleDirective
+
+    public val IGNORE_ERRORS: SimpleDirective
+
+    public val TREAT_AS_ONE_FILE: SimpleDirective
+
+    public val NO_CHECK_LAMBDA_INLINING: SimpleDirective
+
+    public val SKIP_INLINE_CHECK_IN: StringDirective
+
+    public val DUMP_SMAP: SimpleDirective
+
+    public val NO_SMAP_DUMP: SimpleDirective
+
+    public val SEPARATE_SMAP_DUMPS: SimpleDirective
+
+    public val ATTACH_DEBUGGER: SimpleDirective
+
+    public val REQUIRES_SEPARATE_PROCESS: SimpleDirective
+}

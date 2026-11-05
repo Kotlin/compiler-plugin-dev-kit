@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.compiler.plugin.devkit.handlers
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.JvmCodegenDirectivesCompat.CHECK_BYTECODE_LISTING
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives
 import org.jetbrains.kotlin.compiler.plugin.devkit.assertEqualsToDump
 import org.jetbrains.kotlin.compiler.plugin.devkit.getClassifiedDumpFile
@@ -20,7 +21,6 @@ import org.jetbrains.kotlin.fir.renderer.FirPackageDirectiveRenderer
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
 import org.jetbrains.kotlin.fir.renderer.FirSymbolRendererWithStaticFlag
 import org.jetbrains.kotlin.fir.symbols.lazyDeclarationResolver
-import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.CHECK_BYTECODE_LISTING
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.DISABLE_TYPEALIAS_EXPANSION
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_FIR_DUMP_HANDLER

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.JvmCodegenDirectivesCompat.REQUIRES_SEPARATE_PROCESS
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedIrTextDumpHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.setupJvmPipelineSteps
@@ -23,11 +24,18 @@ import org.jetbrains.kotlin.test.builders.configureJvmArtifactsHandlersStep
 import org.jetbrains.kotlin.test.configuration.configureBlackBoxTestSettings
 import org.jetbrains.kotlin.test.configuration.configureCommonHandlersForBoxTest
 import org.jetbrains.kotlin.test.configuration.configureJvmBoxCodegenSettings
+import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.JDK_KIND
 import org.jetbrains.kotlin.test.directives.configureFirParser
+import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
+import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
+import org.jetbrains.kotlin.test.model.TestFile
+import org.jetbrains.kotlin.test.model.TestModule
+import org.jetbrains.kotlin.test.services.TestModuleStructure
+import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.sourceProviders.MainFunctionForBlackBoxTestsSourceProvider
 
 public abstract class BackportedJvmBlackBoxCodegenTestBase(
@@ -66,7 +74,7 @@ public abstract class BackportedJvmBlackBoxCodegenTestBase(
             configureDumpHandlersForCodegenTestDevKit()
             configureBlackBoxTestSettings()
 
-            useAdditionalSourceProviders(::MainFunctionForBlackBoxTestsSourceProvider)
+            useAdditionalSourceProviders(::JvmMainFunctionForBlackBoxTestsSourceProvider)
             useFailureSuppressorsCompat(::BlackBoxCodegenSuppressor)
 
             configureJvmBoxCodegenSettings(includeAllDumpHandlers = true)
@@ -90,5 +98,22 @@ public fun TestConfigurationBuilder.configureDumpHandlersForCodegenTestDevKit(
         if (includeAllDumpHandlers) {
             useHandlers(::BytecodeListingHandler)
         }
+    }
+}
+
+public class JvmMainFunctionForBlackBoxTestsSourceProvider(testServices: TestServices) :
+    MainFunctionForBlackBoxTestsSourceProvider(testServices) {
+    override fun produceAdditionalFiles(
+        globalDirectives: RegisteredDirectives,
+        module: TestModule,
+        testModuleStructure: TestModuleStructure,
+    ): List<TestFile> {
+        if (
+            REQUIRES_SEPARATE_PROCESS !in module.directives &&
+                module.directives.singleOrZeroValue(JDK_KIND)?.requiresSeparateProcess != true
+        ) {
+            return emptyList()
+        }
+        return super.produceAdditionalFiles(globalDirectives, module, testModuleStructure)
     }
 }
