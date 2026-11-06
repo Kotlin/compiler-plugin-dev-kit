@@ -1,4 +1,4 @@
-# Spec
+# Spec {#spec}
 
 Use the DevKit to build Kotlin compiler plugins that support many Kotlin compiler versions from one source tree. It
 publishes Gradle plugins and runtime/test libraries.
@@ -9,31 +9,31 @@ genuinely differ. A breaking change appears as a compile error, together with th
 One multi-release jar then holds every version, and the DevKit picks the matching one at Gradle build time and at
 compiler and IDE runtime.
 
-## Definitions
+## Definitions {#definitions}
 
-### Functional test
+### Functional test {#functional-test}
 
 A Gradle integration test that uses [Gradle TestKit](https://docs.gradle.org/current/userguide/test_kit.html).
 
-### Gradle support plugin
+### Gradle support plugin {#gradle-support-plugin}
 
 A `KotlinCompilerPluginSupportPlugin`.
 
-### Companion library
+### Companion library {#companion-library}
 
 A library that the compiler plugin needs on the classpath of the user's code. The Gradle support plugin adds it. Such a
 library usually has annotations, and can also have types and utilities.
 
-### Version
+### Version {#version}
 
 A Kotlin version (`KotlinToolingVersion`), including `-dev-` and `-ijXYZ-` versions.
 
-### CLI version
+### CLI version {#cli-version}
 
 A [version](#version) that is available on Maven Central or in the `dev` or `bootstrap` repository. Command-line builds
 use it to compile code.
 
-### IDE version
+### IDE version {#ide-version}
 
 A [version](#version) that is available in the `intellij-dependencies` repository. IDEs use it for analysis, and
 sometimes to compile JVM code for `Evaluate Expression` and `Show Kotlin Bytecode`. An IDE version is always a `-dev-`
@@ -43,7 +43,7 @@ By default, every `-dev-` version is considered an IDE version by `testAgainst`.
 
 All `-ijXYZ-` versions with the same `XYZ` come from the same major IDE release. For example, `263` is 2026.3.
 
-### Branch point
+### Branch point {#branch-point}
 
 The `-dev-` [version](#ide-version) that an `-ijXYZ-` [version](#ide-version) branched from. Git ancestry gives the
 exact branch point. In practice, the newest recorded `XYZ` build that maps to a plain `dev` version gives the branch
@@ -51,39 +51,39 @@ point. [
 `ide-mappings.txt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
 records it. A release line whose recorded builds all map to `-ij` versions has no branch point.
 
-### Base version
+### Base version {#base-version}
 
 A Kotlin version (`KotlinVersion`) without a classifier, for example `1.9.0` or `2.4.21`. Each Kotlin
 [version](#version) has a base version. To compare a [version](#version) with a base version, convert the version to its
 base version.
 
-### Target name
+### Target name {#target-name}
 
 The Gradle target name of a [version](#version): `k` + the version, lowercased, with `.` removed and `-` replaced by
 `_`. For example, `2.4.20-dev-7885` → `k2420_dev_7885`.
 
-### IDE stability
+### IDE stability {#ide-stability}
 
 Release, RC, or EAP, in IntelliJ terms. For Android Studio, Beta counts as RC, and Canary counts as EAP.
 
-### IDE channel
+### IDE channel {#ide-channel}
 
 An [IDE stability](#ide-stability) and a product (IntelliJ IDEA or Android Studio).
 
-### Sibling dependency
+### Sibling dependency {#sibling-dependency}
 
 A dependency on a project with the same `group` and the same `version`. Composite builds use it.
 
-### Entry point
+### Entry point {#entry-point}
 
 A class of a plugin that the Kotlin compiler instantiates: `CommandLineProcessor` or `CompilerPluginRegistrar`.
 
-### Classified dump
+### Classified dump {#classified-dump}
 
 A dump (golden data) file with classifiers that tell it apart from similar dumps. For example, a [version](#version)
 classifier gives one dump for each compiler version.
 
-## DevKit Structure
+## DevKit Structure {#devkit-structure}
 
 - [
   `version-resolution`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/):
@@ -113,7 +113,7 @@ also has the `pluginDevKit(<variant>)` accessors, in the `org.gradle.kotlin.dsl`
 `pluginDevKit("compiler-plugin")` inside `plugins { }` and `pluginDevKit("version-resolution")` as a dependency
 notation.
 
-## Expected build structure
+## Expected build structure {#expected-build-structure}
 
 A typical compiler plugin has these parts:
 
@@ -143,9 +143,9 @@ One build limits the range of [versions](#version) for these reasons:
       For the composite build structure, using KGP `2.7.0` for compiler plugin, and `2.4.0` for companion libraries, one
       can support `2.4.0-2.8.0`
 
-## DevKit plugins
+## DevKit plugins {#devkit-plugins}
 
-### Shared properties
+### Shared properties {#shared-properties}
 
 Each setting is available both as a DSL function of `pluginDevKit { }` and as a Gradle property, in
 [
@@ -246,7 +246,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
       external [companion libraries](#companion-library).
     - If no library has a klib, the default is the lowest registered [version](#version), so the DevKit skips no tests.
 
-### Settings plugin
+### Settings plugin {#settings-plugin}
 
 - Adds the `bootstrap`, `dev`, and `intellij-dependencies` repositories to `dependencyResolutionManagement`.
 - Applies [
@@ -261,7 +261,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
       calls `includeBuild`, and makes the `check` task of the root project depend on the `check` task of the included
       build.
 
-### `pluginDevKit("gradle-plugin")`
+### `pluginDevKit("gradle-plugin")` {#plugindevkitgradle-plugin}
 
 - Applies `functional-test-publishing`, `buildconfig`, and `java-gradle-plugin`.
 - Ignores all [IDE versions](#ide-version).
@@ -311,7 +311,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
         - Convenience functions set `LocalProject` with `compilerPlugin(project(...))`, and `Sibling` or `External` with
           `compilerPlugin("...")`
 
-### `pluginDevKit("compiler-plugin")`/`pluginDevKit("compiler-library")`
+### `pluginDevKit("compiler-plugin")`/`pluginDevKit("compiler-library")` {#plugindevkitcompiler-pluginplugindevkitcompiler-library}
 
 - Applies the Kotlin `multiplatform` plugin, `buildconfig`, `node-gradle`, `idea`, `D8Plugin`, and
   `functional-test-publishing`.
@@ -419,9 +419,9 @@ entries with commas or whitespace. A boolean property counts as true only when i
 - Registers an [artifact transform](#in-gradle-artifact-transform), so each compilation sees a version-specific jar of
   the compiler plugin and of each `compiler-library`.
 
-## Runtime libraries
+## Runtime libraries {#runtime-libraries}
 
-### `compiler-plugin-runtime`
+### `compiler-plugin-runtime` {#compiler-plugin-runtime}
 
 - Has the interfaces for compiler plugin entry points:
     - [
@@ -447,14 +447,14 @@ entries with commas or whitespace. A boolean property counts as true only when i
   It isn't versioned, because it runs before the version is known.
   [In the compiler: plugin loading](#in-the-compiler-plugin-loading) describes these classes.
 
-### `compiler-plugin-test`
+### `compiler-plugin-test` {#compiler-plugin-test}
 
 The [`compiler-plugin`](#plugindevkitcompiler-pluginplugindevkitcompiler-library) and [
 `compiler-library`](#plugindevkitcompiler-pluginplugindevkitcompiler-library) plugins add it as an `api` dependency of
 `commonTestFixtures`. They also add `junit-bom` there: `kotlin-test-junit5` pins JUnit Jupiter 5.10.1, but the
 `kotlin-compiler-internal-test-framework` of Kotlin `2.4.0` and later needs 5.12.
 
-#### Test bases
+#### Test bases {#test-bases}
 
 The test bases are in the package
 [
@@ -489,7 +489,7 @@ The test bases are in the package
 | [`DevKitJsBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                    | [`MultiVersionJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                                                   | `DUMP_IR`, `FIR_DUMP`                                                 |
 | [`DevKitJsDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt)      | [`BackportedJsDiagnosticWithBackendTestBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt)                 | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`                              |
 
-#### Services
+#### Services {#services}
 
 The services are in the package
 [
@@ -512,7 +512,7 @@ The services are in the package
   [
   `companionLibrariesKotlinVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt).
 
-#### Version compatibility
+#### Version compatibility {#version-compatibility}
 
 - [
   `DevKitTestCompat.kt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestCompat.kt)
@@ -528,7 +528,7 @@ The services are in the package
       is then re-expanded into the proper `TestConfigurationBuilder` for this version. This doesn't affect CLI
       compilation.
 
-#### CLI-only code
+#### CLI-only code {#cli-only-code}
 
 [
 `src/cliMain`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain)
@@ -557,7 +557,7 @@ compiles only for [CLI versions](#cli-version). It has:
 IDE versions get no JS tests. The IDE uses only the JVM backend (for `Evaluate Expression`/`Show Kotlin Bytecode`), and
 Analysis API tests cover JS diagnostics better than compiler tests.
 
-#### Classified dumps
+#### Classified dumps {#classified-dumps}
 
 A classified dump has classifiers in its file name, between the test name and the dump extension. For the test data file
 `foo.kt` and the extension `.fir.txt`, `foo.fir.txt` is the unclassified dump, and `foo.2420_dev_7885.fir.txt` is the
@@ -647,7 +647,7 @@ longer listed doesn't fail the test ([#64](https://github.com/Kotlin/compiler-pl
 `-PupdateTestData` sets the system property `kotlin.test.update.test.data`, so the test framework writes each dump that
 doesn't match.
 
-### `gradle-plugin-runtime`
+### `gradle-plugin-runtime` {#gradle-plugin-runtime}
 
 A JVM library for the [Gradle support plugin](#gradle-support-plugin). `pluginDevKit("gradle-plugin")` adds it and its
 test fixtures.
@@ -703,13 +703,13 @@ The main fixtures:
   finds the expected text for `TEST_COMPILER_VERSION` in the build output. If the map has no entry for that version, it
   uses the entry of the nearest lower base version.
 
-## Versions
+## Versions {#versions}
 
 The jar of a compiler plugin or of a `compiler-library` holds the classes of every [version](#version). The DevKit
 selects a version at Gradle build time and at compiler and IDE runtime. Both paths use
 [Version resolution](#version-resolution).
 
-### Version resolution
+### Version resolution {#version-resolution}
 
 `version-resolution` has these parts:
 
@@ -746,7 +746,7 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
   simplify [#82](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/82)). When it doesn't, the experience is
   already bad. When no rule matches, `resolveVersion` returns null.
 
-### The multi-release jar
+### The multi-release jar {#the-multi-release-jar}
 
 The jar holds the plugin code for each version and the embedded dependencies:
 
@@ -774,7 +774,7 @@ none:
 5. Add `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`.
 6. Add the jar root.
 
-### In Gradle: artifact transform
+### In Gradle: artifact transform {#in-gradle-artifact-transform}
 
 [
 `MultiReleasePluginTransform`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/MultiReleasePluginTransform.kt)
@@ -822,7 +822,7 @@ uses the `-mv-<version>` suffix:
 - If the resolved version isn't the requested version, the suffix doesn't match, and the resolver doesn't change the
   coordinates (known problem).
 
-### In the compiler: plugin loading
+### In the compiler: plugin loading {#in-the-compiler-plugin-loading}
 
 For a `compiler-plugin`, `buildconfig` generates the internal object `<pluginPackage>.PluginInfo` in the `entryPoint`
 compilation of the surrogate target:
@@ -882,7 +882,7 @@ earlier one. Plugins that use different DevKit versions share the
 [entry point runtime classes](#plugindevkitcompiler-pluginplugindevkitcompiler-library), so the class that loads first
 can come from an older DevKit. It still reads the mappings of every DevKit on the classpath.
 
-## Data files
+## Data files {#data-files}
 
 [
 `fetch-all.sh`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/fetch-all.sh)
