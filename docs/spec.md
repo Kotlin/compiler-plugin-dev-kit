@@ -104,57 +104,6 @@ One build limits the range of [versions](#version) for these reasons:
       For the composite build structure, using KGP `2.7.0` for compiler plugin, and `2.4.0` for companion libraries, one
       can support `2.4.0-2.8.0`
 
-## Version resolution
-
-`version-resolution` has these parts:
-
-- [
-  `ide-mappings.txt`](../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
-  maps IDE builds to [IDE versions](#ide-version) (#15). The DevKit uses it to find the correct version on Android
-  Studio, and to find the [branch point](#branch-point) of an IDE version.
-- [
-  `IdeBuildNumber`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt),
-  a simplified version of the IntelliJ `BuildNumber`. It sorts build numbers lexicographically by their `Int` segments.
-- A function [
-  `VersionResolution.resolveVersion`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
-  that chooses a compatible version from a list of [versions](#version), for a `currentVersion`. The first rule that
-  matches applies:
-    1. If `currentVersion` is in the list, return it. This is the most frequent case.
-    2. If `currentVersion` is an EAP or a Release version, return
-       `versions.filter { !it.isDev && it < currentVersion }.maxOrNull()`.
-    3. If `currentVersion` is an [IDE version](#ide-version) of the form `-ijXYZ-`, try these steps in order:
-         1. `versions.filter { it.classifier.startsWith("-ij<XYZ>") && it < currentVersion }.max()`, that is, an earlier
-            version from the same IDE release.
-         2. If `currentVersion` has a known [branch point](#branch-point), run the algorithm again with the branch
-            point.
-         3. `versions.filter { it.baseVersion == currentVersion.baseVersion }.min()`.
-    4. If `currentVersion` is a `-dev-` version, or an `-ij` version that rule 3 didn't resolve, try these steps in
-       order:
-         1. `versions.filter { it.isDev && it.baseVersion == currentVersion.baseVersion && it < currentVersion }.max()`.
-         2. The Release version of `currentVersion.baseVersion`.
-         3. `versions.filter { it.baseVersion < currentVersion.baseVersion }.maxOrNull()`.
-
-  The algorithm can be simpler. Usually, the list has the exact version or a close one. If it doesn't, the user
-  experience is bad anyway.
-- The jar format, which holds the plugin code for each version and the embedded dependencies:
-    - Plugin code is in `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`. Dependencies are in
-      `META-INF/kotlin/plugin/<plugin-id>/dependencies`.
-    - `<plugin-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the
-      jars anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
-    - Each `<version>` under `versions` must be a valid [version](#version).
-    - Each directory under `dependencies` must be an unpacked jar. The DevKit resolves the version of each dependency
-      separately. This is confusing and can be simpler.
-- A function that rebuilds the classpath of a plugin from its resolved version and its dependencies. It takes a plugin
-  ID, a jar path, and the `currentVersion`, and returns a list of directories in the jar (classpath roots):
-    1. If the jar doesn't have the `Kotlin-Compiler-Plugin-Multi-Release` attribute, return null.
-    2. List the versions in `META-INF/kotlin/plugin/<plugin-id>/versions`. If the directory is empty or missing, return
-       null.
-    3. Resolve the [version](#version) with the version resolution function above.
-    4. Add the classpath roots of each dependency, recursively, with the ID of that dependency. If a dependency has no
-       version to select, the whole dependency directory is one classpath root.
-    5. Add `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`.
-    6. Add the jar root.
-
 ## DevKit plugins
 
 ### Shared properties
@@ -183,9 +132,9 @@ commas or whitespace. A boolean property counts as true only when its value is e
     - `min` and `max` are [base versions](#base-version). The range compares by base version, so a bound of `2.4.20`
       also takes in `2.4.20-Beta1`.
     - Open-ended ranges are supported.
-    - The DevKit plugins ship with a list of known non-dev [CLI versions](#cli-version) of [
-      `KnownVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt) (dynamic
-      version resolution would be nicer, #15).
+    - The DevKit plugins have a built-in list of known non-dev [CLI versions](#cli-version) of [
+      `KnownVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt) (#15
+      tracks dynamic version resolution).
     - The default for `betaAndRc` is `BetaAndRc.LATEST`
     - [`betaAndRc`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt) is
       a [`BetaAndRc`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/BetaAndRc.kt), an enum with
@@ -204,7 +153,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
     - `includeRc` and `includeEap` default to `false`.
     - It uses the IDE build mapping of [Version resolution](#version-resolution) (#15). The DevKit skips a build that
       `ide-mappings.txt` doesn't map to a version.
-    - The DevKit plugins ship with a list of known IDE builds in
+    - The DevKit plugins have a built-in list of known IDE builds in
       [
       `ide-versions.txt`](../plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-versions.txt),
       grouped by product and [IDE channel](#ide-channel) (#15). The DevKit registers only the newest recorded build of
@@ -215,12 +164,11 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `Kotlin-Compiler-Plugin-Until-Build` of the
       [surrogate jar](#plugindevkitcompiler-pluginplugindevkitcompiler-library). `Until-Build` is `<max>.*`, so the jar
       supports every build of that series.
-    - The name is misleading, because it also adds Android Studio versions. In practice, Android Studio uses a stable
-      IntelliJ IDEA release as its base.
+    - The function also adds Android Studio builds. Android Studio uses a stable IntelliJ IDEA release as its base.
 - [`useLatestDev`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)/[
   `useLatestBootstrap`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
   get the latest Kotlin [version](#cli-version) from the `dev`/`bootstrap` repository and add it as
-  a [CLI version](#cli-version). They help automated CI checks detect breaking changes.
+  a [CLI version](#cli-version). They help automated CI checks find breaking changes.
 - [
   `defaultTestVersion("2.x.y")`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
   sets the [version](#version) that the `default*Test` tasks run against (possibly not useful, #71).
@@ -280,15 +228,15 @@ commas or whitespace. A boolean property counts as true only when its value is e
       No test task makes a separate Gradle cache.
 - Registers an `allVersionedFunctionalTests` task, like the `allTests` task of KGP. The `check` task depends on it.
 - Registers a lifecycle `defaultFunctionalTest` task, which depends on the functional test task of the
-  `defaultTestVersion`. The testkit's `functionalTest` task is turned into a lifecycle task too, running
-  `defaultFunctionalTest`
+  `defaultTestVersion`. The testkit's `functionalTest` task also becomes a lifecycle task, running
+  `defaultFunctionalTest`.
 - Publishes all project [companion libraries](#companion-library) for [functional tests](#functional-test), and adds
   them to the test runtime classpath, so reflective calls succeed.
-    - If a [companion library](#companion-library) comes from an included build, its `installForFunctionalTest` task is
-      wired into this plugin's `installForFunctionalTest`.
-    - The `functionalTestRepo` for that included build is passed using the
-      `com.autonomousapps.plugin-under-test.repos-included` property to the [functional test](#functional-test), which
-      is then read by the [gradle plugin test runtime](#gradle-plugin-runtime) and added as a repository to the test
+    - If a [companion library](#companion-library) comes from a project in an included build, this plugin's
+      `installForFunctionalTest` task depends on that project's `installForFunctionalTest` task.
+    - The [functional test](#functional-test) gets the `functionalTestRepo` of that build through the
+      `com.autonomousapps.plugin-under-test.repos-included` property.
+      The [gradle plugin test runtime](#gradle-plugin-runtime) reads the property, and adds the repository to the test
       build.
 - Generates a `PluginInfo` object with `buildconfig`. The object has the plugin ID, the plugin coordinates, and
   the [companion library](#companion-library) coordinates.
@@ -310,8 +258,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
           for [functional tests](#functional-test). A value that starts with `:` is a project path.
         - `External`: explicit coordinates. A value of the form `<group>:<artifact>:<version>` is `External`.
         - `Sibling`: a [sibling dependency](#sibling-dependency). Any other value is a `Sibling`.
-        - Convenience functions are provided so that `LocalProject` can be set with `compilerPlugin(project(...))`, and
-          `Sibling` and `External` can be set with `compilerPlugin("...")`
+        - Convenience functions set `LocalProject` with `compilerPlugin(project(...))`, and `Sibling` or `External` with
+          `compilerPlugin("...")`
 
 ### `pluginDevKit("compiler-plugin")`/`pluginDevKit("compiler-library")`
 
@@ -356,7 +304,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `org.jetbrains.kotlin` modules that
       [
       `kotlin-modules.txt`](../plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/kotlin-modules.txt)
-      lists, which are aggregated from the `dev` and `intellij-dependencies` repositories
+      lists, the modules of the `dev` and `intellij-dependencies` repositories
         - A [CLI version](#cli-version) keeps the module names and forces their versions.
         - An [IDE version](#ide-version) also maps each module to the name that it goes by in `intellij-dependencies`.
         - The mapping `UNRELATED` records a module with a versioning scheme unrelated to Kotlin, so the DevKit doesn't
@@ -414,14 +362,6 @@ commas or whitespace. A boolean property counts as true only when its value is e
       buildconfig class `TestDataLibraries`.
 - Passes the libraries that `internal-test-framework` needs as system properties. They always match the
   target [version](#version). For JS tests, it also passes the `d8` executable and a generated `repl.js`.
-    - Has the [
-      `classifiedDumpVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
-      property: the Kotlin versions to use for [classified dumps](#classified-dumps). The Gradle property
-      `kotlin.compiler.plugin.devkit.classifiedDumpVersions` sets it, and the default is every
-      registered [version](#version).
-    - This is useful on CI if running tests for each version in parallel; By registering only a single version,
-      duplicate work is minimized, but this effectively disables the versioned classifier mechanism. This property fixes
-      that.
 - Registers an [artifact transform](#in-gradle-artifact-transform), so each compilation sees a version-specific jar of
   the compiler plugin and of each `compiler-library`.
 
@@ -477,8 +417,6 @@ The test bases are in the package
       `configureDefaultTestDataLibraries()`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/TestDataLibrariesProvider.kt),
       and [
       `DevKitTestConfigurator`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt).
-        - `DevKitTestConfigurator` skips KLIB-based tests on unsupported versions (because KLIBs lack forward
-          compatibility)
     - It reads the standard library paths from the system properties that the `<target>Test` task sets.
     - `configure(builder)` is final. A subclass adds configuration through the constructor or the protected `configure`
       functions.
@@ -512,9 +450,9 @@ The services are in the package
 - [
   `DevKitTestConfigurator`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt)
   skips JS tests if [
-  `TEST_COMPILER_VERSION`](../gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt)
+  `TEST_COMPILER_VERSION`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt)
   is lower than [
-  `BUILD_COMPILER_VERSION`](../gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt),
+  `BUILD_COMPILER_VERSION`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt),
   because KLIBs aren't forward compatible. `TEST_COMPILER_VERSION` is the version of the test task.
   `BUILD_COMPILER_VERSION` is
   [
@@ -546,8 +484,9 @@ The services are in the package
     - The `generateTests*` task gives the directories in the system property `kotlin.compiler.plugin.devkit.roots`. Its
       value is pairs of an output directory and a comma-separated list of data directories, all separated by `;`.
     - The generated suites need different FQNs, because otherwise the Kotlin Compiler DevKit IDE plugin can't tell them
-      apart. Each suite is in the package `<package of the test base>.<target name>{_<index>}`, where the target name is
-      the name of the output directory, and `_<index>` is added for subsequent data directories.
+      apart. Each suite is in the package `<package of the test base>.<target name>{_<index>}`. The `<target name>` is
+      the [target name](#target-name) of the version that the suite tests. The generator adds `_<index>` for each data
+      directory after the first.
 - The JS runners: [
   `BackportedJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
   [
@@ -597,7 +536,7 @@ The directives of [
 - `DUMP_CLASSIFIER`: the classifiers of a test. Only the test configuration can set it, not a test data file. It must
   have the whole `compatibleWith` chain of each classifier.
     - Every classifier in the chain needs a test runner that writes its file directly. This includes the last classifier
-      of the chain. Then no fallback file gets stale.
+      of the chain. Then no fallback file is out of date.
 - `DUMP_AS_DIFF`: write each classified dump as a unified diff against the unclassified dump. The dump extension
   `.fir.txt` becomes `.fir.patch`.
 
@@ -625,9 +564,16 @@ The first rule that matches applies:
 
 The [version classifier](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionClassifier.kt):
 
+- [
+  `classifiedDumpVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  sets the [versions](#version) that get a classifier. The Gradle property
+  `kotlin.compiler.plugin.devkit.classifiedDumpVersions` sets it, and the default is every registered
+  [version](#version).
+    - Use it on CI, where each shard registers a single version, so no test runs twice. With this property, the version tree has a classifier for each version in the list, so each shard writes its
+      own dump file.
 - It has one classifier for each version of `classifiedDumpVersions` except the highest. The `<target>Test` task gives
   these versions in the system property `kotlin.compiler.plugin.devkit.versions`.
-- The name of a classifier its [target name](#target-name) without the "k" prefix
+- The name of a classifier is its [target name](#target-name) without the `k` prefix.
 - A classifier falls back to the classifier of the next higher version. The highest version writes directly to the
   unclassified dump.
 - [
@@ -639,7 +585,7 @@ So the highest listed version uses the unclassified dump. A lower version uses t
 that has its own file. It needs its own file only if its dump is different. If a build lists a new highest version, the
 previous highest version can need its own files.
 
-The classifier chain covers only the versions of `classifiedDumpVersions`, so a dump file for a version that is no
+The classifier chain covers only the versions of `classifiedDumpVersions`. So a dump file for a version that is no
 longer listed doesn't fail the test (#64).
 
 `-PupdateTestData` sets the system property `kotlin.test.update.test.data`, so the test framework writes each dump that
@@ -701,10 +647,73 @@ The main fixtures:
   finds the expected text for `TEST_COMPILER_VERSION` in the build output. If the map has no entry for that version, it
   uses the entry of the nearest lower base version.
 
-## Version selection
+## Versions
 
 The jar of a compiler plugin or of a `compiler-library` holds the classes of every [version](#version). The DevKit
-selects a version in Gradle and during runtime. Both use [Version resolution](#version-resolution).
+selects a version at Gradle build time and at compiler and IDE runtime. Both paths use
+[Version resolution](#version-resolution).
+
+### Version resolution
+
+`version-resolution` has these parts:
+
+- [
+  `ide-mappings.txt`](../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
+  maps IDE builds to [IDE versions](#ide-version) (#15). The DevKit uses it to find the correct version on Android
+  Studio, and to find the [branch point](#branch-point) of an IDE version.
+- [
+  `IdeBuildNumber`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt),
+  a simplified version of the IntelliJ `BuildNumber`. It sorts build numbers lexicographically by their `Int` segments.
+- A function [
+  `VersionResolution.resolveVersion`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
+  that chooses a compatible version from a list of [versions](#version), for a `currentVersion`. The first rule that
+  matches applies:
+    1. If `currentVersion` is in the list, return it. This is the most frequent case.
+    2. If `currentVersion` is an EAP or a Release version, return
+       `versions.filter { !it.isDev && it <= currentVersion }.maxOrNull()`.
+    3. If `currentVersion` is an [IDE version](#ide-version) of the form `-ijXYZ-`, try these steps in order:
+         1. `versions.filter { it.idePlatform == currentVersion.idePlatform && it <= currentVersion }.max()`, that is,
+            an earlier version from the same IDE release.
+         2. Run the algorithm again with the [branch point](#branch-point) of `XYZ`, over the [versions](#version)
+            that aren't `-ij` versions. An `-ij` [version](#version) still in the list is ahead of `currentVersion` or
+            from another IDE release, so the rerun must not take it.
+         3. `versions.filter { it.hasSameBaseVersionAs(currentVersion) }.min()`.
+    4. If `currentVersion` is a `-dev-` version, or an `-ij` version that rule 3 didn't resolve, try these steps in
+       order:
+         1. `versions.filter { it.isDev && it.hasSameBaseVersionAs(currentVersion) && it <= currentVersion }.max()`.
+         2. `versions.filter { if (it.isDev) it <= currentVersion else it.baseVersion <= currentVersion.baseVersion }`
+            `.maxOrNull()`. The Release version of the base version of `currentVersion` wins this step when the list has
+            it.
+
+  Usually the list holds the exact version or a close one. When it doesn't, the experience is already bad. When no rule matches, `resolveVersion` returns null.
+
+### The multi-release jar
+
+The jar holds the plugin code for each version and the embedded dependencies:
+
+- Plugin code is in `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`. Dependencies are in
+  `META-INF/kotlin/plugin/<plugin-id>/dependencies`.
+- `<plugin-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the jars
+  anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
+- Each `<version>` under `versions` must be a valid [version](#version).
+- Each directory under `dependencies` must be an unpacked jar. The DevKit resolves the version of each dependency
+  separately.
+
+[
+`addOverlayAndDependencies`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
+rebuilds the classpath of a plugin from its resolved version and its dependencies. It takes a plugin ID, a jar path, and
+the `currentVersion`. It adds the classpath roots to a list, and returns the resolved version, or null when the jar has
+none:
+
+1. If the jar doesn't have the `Kotlin-Compiler-Plugin-Multi-Release` attribute, return null.
+2. List the versions in `META-INF/kotlin/plugin/<plugin-id>/versions`. If the directory is empty or missing, return
+   null.
+3. Resolve the [version](#version) with the version resolution function above.
+4. Add the classpath roots of each dependency, recursively, with no ID: each dependency uses the only directory under
+   its own `META-INF/kotlin/plugin`. If a dependency has no version to select, the whole dependency directory is one
+   classpath root.
+5. Add `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`.
+6. Add the jar root.
 
 ### In Gradle: artifact transform
 
@@ -730,7 +739,7 @@ Two more cases get the original artifacts:
 
 The transform:
 
-1. Runs the `addOverlayAndDependencies` function with no plugin ID, so it uses in the only directory under
+1. Runs the `addOverlayAndDependencies` function with no plugin ID, so it uses the only directory under
    `META-INF/kotlin/plugin`.
 2. Returns the artifact unchanged if the function returns no version. So the transform changes only multi-version jars,
    and every other dependency passes through.
@@ -778,12 +787,12 @@ On the first call to `registerExtensions`, `processOption`, or `pluginOptions`, 
    loader that isn't a `URLClassLoader`, it calls a public `getUrls()` method with reflection. The IntelliJ
    `UrlClassLoader` has one.
 3. If the version or the URLs are unknown, `resolve` returns null, which skips loading the plugins.
-4. Otherwise, `resolve` runs the `addOverlayAndDependencies` function on each URL, with the plugin ID. A jar that
-   doesn't match that ID is ignored, so other plugins don't interfere with this one.
+4. Otherwise, `resolve` runs the `addOverlayAndDependencies` function on each URL, with the plugin ID. `resolve` ignores
+   a jar that doesn't match that ID, so other plugins don't interfere with this one.
 5. `resolve` makes a `URLClassLoader` over the result. Its parent is the **parent** of the class loader of the entry
    point. Thus, the plugin sees the compiler and its own classpath only. It doesn't see other plugins.
-6. `resolve` caches the class loader for each plugin ID, so that `CommandLineProcessor` and `ComponentRegistrar` can
-   communicate through `CompilerConfiguration` using the same classes
+6. `resolve` caches the class loader for each plugin ID. `CommandLineProcessor` and `ComponentRegistrar` then exchange
+   the same classes through `CompilerConfiguration`.
 7. The entry point loads the `componentRegistrar` or `commandLineProcessor` class from that class loader, makes an
    instance, and calls it with reflection.
 
@@ -826,8 +835,8 @@ aborts on the first failure: `fetch-all-kotlin-modules.py` exits with code `2` w
 | [`ide-mappings.txt`](../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt) | [`fetch-all-ide-kotlin-versions.py`](../version-resolution/fetch-all-ide-kotlin-versions.py) | The Kotlin version that each recorded IDE build bundles.                                                                                    |
 
 - `kotlin-versions.txt` has no `dev` versions.
-- `ide-versions.txt` uses the same key space as `ide-mappings.txt`. The file records the channel with the build, which
-  is later used by the DevKit plugins for registering IDE versions in range.
+- `ide-versions.txt` uses the same key space as `ide-mappings.txt`. The file records the channel with the build. The
+  DevKit plugins use the channel to register the IDE versions in range.
 - `kotlin-modules.txt` is hand-curated. The script only finds modules, from `dev` and `intellij-dependencies`, and
   writes `foo=` for a module with no mapping. The run fails when a mapping is blank, until a human fills it in.
 - `ide-mappings.txt` takes each IDE build's Kotlin version from the IDE's own library declaration. The script reads the
