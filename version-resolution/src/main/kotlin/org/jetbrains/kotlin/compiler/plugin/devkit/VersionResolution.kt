@@ -50,9 +50,14 @@ public object VersionResolution {
             findHighestSameIdeBranchVersion(currentVersion, versions)?.let {
                 return it
             }
-            CompilerVersionAliases.IDE_BUILD_NUMBER?.ideBranchPoint?.let {
-                return resolveVersion(it, versions)
-            }
+            val branchPoint =
+                currentVersion.classifier!!
+                    .removePrefix("ij")
+                    .take(3)
+                    .toIntOrNull()
+                    ?.let { IdeBuildNumber(it.toString()) }
+                    ?.ideBranchPoint
+            if (branchPoint != null) return resolveVersion(branchPoint, versions)
             findLowestSameBaseVersion(currentVersion, versions)?.let {
                 return it
             }
