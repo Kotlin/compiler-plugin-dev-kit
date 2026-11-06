@@ -96,7 +96,7 @@ classifier gives one dump for each compiler version.
     - [`pluginDevKit("gradle-plugin")`](#plugindevkitgradle-plugin): for
       the [Gradle support plugin](#gradle-support-plugin).
     - [
-      `pluginDevKit("functional-test-publishing")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitFunctionalTestPublishingPlugin.kt):
+      `pluginDevKit("functional-test-publishing")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitFunctionalTestPublishingPlugin.kt#L10):
       for all projects.
 - [Runtime libraries](#runtime-libraries):
     - [`compiler-plugin-runtime`](#compiler-plugin-runtime): compiler plugin utilities and [entry point](#entry-point)
@@ -164,22 +164,22 @@ entries with commas or whitespace. A boolean property counts as true only when i
 | `companionLibrary(...)`                         | `companionLibraries`                                                  |
 
 - [
-  `testAgainst("2.x.y")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `testAgainst("2.x.y")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L42)
   adds a [version](#version) to compile for and test against.
 - [
-  `cliVersions(min, max, betaAndRc)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `cliVersions(min, max, betaAndRc)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L62)
   adds Release, Beta, and RC [CLI versions](#cli-version) from `min` to `max`.
     - `min` and `max` are [base versions](#base-version). The range compares by base version, so a bound of `2.4.20`
       also takes in `2.4.20-Beta1`.
     - Open-ended ranges are supported.
     - The DevKit plugins have a built-in list of known non-dev [CLI versions](#cli-version) of [
-      `KnownVersions`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt)
+      `KnownVersions`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt#L41)
       ([#15](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/15) tracks dynamic version resolution).
     - The default for `betaAndRc` is `BetaAndRc.LATEST`
     - [
-      `betaAndRc`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+      `betaAndRc`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L65)
       is a [
-      `BetaAndRc`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/BetaAndRc.kt),
+      `BetaAndRc`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/BetaAndRc.kt#L8),
       an enum with 3 values:
         - `NONE`: Release [versions](#cli-version) in the range.
         - `LATEST`: Release [versions](#cli-version) in the range, and the Beta and RC [versions](#cli-version) of the
@@ -188,7 +188,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
           version.
         - `ALL`: Release, Beta, and RC [versions](#cli-version) in the range.
 - [
-  `ideaVersions(min, max, includeRc, includeEap)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `ideaVersions(min, max, includeRc, includeEap)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L116)
   adds Release, RC, and EAP [IDE versions](#ide-version).
     - `min` is an `IdeBuildNumber`, and `max` is an `Int`. This matches `sinceBuild` and `untilBuild`.
     - Open-ended ranges are supported
@@ -211,12 +211,12 @@ entries with commas or whitespace. A boolean property counts as true only when i
       supports every build of that series.
     - The function also adds Android Studio builds. Android Studio uses a stable IntelliJ IDEA release as its base.
 - [
-  `useLatestDev`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)/[
-  `useLatestBootstrap`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `useLatestDev`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L147)/[
+  `useLatestBootstrap`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L159)
   get the latest Kotlin [version](#cli-version) from the `dev`/`bootstrap` repository and add it as
   a [CLI version](#cli-version). They help automated CI checks find breaking changes.
 - [
-  `defaultTestVersion("2.x.y")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `defaultTestVersion("2.x.y")`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L183)
   sets the [version](#version) that the `default*Test` tasks run against (possibly not
   useful, [#71](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/71)).
     - If the other properties don't add this [version](#version), `defaultTestVersion` adds it like `testAgainst` does.
@@ -225,12 +225,12 @@ entries with commas or whitespace. A boolean property counts as true only when i
 - If none of the properties above add a [version](#version), the DevKit adds the `kotlinToolingVersion` of KGP as a
   [CLI version](#cli-version). So the build always has at least 1 [version](#version).
 - [
-  `pluginPackage = "foo.bar"`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `pluginPackage = "foo.bar"`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L195)
   sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a
   split, [#55](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/55)).
     - The default is the `group` of the project.
 - [
-  `companionLibrary(notation)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `companionLibrary(notation)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt#L204)
   adds a [companion library](#companion-library).
     - Compiler plugin test data can use the library.
     - The [Gradle support plugin](#gradle-support-plugin) adds it as a dependency of its users.
@@ -239,7 +239,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
         2. A normal dependency notation, if it has `:`.
         3. A [sibling dependency](#sibling-dependency).
 - [
-  `companionLibrariesKotlinVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  `companionLibrariesKotlinVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L318)
   skips KMP tests for incompatible [versions](#version). The reason is in
   [Expected build structure](#expected-build-structure).
     - The default is the highest `compiler_version` the libraries' klib manifests record, so it also covers
@@ -250,14 +250,14 @@ entries with commas or whitespace. A boolean property counts as true only when i
 
 - Adds the `bootstrap`, `dev`, and `intellij-dependencies` repositories to `dependencyResolutionManagement`.
 - Applies [
-  `functional-test-publishing`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitFunctionalTestPublishingPlugin.kt)
+  `functional-test-publishing`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitFunctionalTestPublishingPlugin.kt#L10)
   to every project. That plugin applies `com.autonomousapps.testkit`, without the `testKitSupportFor*` publication.
 - Has utilities for a composite build setup:
     - [
-      `createVersionCatalogFrom(pathToRoot, pathToVersionCatalog, name)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSettingsPlugin.kt)
+      `createVersionCatalogFrom(pathToRoot, pathToVersionCatalog, name)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSettingsPlugin.kt#L31)
       makes a `name` version catalog from the file at `pathToRoot/pathToVersionCatalog`.
     - [
-      `includeBuildWithChecks`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSettingsPlugin.kt)
+      `includeBuildWithChecks`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/settings/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSettingsPlugin.kt#L45)
       calls `includeBuild`, and makes the `check` task of the root project depend on the `check` task of the included
       build.
 
@@ -289,20 +289,20 @@ entries with commas or whitespace. A boolean property counts as true only when i
   the [companion library](#companion-library) coordinates.
 - Has these properties beyond the [shared properties](#shared-properties):
     - [
-      `functionalTestProperties`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
+      `functionalTestProperties`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt#L329):
       lines that [functional tests](#functional-test) add to `gradle.properties`.
     - [
-      `kmpTarget`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
+      `kmpTarget`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt#L115):
       the KMP target that multiplatform IC [functional tests](#functional-test) test (should just be an env
       var [#85](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/85)). The value is one of these:
         - A standard target name.
         - `native_host`: the native target that the current OS supports.
         - `all`.
     - [
-      `compilerPlugin`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
+      `compilerPlugin`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt#L121):
       the compiler plugin that
       [
-      `DevKitSupportPlugin`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/main/java/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSupportPlugin.kt)
+      `DevKitSupportPlugin`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/main/java/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSupportPlugin.kt#L16)
       applies. The Gradle property is `kotlin.compiler.plugin.devkit.compilerPlugin`. The value is one of these:
         - `LocalProject`: a project with the coordinates of a [sibling dependency](#sibling-dependency). It is published
           for [functional tests](#functional-test). A value that starts with `:` is a project path.
@@ -331,7 +331,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
         - To prevent this, the package acts as a version of the classes. After the DevKit is public, each change to
           `version-resolution` or to the entry point logic *must* change the package of the changed classes.
 - Registers a [
-  `DevKitTarget`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt)
+  `DevKitTarget`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt#L69)
   for each [version](#version):
     - The target name is the [target name](#target-name) of the [version](#version), for example `k2420_dev_7885`.
     - `DevKitTarget` uses the `ExternalKotlinTargetApi`.
@@ -339,7 +339,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
     - A `DevKitTarget` has 3 default compilations: `main`, `testFixtures`, and `test`. `testFixtures` works like
       `java-test-fixtures`.
     - It has its own [
-      `DevKitTestRun`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt).
+      `DevKitTestRun`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt#L311).
       It is almost the same as `JvmTestRun`, but it sets `targetName` to the [version](#version) string.
     - The test run registers a `<targetName>Test` task, and passes it to KGP's `KotlinTestsRegistry`. So `allTests`
       aggregates the test tasks, and `check` runs them.
@@ -363,17 +363,17 @@ entries with commas or whitespace. A boolean property counts as true only when i
         - The mappings `UNSUPPORTED` and `DEAD` record that no reasonable IDE equivalent exists. For
           an [IDE version](#ide-version), the DevKit fails the build on them.
 - Has a [
-  `versionHierarchy`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  `versionHierarchy`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L409)
   DSL:
     - The `common`, `ide`, and `cli` groups are registered automatically.
     - [
-      `groupVersions("name") { version -> condition }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt)
+      `groupVersions("name") { version -> condition }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt#L18)
       groups the [versions](#version) that match `condition`. If the
       [branch point](#branch-point) is known, `version` is the branch point.
     - [`pre`/`post`/
-      `split`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt)
+      `split`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt#L30)
       group the versions before, from, and around a [version](#version). [`preDev`/`postDev`/
-      `splitDev`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt)
+      `splitDev`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt#L37)
       do the same for a [base version](#base-version).
         - If we have `2.5.20-Beta1`, `2.5.20-dev-1234`, `2.5.0`, and `2.5.20` registered
             - `pre(“2.5.20”)` matches `2.5.20-Beta1`, `2.5.20-dev-1234`, and `2.5.0` together
@@ -388,13 +388,13 @@ entries with commas or whitespace. A boolean property counts as true only when i
     - The DevKit generates the [entry point classes](#entry-point) into a separate `entry-point` compilation of the
       surrogate target.
 - Generates tests into [
-  `generatedTestsDir`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt),
+  `generatedTestsDir`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L97),
   default `build/test-gen`:
     - The generator is the class that [
-      `generateTestsClass`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+      `generateTestsClass`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L93)
       names, in the `generateTests` source set. The default is `<pluginPackage>.GenerateTestsKt`.
     - The [
-      `generateTestsEnabled`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+      `generateTestsEnabled`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L109)
       property turns generation off. Default is true for `compiler-plugin`, and false for `compiler-library`.
     - Both generator compilations use the newest known Kotlin version, so the generator never compiles against
       `compiler-tests-for-ide`, which has no test generator.
@@ -408,7 +408,7 @@ entries with commas or whitespace. A boolean property counts as true only when i
       [IDEA-339729](https://youtrack.jetbrains.com/issue/IDEA-339729)).
 - The resources of every test source set come from `src/<sourceSetName>/data`.
 - Supports [companion libraries](#companion-library), and "conditional" libraries through the [
-  `testDataLibraries`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  `testDataLibraries`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L295)
   DSL:
     - It has the `common`, `jvm`, and `js` `DependencyCollector`s.
     - It can register named library collections.
@@ -425,10 +425,10 @@ entries with commas or whitespace. A boolean property counts as true only when i
 
 - Has the interfaces for compiler plugin entry points:
     - [
-      `DevKitComponentRegistrar`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitComponentRegistrar.kt)
+      `DevKitComponentRegistrar`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitComponentRegistrar.kt#L6)
       (mimicking `CompilerPluginRegistrar`): has `registerExtensions` only.
     - [
-      `DevKitCLP`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCLP.kt)
+      `DevKitCLP`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCLP.kt#L6)
       (mimicking `CommandLineProcessor`): has `processOption` and `pluginOptions` only.
 - Each implementation must have a public no-arg constructor, because the [entry point](#entry-point) instantiates it
   with reflection (add static check [#86](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/86)).
@@ -439,11 +439,11 @@ entries with commas or whitespace. A boolean property counts as true only when i
   has compatibility functions for compiler APIs that differ between [versions](#version), for example
   `KtFakeSourceElementKind.PluginGenerated`.
 - The `entryPoint` compilation has [
-  `DevKitCompilerPluginRegistrar`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPluginRegistrar.kt), [
-  `DevKitCommandLineProcessor`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCommandLineProcessor.kt),
+  `DevKitCompilerPluginRegistrar`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPluginRegistrar.kt#L6), [
+  `DevKitCommandLineProcessor`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCommandLineProcessor.kt#L7),
   and
   [
-  `VersionedPluginClassLoading`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionedPluginClassLoading.kt).
+  `VersionedPluginClassLoading`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionedPluginClassLoading.kt#L15).
   It isn't versioned, because it runs before the version is known.
   [In the compiler: plugin loading](#in-the-compiler-plugin-loading) describes these classes.
 
@@ -461,16 +461,16 @@ The test bases are in the package
 `org.jetbrains.kotlin.compiler.plugin.devkit.runners`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners):
 
 - [
-  `DevKitTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitTest.kt)
+  `DevKitTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitTest.kt#L16)
   is the base of every other DevKit test base:
     - Its constructors take configuration lambdas as a `vararg`, alongside other arguments like `targetBackend` or an
       `AbstractKotlinCompilerTest` to wrap
     - Every test gets the [version classifier](#classified-dumps), [
-      `firIdenticalCompat()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestCompat.kt),
+      `firIdenticalCompat()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestCompat.kt#L29),
       [
-      `configureDefaultTestDataLibraries()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/TestDataLibrariesProvider.kt),
+      `configureDefaultTestDataLibraries()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/TestDataLibrariesProvider.kt#L35),
       and [
-      `DevKitTestConfigurator`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt).
+      `DevKitTestConfigurator`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt#L17).
     - It reads the standard library paths from the system properties that the `<target>Test` task sets.
     - `configure(builder)` is final. A subclass adds configuration through the constructor or the protected `configure`
       functions.
@@ -482,12 +482,12 @@ The test bases are in the package
     - These defaults match
       the [compiler-plugin-template](https://github.com/Kotlin/compiler-plugin-template/tree/devkit).
 
-| Runner                                                                                                                                                                                                                                                 | Base                                                                                                                                                                                                                                                                                     | Default directives                                                    |
-|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| [`DevKitJvmBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmBoxTest.kt)               | [`BackportedFirBlackBoxCodegenTestSpecBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirBlackBoxCodegenTestSpecBase.kt) | `DUMP_IR`, `FIR_DUMP`, `FULL_JDK`, `IGNORE_DEXING`                    |
-| [`DevKitJvmDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmDiagnosticTest.kt) | [`BackportedFirPhasedDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirPhasedDiagnosticTest.kt)               | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`, `FULL_JDK`, `IGNORE_DEXING` |
-| [`DevKitJsBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                    | [`MultiVersionJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                                                   | `DUMP_IR`, `FIR_DUMP`                                                 |
-| [`DevKitJsDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt)      | [`BackportedJsDiagnosticWithBackendTestBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt)                 | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`                              |
+| Runner                                                                                                                                                                                                                | Base                                                                                                                                                                                                                                                     | Default directives                                                    |
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| [`DevKitJvmBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmBoxTest.kt#L9)               | [`BackportedFirBlackBoxCodegenTestSpecBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirBlackBoxCodegenTestSpecBase.kt#L21) | `DUMP_IR`, `FIR_DUMP`, `FULL_JDK`, `IGNORE_DEXING`                    |
+| [`DevKitJvmDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmDiagnosticTest.kt#L8) | [`BackportedFirPhasedDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirPhasedDiagnosticTest.kt#L43)               | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`, `FULL_JDK`, `IGNORE_DEXING` |
+| [`DevKitJsBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt#L29)                   | [`MultiVersionJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt#L8)                                                    | `DUMP_IR`, `FIR_DUMP`                                                 |
+| [`DevKitJsDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt#L6)      | [`BackportedJsDiagnosticWithBackendTestBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt#L69)                 | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`                              |
 
 #### Services {#services}
 
@@ -496,21 +496,21 @@ The services are in the package
 `org.jetbrains.kotlin.compiler.plugin.devkit.services`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services):
 
 - [
-  `configurePlugin(registrar)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/ExtensionRegistrarConfigurator.kt)
+  `configurePlugin(registrar)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/ExtensionRegistrarConfigurator.kt#L11)
   registers the extensions of a `DevKitComponentRegistrar`.
 - [
-  `configureTestDataLibrary(library) { module -> condition }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/TestDataLibrariesProvider.kt)
+  `configureTestDataLibrary(library) { module -> condition }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/TestDataLibrariesProvider.kt#L39)
   adds a `TestDataLibrary` to the compile and runtime classpaths of the modules that match.
 - [
-  `DevKitTestConfigurator`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt)
+  `DevKitTestConfigurator`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt#L17)
   skips JS tests if [
-  `TEST_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt)
+  `TEST_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt#L13)
   is lower than [
-  `BUILD_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt),
+  `BUILD_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/services/DevKitTestConfigurator.kt#L9),
   because KLIBs aren't forward compatible. `TEST_COMPILER_VERSION` is the version of the test task.
   `BUILD_COMPILER_VERSION` is
   [
-  `companionLibrariesKotlinVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt).
+  `companionLibrariesKotlinVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L318).
 
 #### Version compatibility {#version-compatibility}
 
@@ -519,10 +519,10 @@ The services are in the package
   has compatibility declarations for test framework APIs that differ between [versions](#version).
 - Typealiases in `org.jetbrains.kotlin.test.builders` give every version both
   [
-  `NonGroupingPhaseTestConfigurationBuilder`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/pre24DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt)
+  `NonGroupingPhaseTestConfigurationBuilder`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/pre24DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt#L3)
   and
   [
-  `NonGroupingStageTestConfigurationBuilder`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/pre2420DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt).
+  `NonGroupingStageTestConfigurationBuilder`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/pre2420DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt#L3).
     - They exist for the IDE: `expect/actual` with `TestConfigurationBuilder` confuses the IDE, because the IDE
       immediately expands a `typealias` to a different class in each version. With these type aliases, the expanded type
       is then re-expanded into the proper `TestConfigurationBuilder` for this version. This doesn't affect CLI
@@ -535,7 +535,7 @@ The services are in the package
 compiles only for [CLI versions](#cli-version). It has:
 
 - The test generator API. [
-  `generateDevKitTestsWithJUnit5 { }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestGenerator.kt)
+  `generateDevKitTestsWithJUnit5 { }`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestGenerator.kt#L79)
   calls `testGroup` for each test data directory:
     - The `generateTests*` task gives the directories in the system property `kotlin.compiler.plugin.devkit.roots`. Its
       value is pairs of an output directory and a comma-separated list of data directories, all separated by `;`.
@@ -544,15 +544,15 @@ compiles only for [CLI versions](#cli-version). It has:
       the [target name](#target-name) of the version that the suite tests. The generator adds `_<index>` for each data
       directory after the first.
 - The JS runners: [
-  `BackportedJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
+  `BackportedJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt#L29),
   [
-  `MultiVersionJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+  `MultiVersionJsTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt#L8),
   [
-  `BackportedJsDiagnosticWithBackendTestBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt),
+  `BackportedJsDiagnosticWithBackendTestBase`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt#L69),
   [
-  `DevKitJsBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+  `DevKitJsBoxTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt#L29),
   and [
-  `DevKitJsDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt).
+  `DevKitJsDiagnosticTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt#L6).
 
 IDE versions get no JS tests. The IDE uses only the JVM backend (for `Evaluate Expression`/`Show Kotlin Bytecode`), and
 Analysis API tests cover JS diagnostics better than compiler tests.
@@ -567,18 +567,18 @@ justifies the ambiguity and fixed-classifier rules.
 The model:
 
 - [
-  `TestDumpRoot`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt):
+  `TestDumpRoot`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L45):
   one dimension of classifiers, for example `version`. `calculateClassifiers()` lists its classifiers.
 - [
-  `TestDumpClassifier`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt):
+  `TestDumpClassifier`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L69):
   one value of a root. Its `extension` is its part of the file name. Its `compatibleWith` is the classifier to fall back
   to, or `null` to fall back to no classifier of this root. The `compatibleWith` chain must have no cycles. So the
   classifiers of each root form a tree.
 - [
-  `SingleTestDumpClassifier`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt):
+  `SingleTestDumpClassifier`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L82):
   a root with one classifier.
 - [
-  `TestDumpRoot.fixedClassifiers(directives)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt):
+  `TestDumpRoot.fixedClassifiers(directives)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L64):
   limits a root to some of its classifiers. A classifier collapses along its `compatibleWith` chain to the first fixed
   classifier, and the test always needs the file of that classifier. If the chain has no fixed classifier, the file name
   gets no classifier of this root.
@@ -587,7 +587,7 @@ The model:
   the file name, not the fallback.
 
 The directives of [
-`TestDumpDirectives`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt):
+`TestDumpDirectives`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L26):
 
 - `DUMP_CLASSIFIER`: the classifiers of a test. Only the test configuration can set it, not a test data file. It must
   have the whole `compatibleWith` chain of each classifier.
@@ -597,12 +597,12 @@ The directives of [
   `.fir.txt` becomes `.fir.patch`.
 
 The DevKit dump handlers, [
-`BackportedFirDumpHandler`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/handlers/BackportedFirDumpHandler.kt)
+`BackportedFirDumpHandler`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/handlers/BackportedFirDumpHandler.kt#L39)
 and [
-`BackportedIrTextDumpHandler`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/handlers/BackportedIrTextDumpHandler.kt),
+`BackportedIrTextDumpHandler`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/handlers/BackportedIrTextDumpHandler.kt#L43),
 check their dumps with
 [
-`assertEqualsToDump`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt).
+`assertEqualsToDump`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/TestDumpDirectives.kt#L391).
 `assertEqualsToDump` uses two files:
 
 - The fully classified file has all classifiers of the test.
@@ -618,10 +618,10 @@ The first rule that matches applies:
 2. If the dump is the same as the fallback file, and no classifier is fixed, the fully classified file must not exist.
 3. Otherwise, the dump must be the same as the fully classified file.
 
-The [version classifier](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionClassifier.kt):
+The [version classifier](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionClassifier.kt#L17):
 
 - [
-  `classifiedDumpVersions`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  `classifiedDumpVersions`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L130)
   sets the [versions](#version) that get a classifier. The Gradle property
   `kotlin.compiler.plugin.devkit.classifiedDumpVersions` sets it, and the default is every registered
   [version](#version).
@@ -633,7 +633,7 @@ The [version classifier](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/
 - A classifier falls back to the classifier of the next higher version. The highest version writes directly to the
   unclassified dump.
 - [
-  `DevKitTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitTest.kt)
+  `DevKitTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitTest.kt#L16)
   sets `DUMP_CLASSIFIER` to the chain of the version of the current compiler. Every version runs its own tests, so every
   classifier in the chain has a test runner that writes its file directly.
 
@@ -653,7 +653,7 @@ A JVM library for the [Gradle support plugin](#gradle-support-plugin). `pluginDe
 test fixtures.
 
 [
-`DevKitSupportPlugin(info)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/main/java/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSupportPlugin.kt)
+`DevKitSupportPlugin(info)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/main/java/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitSupportPlugin.kt#L16)
 is an abstract `KotlinCompilerPluginSupportPlugin`. A Gradle support plugin extends it, and gives it the generated
 `PluginInfo.PLUGIN_INFO`, a `DevKitPluginInfo(id, artifact, companionLibraryCoordinates)`:
 
@@ -670,17 +670,17 @@ The test fixtures, in the package
 help with [functional tests](#functional-test). Each `<versionName>FunctionalTest` task gives them these system
 properties:
 
-| System property                                        | Value                             | Read by                                                                                                                                                                                                                                                        |
-|--------------------------------------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `kotlin.compiler.plugin.devkit.test.kotlin-version`    | The version of the task           | [`TEST_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt)                       |
-| `kotlin.compiler.plugin.devkit.build.kotlin-version`   | `companionLibrariesKotlinVersion` | [`BUILD_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt)                      |
-| `kotlin.compiler.plugin.devkit.test.gradle-properties` | `functionalTestProperties`        | [`AbstractDevKitGradleProject`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractDevKitGradleProject.kt) |
-| `kotlin.compiler.plugin.devkit.gradle.test.kmpTarget`  | `kmpTarget`                       | [`KmpTarget.selectedTargets()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KmpTarget.kt)                   |
+| System property                                        | Value                             | Read by                                                                                                                                                                                                                        |
+|--------------------------------------------------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `kotlin.compiler.plugin.devkit.test.kotlin-version`    | The version of the task           | [`TEST_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt#L72)                       |
+| `kotlin.compiler.plugin.devkit.build.kotlin-version`   | `companionLibrariesKotlinVersion` | [`BUILD_COMPILER_VERSION`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/TestSupport.kt#L98)                      |
+| `kotlin.compiler.plugin.devkit.test.gradle-properties` | `functionalTestProperties`        | [`AbstractDevKitGradleProject`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractDevKitGradleProject.kt#L24) |
+| `kotlin.compiler.plugin.devkit.gradle.test.kmpTarget`  | `kmpTarget`                       | [`KmpTarget.selectedTargets()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KmpTarget.kt#L29)                   |
 
 The main fixtures:
 
 - [
-  `AbstractDevKitGradleProject`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractDevKitGradleProject.kt):
+  `AbstractDevKitGradleProject`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractDevKitGradleProject.kt#L24):
   the base class of a generated TestKit build that applies the plugin under test. A subclass sets `pluginUnderTest`. The
   build has one module or several:
     - Its `gradle.properties` has DevKit defaults, for example a read-only configuration cache, and then
@@ -689,17 +689,17 @@ The main fixtures:
     - The fixture skips a multiplatform build if `TEST_COMPILER_VERSION` is lower than `BUILD_COMPILER_VERSION`, because
       KLIBs aren't forward compatible.
 - [
-  `AbstractIncrementalCompilationTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractIncrementalCompilationTest.kt):
+  `AbstractIncrementalCompilationTest`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/AbstractIncrementalCompilationTest.kt#L20):
   a JUnit 4 base class for incremental compilation tests of a KMP build, for one `KmpTarget`. By default, it skips
   versions lower than `2.3.21`, the lowest version with working KMP incremental compilation. It skips non-JVM targets if
   `TEST_COMPILER_VERSION` is lower than `BUILD_COMPILER_VERSION`.
 - [
-  `KotlinPlugins.jvm()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KotlinPlugins.kt)
+  `KotlinPlugins.jvm()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KotlinPlugins.kt#L11)
   and [
-  `KotlinPlugins.multiplatform()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KotlinPlugins.kt):
+  `KotlinPlugins.multiplatform()`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/KotlinPlugins.kt#L13):
   the Kotlin plugin of the generated build. The default version is `TEST_COMPILER_VERSION`.
 - [
-  `assertOutputContainsOnDifferentKotlinVersions(map)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/SourceSupport.kt):
+  `assertOutputContainsOnDifferentKotlinVersions(map)`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/gradle-plugin-runtime/src/testFixtures/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/test/SourceSupport.kt#L67):
   finds the expected text for `TEST_COMPILER_VERSION` in the build output. If the map has no entry for that version, it
   uses the entry of the nearest lower base version.
 
@@ -719,10 +719,10 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
   The DevKit uses it to find the correct version on Android Studio, and to find the [branch point](#branch-point) of an
   IDE version.
 - [
-  `IdeBuildNumber`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt),
+  `IdeBuildNumber`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt#L97),
   a simplified version of the IntelliJ `BuildNumber`. It sorts build numbers lexicographically by their `Int` segments.
 - A function [
-  `VersionResolution.resolveVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
+  `VersionResolution.resolveVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt#L46)
   that chooses a compatible version from a list of [versions](#version), for a `currentVersion`. The first rule that
   matches applies:
     1. If `currentVersion` is in the list, return it. This is the most frequent case.
@@ -759,7 +759,7 @@ The jar holds the plugin code for each version and the embedded dependencies:
   separately.
 
 [
-`addOverlayAndDependencies`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
+`addOverlayAndDependencies`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt#L125)
 rebuilds the classpath of a plugin from its resolved version and its dependencies. It takes a plugin ID, a jar path, and
 the `currentVersion`. It adds the classpath roots to a list, and returns the resolved version, or null when the jar has
 none:
@@ -777,10 +777,10 @@ none:
 ### In Gradle: artifact transform {#in-gradle-artifact-transform}
 
 [
-`MultiReleasePluginTransform`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/MultiReleasePluginTransform.kt)
+`MultiReleasePluginTransform`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/MultiReleasePluginTransform.kt#L26)
 selects the version for the compilations of each `DevKitTarget`. It is an artifact transform on the attribute
 `org.jetbrains.kotlin.compiler.version` ([
-`KotlinCompilerVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KotlinCompilerVersion.kt)):
+`KotlinCompilerVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KotlinCompilerVersion.kt#L9)):
 
 - Every artifact type has the value `noVersion`.
 - The compile and runtime classpaths of each compilation request the version of its target. These compilations are
@@ -809,11 +809,11 @@ The transform:
 
 The `apiElements`, `runtimeElements`, and `sourcesElements` variants of the non-surrogate targets (and their
 `*Published` variants) have the extra attribute `org.jetbrains.kotlin.compiler.version.fake` ([
-`FakeKotlinCompilerVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KotlinCompilerVersion.kt)).
+`FakeKotlinCompilerVersion`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KotlinCompilerVersion.kt#L30)).
 Gradle prefers a variant without an extra attribute, so it selects the surrogate target (TODO disable them instead).
 
 During IDE import, [
-`IdeMultiVersionDependencyResolver`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/IdeMultiVersionDependencyResolver.kt)
+`IdeMultiVersionDependencyResolver`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/IdeMultiVersionDependencyResolver.kt#L39)
 uses the `-mv-<version>` suffix:
 
 - If the file of a binary dependency ends with `-mv-<version>`, the resolver sets the `sourceSetName` of its coordinates
@@ -833,7 +833,7 @@ compilation of the surrogate target:
 - `PROCESSOR_CLASS`: the same for `DevKitCommandLineProcessor` and `commandLineProcessor`.
 
 [
-`generateServices`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+`generateServices`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt#L143)
 writes the `META-INF/services` files for `CompilerPluginRegistrar` and `CommandLineProcessor`. They name the local
 classes by their binary names, `<pluginPackage>.PluginInfo$REGISTRAR_CLASS$1$Plugin` and
 `<pluginPackage>.PluginInfo$PROCESSOR_CLASS$1$Plugin`. These names depend on the shape of the generated code. If the
@@ -842,7 +842,7 @@ shape changes, `generateServices` must change too.
 On the first call to `registerExtensions`, `processOption`, or `pluginOptions`, the entry point loads the plugin:
 
 1. The entry point calls [
-   `VersionedPluginClassLoading.resolve`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionedPluginClassLoading.kt)
+   `VersionedPluginClassLoading.resolve`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionedPluginClassLoading.kt#L18)
    with its own class and the plugin ID.
 2. `resolve` finds the current version (see below), and the URLs of the class loader of the entry point. For a class
    loader that isn't a `URLClassLoader`, it calls a public `getUrls()` method with reflection. The IntelliJ
@@ -863,10 +863,10 @@ reload).
 The current version:
 
 - `resolve` gets it from `KotlinCompilerVersion.getVersion()`, then maps it with [
-  `CompilerVersionAliases.map`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt).
+  `CompilerVersionAliases.map`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt#L59).
 - `map` changes only the placeholder version of an Android Studio Canary build, `<major>.<minor>.255-dev-<n>`. For this
   version, `map` gets the IDE build number from `ApplicationInfo` with reflection. Then [
-  `forIdeBuild`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt)
+  `forIdeBuild`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt#L87)
   maps the build number through `ide-mappings.txt`.
 - A build number without an entry gets the highest entry below it with the same baseline (the first number of the build
   number).
@@ -876,7 +876,7 @@ The current version:
 `ide-mappings.txt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
 is at `META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt`. Each line is
 `<build number>=<version>`. [
-`CompilerVersionAliases`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt)
+`CompilerVersionAliases`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt#L8)
 merges every copy that its class loader finds. For the same build number, a later copy on the classpath overrides an
 earlier one. Plugins that use different DevKit versions share the
 [entry point runtime classes](#plugindevkitcompiler-pluginplugindevkitcompiler-library), so the class that loads first
@@ -890,8 +890,8 @@ regenerates every checked-in data file, with one Python script for each file. It
 `fetch-all-kotlin-modules.py` exits with code `2` when a module mapping needs a human, and
 `fetch-all-ide-kotlin-versions.py` exits with code `1` without an authenticated `gh`.
 
-| File                                                                                                                                                                                                                              | Script                                                                                                                                                                                    | Content                                                                                                                                     |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| File                                                                                                                                                                                          | Script                                                                                                                                                | Content                                                                                                                                     |
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | [`kotlin-versions.txt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/kotlin-versions.txt)      | [`fetch-all-kotlin-versions.py`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/fetch-all-kotlin-versions.py)                    | Every Kotlin release published to Maven Central, one release on each line.                                                                  |
 | [`ide-versions.txt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-versions.txt)            | [`fetch-all-ide-versions.py`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/fetch-all-ide-versions.py)                          | The known IDE builds, keyed on the platform build, grouped by product and [IDE channel](#ide-channel).                                      |
 | [`kotlin-modules.txt`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/kotlin-modules.txt)        | [`fetch-all-kotlin-modules.py`](https://github.com/Kotlin/compiler-plugin-dev-kit/blob/spec/plugins/fetch-all-kotlin-modules.py)                      | The `org.jetbrains.kotlin` modules whose versions the DevKit forces, mapped to the name that the module goes by in `intellij-dependencies`. |
