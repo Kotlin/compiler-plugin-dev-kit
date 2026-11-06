@@ -50,8 +50,24 @@ class VersionResolutionTest {
     }
 
     @Test
-    fun `ide build falls back to the earliest same-base version without its branch`() {
+    fun `ide build with no version of its branch takes its branch point`() {
+        // ide-mappings.txt records 261's branch point as 2.4.0-dev-2631, so it wins over the
+        // earlier same-base versions the plugin also ships.
         assertThat(resolve("2.4.0-ij261-64", "2.4.0-dev-1645", "2.4.0-dev-2631", "2.4.0"))
+            .isEqualTo("2.4.0-dev-2631")
+    }
+
+    @Test
+    fun `ide build of a later baseline takes that baseline's branch point`() {
+        // ide-mappings.txt records 262's branch point as 2.4.20-dev-6724.
+        assertThat(resolve("2.4.20-ij262-99", "2.4.20-dev-1435", "2.4.20-dev-6724"))
+            .isEqualTo("2.4.20-dev-6724")
+    }
+
+    @Test
+    fun `ide build of an unrecorded baseline falls back to the earliest same-base version`() {
+        // ide-mappings.txt records no build of baseline 999, so ij999 has no branch point.
+        assertThat(resolve("2.4.0-ij999-64", "2.4.0-dev-1645", "2.4.0-dev-2631", "2.4.0"))
             .isEqualTo("2.4.0-dev-1645")
     }
 
@@ -59,6 +75,12 @@ class VersionResolutionTest {
     fun `ide build older than every branch build falls back to same-base`() {
         assertThat(resolve("2.4.0-ij261-20", "2.4.0-ij261-32", "2.4.0-ij261-50"))
             .isEqualTo("2.4.0-ij261-32")
+    }
+
+    @Test
+    fun `branch point that selects nothing falls back to the same-base rule`() {
+        // 2.4.0-dev-9999 is ahead of 261's branch point, so the branch point selects nothing.
+        assertThat(resolve("2.4.0-ij261-64", "2.4.0-dev-9999")).isEqualTo("2.4.0-dev-9999")
     }
 
     @Test

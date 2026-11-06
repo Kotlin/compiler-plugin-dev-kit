@@ -35,9 +35,10 @@ public object VersionResolution {
      *
      * An IDE build like 2.4.0-ij261-64 takes the newest build of its own IDE branch that is not
      * ahead of it: `ij261` names the branch the IDE's compiler was cut on, so a version carrying it
-     * describes that compiler exactly. Only when the plugin holds no build of that branch does it
-     * fall back to the earliest same-base version, because an IntelliJ build number and a Kotlin
-     * dev build number say nothing about each other.
+     * describes that compiler exactly. When the plugin holds no build of that branch, resolution
+     * runs again from the branch point of the IDE branch. When that gives nothing either, it falls
+     * back to the earliest same-base version, because an IntelliJ build number and a Kotlin dev
+     * build number say nothing about each other.
      *
      * This ensures that a dev build like 2.3.20-dev-7791 doesn't incorrectly match 2.3.20-Beta1
      * just because beta > dev in maturity ordering.
@@ -55,9 +56,13 @@ public object VersionResolution {
                     .removePrefix("ij")
                     .take(3)
                     .toIntOrNull()
-                    ?.let { IdeBuildNumber(it.toString()) }
+                    ?.let { IdeBuildNumber("$it.${Int.MAX_VALUE}") }
                     ?.ideBranchPoint
-            if (branchPoint != null) return resolveVersion(branchPoint, versions)
+            if (branchPoint != null) {
+                resolveVersion(branchPoint, versions.filter { !it.isIdeBuild })?.let {
+                    return it
+                }
+            }
             findLowestSameBaseVersion(currentVersion, versions)?.let {
                 return it
             }
