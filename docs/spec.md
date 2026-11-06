@@ -179,7 +179,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
   [CLI version](#cli-version). So the build always has at least 1 [version](#version) (to change to
   `kotlin.compilerVersion`, #52).
 - [
-  `pluginPackage("foo.bar")`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  `pluginPackage = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
   sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a split, #55).
     - The default is the `group` of the project.
 - [
@@ -569,8 +569,8 @@ The [version classifier](../compiler-plugin-test/src/commonMain/kotlin/org/jetbr
   sets the [versions](#version) that get a classifier. The Gradle property
   `kotlin.compiler.plugin.devkit.classifiedDumpVersions` sets it, and the default is every registered
   [version](#version).
-    - Use it on CI, where each shard registers a single version, so no test runs twice. With this property, the version tree has a classifier for each version in the list, so each shard writes its
-      own dump file.
+    - Use it on CI, where each shard registers a single version, so no test runs twice. With this property, the version
+      tree has a classifier for each version in the list, so each shard writes its own dump file.
 - It has one classifier for each version of `classifiedDumpVersions` except the highest. The `<target>Test` task gives
   these versions in the system property `kotlin.compiler.plugin.devkit.versions`.
 - The name of a classifier is its [target name](#target-name) without the `k` prefix.
@@ -685,7 +685,8 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
             `.maxOrNull()`. The Release version of the base version of `currentVersion` wins this step when the list has
             it.
 
-  Usually the list holds the exact version or a close one. When it doesn't, the experience is already bad. When no rule matches, `resolveVersion` returns null.
+  Usually the list holds the exact version or a close one. When it doesn't, the experience is already bad. When no rule
+  matches, `resolveVersion` returns null.
 
 ### The multi-release jar
 
