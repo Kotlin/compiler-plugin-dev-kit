@@ -11,38 +11,76 @@ compiler and IDE runtime.
 
 ## Definitions
 
-<dl>
-    <dt id="functional-test">Functional test</dt>
-    <dd>A Gradle integration test that uses <a href="https://docs.gradle.org/current/userguide/test_kit.html">Gradle TestKit</a>.</dd>
-    <dt id="gradle-support-plugin">Gradle support plugin</dt>
-    <dd>A <code>KotlinCompilerPluginSupportPlugin</code>.</dd>
-    <dt id="companion-library">Companion library</dt>
-    <dd>A library that the compiler plugin needs on the classpath of the user's code. The Gradle support plugin adds it. Such a library usually has annotations, and can also have types and utilities.</dd>
-    <dt id="version">Version</dt>
-    <dd>A Kotlin version (<code>KotlinToolingVersion</code>), including <code>-dev-</code> and <code>-ijXYZ-</code> versions.</dd>
-    <dt id="cli-version">CLI version</dt>
-    <dd>A <a href="#version">version</a> that is available on Maven Central or in the <code>dev</code> or <code>bootstrap</code> repository. Command-line builds use it to compile code.</dd>
-    <dt id="ide-version">IDE version</dt>
-    <dd>A <a href="#version">version</a> that is available in the <code>intellij-dependencies</code> repository. IDEs use it for analysis, and sometimes to compile JVM code for <code>Evaluate Expression</code> and <code>Show Kotlin Bytecode</code>. An IDE version is always a <code>-dev-</code> or an <code>-ijXYZ-</code> version.</dd>
-    <dd>By default, every <code>-dev-</code> version is considered an IDE version by `testAgainst`. A build can override this by setting `forIde = false`.</dd>
-    <dd>All <code>-ijXYZ-</code> versions with the same <code>XYZ</code> come from the same major IDE release. For example, <code>263</code> is 2026.3.</dd>
-    <dt id="branch-point">Branch point</dt>
-    <dd>The <code>-dev-</code> <a href="#ide-version">version</a> that an <code>-ijXYZ-</code> <a href="#ide-version">version</a> branched from. Git ancestry gives the exact branch point. In practice, the newest recorded <code>XYZ</code> build that maps to a plain <code>dev</code> version gives the branch point. <a href="../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt"><code>ide-mappings.txt</code></a> records it. A release line whose recorded builds all map to <code>-ij</code> versions has no branch point.</dd>
-    <dt id="base-version">Base version</dt>
-    <dd>A Kotlin version (<code>KotlinVersion</code>) without a classifier, for example <code>1.9.0</code> or <code>2.4.21</code>. Each Kotlin <a href="#version">version</a> has a base version. To compare a <a href="#version">version</a> with a base version, convert the version to its base version.</dd>
-    <dt id="target-name">Target name</dt>
-    <dd>The Gradle target name of a <a href="#version">version</a>: <code>k</code> + the version, lowercased, with <code>.</code> removed and <code>-</code> replaced by <code>_</code>. For example, <code>2.4.20-dev-7885</code> → <code>k2420_dev_7885</code>.</dd>
-    <dt id="ide-stability">IDE stability</dt>
-    <dd>Release, RC, or EAP, in IntelliJ terms. For Android Studio, Beta counts as RC, and Canary counts as EAP.</dd>
-    <dt id="ide-channel">IDE channel</dt>
-    <dd>An <a href="#ide-stability">IDE stability</a> and a product (IntelliJ IDEA or Android Studio).</dd>
-    <dt id="sibling-dependency">Sibling dependency</dt>
-    <dd>A dependency on a project with the same <code>group</code> and the same <code>version</code>. Composite builds use it.</dd>
-    <dt id="entry-point">Entry point</dt>
-    <dd>A class of a plugin that the Kotlin compiler instantiates: <code>CommandLineProcessor</code> or <code>CompilerPluginRegistrar</code>.</dd>
-    <dt id="classified-dump">Classified dump</dt>
-    <dd>A dump (golden data) file with classifiers that tell it apart from similar dumps. For example, a <a href="#version">version</a> classifier gives one dump for each compiler version.</dd>
-</dl>
+### Functional test
+
+A Gradle integration test that uses [Gradle TestKit](https://docs.gradle.org/current/userguide/test_kit.html).
+
+### Gradle support plugin
+
+A `KotlinCompilerPluginSupportPlugin`.
+
+### Companion library
+
+A library that the compiler plugin needs on the classpath of the user's code. The Gradle support plugin adds it. Such a
+library usually has annotations, and can also have types and utilities.
+
+### Version
+
+A Kotlin version (`KotlinToolingVersion`), including `-dev-` and `-ijXYZ-` versions.
+
+### CLI version
+
+A [version](#version) that is available on Maven Central or in the `dev` or `bootstrap` repository. Command-line builds
+use it to compile code.
+
+### IDE version
+
+A [version](#version) that is available in the `intellij-dependencies` repository. IDEs use it for analysis, and
+sometimes to compile JVM code for `Evaluate Expression` and `Show Kotlin Bytecode`. An IDE version is always a
+`-dev-` or an `-ijXYZ-` version.
+
+By default, every `-dev-` version is considered an IDE version by `testAgainst`. A build can override this by setting `forIde = false`.
+
+All `-ijXYZ-` versions with the same `XYZ` come from the same major IDE release. For example, `263` is 2026.3.
+
+### Branch point
+
+The `-dev-` [version](#ide-version) that an `-ijXYZ-` [version](#ide-version) branched from. Git ancestry gives the
+exact branch point. In practice, the newest recorded `XYZ` build that maps to a plain `dev` version gives the branch
+point. [`ide-mappings.txt`](../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
+records it. A release line whose recorded builds all map to `-ij` versions has no branch point.
+
+### Base version
+
+A Kotlin version (`KotlinVersion`) without a classifier, for example `1.9.0` or `2.4.21`. Each Kotlin
+[version](#version) has a base version. To compare a [version](#version) with a base version, convert the version to
+its base version.
+
+### Target name
+
+The Gradle target name of a [version](#version): `k` + the version, lowercased, with `.` removed and
+`-` replaced by `_`. For example, `2.4.20-dev-7885` → `k2420_dev_7885`.
+
+### IDE stability
+
+Release, RC, or EAP, in IntelliJ terms. For Android Studio, Beta counts as RC, and Canary counts as EAP.
+
+### IDE channel
+
+An [IDE stability](#ide-stability) and a product (IntelliJ IDEA or Android Studio).
+
+### Sibling dependency
+
+A dependency on a project with the same `group` and the same `version`. Composite builds use it.
+
+### Entry point
+
+A class of a plugin that the Kotlin compiler instantiates: `CommandLineProcessor` or `CompilerPluginRegistrar`.
+
+### Classified dump
+
+A dump (golden data) file with classifiers that tell it apart from similar dumps. For example, a [version](#version)
+classifier gives one dump for each compiler version.
 
 ## DevKit Structure
 
