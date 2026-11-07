@@ -132,7 +132,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
       also takes in `2.4.20-Beta1`.
     - Open-ended ranges are supported.
     - The DevKit plugins have a built-in list of known non-dev [CLI versions](#cli-version) of [
-      `KnownVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt) (#15
+      `KnownVersions`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/KnownVersions.kt)
+      ([#15](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/15)
       tracks dynamic version resolution).
     - The default for `betaAndRc` is `BetaAndRc.LATEST`
     - [`betaAndRc`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt) is
@@ -150,15 +151,18 @@ commas or whitespace. A boolean property counts as true only when its value is e
     - `min` is an `IdeBuildNumber`, and `max` is an `Int`. This matches `sinceBuild` and `untilBuild`.
     - Open-ended ranges are supported
     - `includeRc` and `includeEap` default to `false`.
-    - It uses the IDE build mapping of [Version resolution](#version-resolution) (#15). The DevKit skips a build that
+    - It uses the IDE build mapping of [Version resolution](#version-resolution)
+      ([#15](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/15)). The DevKit skips a build that
       `ide-mappings.txt` doesn't map to a version.
     - The DevKit plugins have a built-in list of known IDE builds in
       [
       `ide-versions.txt`](../plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-versions.txt),
-      grouped by product and [IDE channel](#ide-channel) (#15). The DevKit registers only the newest recorded build of
-      each release line, so the number of targets stays reasonable.
+      grouped by product and [IDE channel](#ide-channel)
+      ([#15](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/15)). The DevKit registers only the newest
+      recorded build of each release line, so the number of targets stays reasonable.
     - For each IDE marketing version, for example `2026.3.3`, only the latest build of each [IDE channel](#ide-channel)
-      is used. In practice, only the latest EAP of a [version](#ide-version) is used (known problem, #70).
+      is used. In practice, only the latest EAP of a [version](#ide-version) is used (known
+      problem, [#70](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/70)).
     - The bounds also set the manifest attributes `Kotlin-Compiler-Plugin-Since-Build` and
       `Kotlin-Compiler-Plugin-Until-Build` of the
       [surrogate jar](#plugindevkitcompiler-pluginplugindevkitcompiler-library). `Until-Build` is `<max>.*`, so the jar
@@ -170,7 +174,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
   a [CLI version](#cli-version). They help automated CI checks find breaking changes.
 - [
   `defaultTestVersion("2.x.y")`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
-  sets the [version](#version) that the `default*Test` tasks run against (possibly not useful, #71).
+  sets the [version](#version) that the `default*Test` tasks run against (possibly not
+  useful, [#71](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/71)).
     - If the other properties don't add this [version](#version), `defaultTestVersion` adds it like `testAgainst` does.
     - If no default is set, the task falls back to the build's own Kotlin version if the build registers it. Otherwise
       it falls back to an arbitrary registered version.
@@ -178,7 +183,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
   [CLI version](#cli-version). So the build always has at least 1 [version](#version).
 - [
   `pluginPackage = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
-  sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a split, #55).
+  sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a
+  split, [#55](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/55)).
     - The default is the `group` of the project.
 - [
   `companionLibrary(notation)`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
@@ -218,7 +224,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
 - Ignores all [IDE versions](#ide-version).
 - Adds [`gradle-plugin-runtime`](#gradle-plugin-runtime) and its test fixtures.
 - Registers a [functional test](#functional-test) task, `<versionName>FunctionalTest`, for each
-  [CLI version](#cli-version) (#54):
+  [CLI version](#cli-version) ([#54](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/54)):
     - The registration logic is a copy of the testkit logic.
     - The build compiles the testkit `functionalTest` source set a single time. Every task runs it against its own
       version.
@@ -243,8 +249,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `functionalTestProperties`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
       lines that [functional tests](#functional-test) add to `gradle.properties`.
     - [`kmpTarget`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt): the
-      KMP target that multiplatform IC [functional tests](#functional-test) test (should just be an env var #85). The
-      value is one of these:
+      KMP target that multiplatform IC [functional tests](#functional-test) test (should just be an env
+      var [#85](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/85)). The value is one of these:
         - A standard target name.
         - `native_host`: the native target that the current OS supports.
         - `all`.
@@ -379,7 +385,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `DevKitCLP`](../compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCLP.kt)
       (mimicking `CommandLineProcessor`): has `processOption` and `pluginOptions` only.
 - Each implementation must have a public no-arg constructor, because the [entry point](#entry-point) instantiates it
-  with reflection (add static check #86).
+  with reflection (add static check [#86](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/86)).
 - The interfaces have no `pluginId` and no `supportsK2`. The entry point sets `pluginId` to the plugin ID, and
   `supportsK2` to `true`.
 - [
@@ -588,7 +594,7 @@ that has its own file. It needs its own file only if its dump is different. If a
 previous highest version can need its own files.
 
 The classifier chain covers only the versions of `classifiedDumpVersions`. So a dump file for a version that is no
-longer listed doesn't fail the test (#64).
+longer listed doesn't fail the test ([#64](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/64)).
 
 `-PupdateTestData` sets the system property `kotlin.test.update.test.data`, so the test framework writes each dump that
 doesn't match.
@@ -661,8 +667,9 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
 
 - [
   `ide-mappings.txt`](../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt)
-  maps IDE builds to [IDE versions](#ide-version) (#15). The DevKit uses it to find the correct version on Android
-  Studio, and to find the [branch point](#branch-point) of an IDE version.
+  maps IDE builds to [IDE versions](#ide-version) ([#15](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/15)).
+  The DevKit uses it to find the correct version on Android Studio, and to find the [branch point](#branch-point) of an
+  IDE version.
 - [
   `IdeBuildNumber`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/CompilerVersionAliases.kt),
   a simplified version of the IntelliJ `BuildNumber`. It sorts build numbers lexicographically by their `Int` segments.
@@ -687,7 +694,8 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
             `.maxOrNull()`. The Release version of the base version of `currentVersion` wins this step when the list has
             it.
 
-  Usually the list holds the exact version or a close one (maybe simplify #82). When it doesn't, the experience is
+  Usually the list holds the exact version or a close one (maybe
+  simplify [#82](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/82)). When it doesn't, the experience is
   already bad. When no rule matches, `resolveVersion` returns null.
 
 ### The multi-release jar
@@ -736,7 +744,8 @@ selects the version for the compilations of each `DevKitTarget`. It is an artifa
 Two more cases get the original artifacts:
 
 - `includedDependencies` and `includedEntryPoint` of `compiler-plugin` request `noVersion`. Thus the plugin jar embeds
-  its dependencies with all their versions, and the compiler selects one at runtime (investigate #77).
+  its dependencies with all their versions, and the compiler selects one at runtime
+  (investigate [#77](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/77)).
 - For a project dependency, the IDE import requests `noVersion`, because IDEA can't identify the project from a
   transformed artifact.
 
