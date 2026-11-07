@@ -17,15 +17,14 @@ compiler and IDE runtime.
     <dt id="gradle-support-plugin">Gradle support plugin</dt>
     <dd>A <code>KotlinCompilerPluginSupportPlugin</code>.</dd>
     <dt id="companion-library">Companion library</dt>
-    <dd>A library that the compiler plugin needs on the classpath of the user's code. The Gradle support plugin adds it. Such a library usually has annotations, and can also have types and utilities. Other names:
-    <code>plugin-annotations</code>, <code>support-library</code>, <code>prelude</code>.</dd>
+    <dd>A library that the compiler plugin needs on the classpath of the user's code. The Gradle support plugin adds it. Such a library usually has annotations, and can also have types and utilities.</dd>
     <dt id="version">Version</dt>
     <dd>A Kotlin version (<code>KotlinToolingVersion</code>), including <code>-dev-</code> and <code>-ijXYZ-</code> versions.</dd>
     <dt id="cli-version">CLI version</dt>
     <dd>A <a href="#version">version</a> that is available on Maven Central or in the <code>dev</code> or <code>bootstrap</code> repository. Command-line builds use it to compile code.</dd>
     <dt id="ide-version">IDE version</dt>
     <dd>A <a href="#version">version</a> that is available in the <code>intellij-dependencies</code> repository. IDEs use it for analysis, and sometimes to compile JVM code for <code>Evaluate Expression</code> and <code>Show Kotlin Bytecode</code>. An IDE version is always a <code>-dev-</code> or an <code>-ijXYZ-</code> version.</dd>
-    <dd>By default, every <code>-dev-</code> version is an IDE version. A build can override this.</dd>
+    <dd>By default, every <code>-dev-</code> version is considered an IDE version by `testAgainst`. A build can override this by setting `forIde = false`.</dd>
     <dd>All <code>-ijXYZ-</code> versions with the same <code>XYZ</code> come from the same major IDE release. For example, <code>263</code> is 2026.3.</dd>
     <dt id="branch-point">Branch point</dt>
     <dd>The <code>-dev-</code> <a href="#ide-version">version</a> that an <code>-ijXYZ-</code> <a href="#ide-version">version</a> branched from. Git ancestry gives the exact branch point. In practice, the newest recorded <code>XYZ</code> build that maps to a plain <code>dev</code> version gives the branch point. <a href="../version-resolution/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt"><code>ide-mappings.txt</code></a> records it. A release line whose recorded builds all map to <code>-ij</code> versions has no branch point.</dd>
@@ -176,8 +175,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
     - If no default is set, the task falls back to the build's own Kotlin version if the build registers it. Otherwise
       it falls back to an arbitrary registered version.
 - If none of the properties above add a [version](#version), the DevKit adds the `kotlinToolingVersion` of KGP as a
-  [CLI version](#cli-version). So the build always has at least 1 [version](#version) (to change to
-  `kotlin.compilerVersion`, #52).
+  [CLI version](#cli-version). So the build always has at least 1 [version](#version).
 - [
   `pluginPackage = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
   sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a split, #55).
@@ -245,7 +243,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `functionalTestProperties`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
       lines that [functional tests](#functional-test) add to `gradle.properties`.
     - [`kmpTarget`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt): the
-      KMP target that multiplatform IC [functional tests](#functional-test) test. The value is one of these:
+      KMP target that multiplatform IC [functional tests](#functional-test) test (should just be an env var #85). The
+      value is one of these:
         - A standard target name.
         - `native_host`: the native target that the current OS supports.
         - `all`.
@@ -324,6 +323,9 @@ commas or whitespace. A boolean property counts as true only when its value is e
       versions before, from, and around a [version](#version). [`preDev`/`postDev`/
       `splitDev`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt) do the
       same for a [base version](#base-version).
+        - If we have `2.5.20-Beta1`, `2.5.20-dev-1234`, `2.5.0`, and `2.5.20` registered
+            - `pre(“2.5.20”)` matches `2.5.20-Beta1`, `2.5.20-dev-1234`, and `2.5.0` together
+            - `preDev(2, 5, 20)` matches `2.5.0` alone
     - `versionHierarchy { }` applies the groups to the `main`, `testFixtures`, and `test` source set trees. So versions
       share test fixtures and tests exactly like main code.
 - Publishes everything in one jar with a "surrogate target":
@@ -377,7 +379,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `DevKitCLP`](../compiler-plugin-runtime/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCLP.kt)
       (mimicking `CommandLineProcessor`): has `processOption` and `pluginOptions` only.
 - Each implementation must have a public no-arg constructor, because the [entry point](#entry-point) instantiates it
-  with reflection.
+  with reflection (add static check #86).
 - The interfaces have no `pluginId` and no `supportsK2`. The entry point sets `pluginId` to the plugin ID, and
   `supportsK2` to `true`.
 - [
@@ -685,8 +687,8 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
             `.maxOrNull()`. The Release version of the base version of `currentVersion` wins this step when the list has
             it.
 
-  Usually the list holds the exact version or a close one. When it doesn't, the experience is already bad. When no rule
-  matches, `resolveVersion` returns null.
+  Usually the list holds the exact version or a close one (maybe simplify #82). When it doesn't, the experience is
+  already bad. When no rule matches, `resolveVersion` returns null.
 
 ### The multi-release jar
 
