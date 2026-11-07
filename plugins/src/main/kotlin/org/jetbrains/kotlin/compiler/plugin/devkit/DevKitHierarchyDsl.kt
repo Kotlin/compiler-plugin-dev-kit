@@ -20,6 +20,12 @@ public interface DevKitHierarchyBuilder {
         condition: (KotlinToolingVersion) -> Boolean,
     )
 
+    /** Creates a version group nested under `cli`. */
+    public fun groupVersionsCli(
+        name: String,
+        condition: (KotlinToolingVersion) -> Boolean,
+    )
+
     public fun groupVersions(
         range: ClosedRange<KotlinToolingVersion>,
         name: String,
@@ -149,5 +155,22 @@ public interface DevKitHierarchyBuilder {
         name: String = kotlinVersionGroupName(major, minor, patch),
     ) {
         splitDev(KotlinVersion(major, minor, patch), name)
+    }
+
+    public fun splitDevCli(
+        version: KotlinVersion,
+        name: String = version.groupName + "Cli",
+    ) {
+        groupVersionsCli("pre$name") { it.toKotlinVersion() < version }
+        groupVersionsCli("post$name") { it.toKotlinVersion() >= version }
+    }
+
+    public fun splitDevCli(
+        major: Int,
+        minor: Int,
+        patch: Int,
+        name: String = kotlinVersionGroupName(major, minor, patch) + "Cli",
+    ) {
+        splitDevCli(KotlinVersion(major, minor, patch), name)
     }
 }

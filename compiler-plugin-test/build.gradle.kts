@@ -51,6 +51,18 @@ pluginDevKit {
         }
         splitDev(2, 4, 20)
         splitDev(2, 4)
+        splitDev(2, 3, 20)
+        splitDevCli(2, 3, 20)
+    }
+}
+
+kotlin.sourceSets {
+    // This exists so that the `typealias` trick for `TestConfigurationBuilder` works within this
+    // project
+    // TODO we could do this wiring automatically, but it'd look ugly in the "actual chooser" in IDE
+    named("pre2320DevCliMain") {
+        dependsOn(getByName("pre24DevMain"))
+        dependsOn(getByName("pre2420DevMain"))
     }
 }
 

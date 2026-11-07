@@ -277,7 +277,9 @@ kotlin-test-testng=kotlin-test-testng
 kotlin-test-wasm=kotlin-test-wasm
 kotlin-test-wasm-js=kotlin-test-wasm-js
 kotlin-test-wasm-wasi=kotlin-test-wasm-wasi
-kotlin-tooling-core=kotlin-tooling-core
+# not actually unrelated, but it rarely changes API shape, and it wasn't published for IDE versions below 2.4
+# alternatively, we could give it a dynamic version, or always use the base version, but this is good enough for now
+kotlin-tooling-core=UNRELATED
 kotlin-tooling-metadata=kotlin-tooling-metadata
 kotlin-util-io=kotlin-util-io
 kotlin-util-klib=kotlin-util-klib

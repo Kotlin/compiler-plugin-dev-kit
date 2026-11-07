@@ -8,8 +8,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedIrTextDumpHandler
 import org.jetbrains.kotlin.js.test.handlers.JsIrRecompiledArtifactsIdentityHandler
-import org.jetbrains.kotlin.js.test.runners.AbstractJsBlackBoxCodegenTestBase
-import org.jetbrains.kotlin.js.test.runners.setUpDefaultDirectivesForJsBoxTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.handlers.IrPrettyKotlinDumpHandler
@@ -34,17 +32,9 @@ public open class BackportedJsTest(
     parser: FirParser = FirParser.Psi,
 ) :
     DevKitTest(
-        object :
-            AbstractJsBlackBoxCodegenTestBase(
-                targetBackend,
-                pathToTestDir,
-                testGroupOutputDirPrefix,
-            ) {
-            override val backendFacades: JsBackendFacades
-                get() = JsBackendFacades.WithRecompilation
-        },
+        createJsBoxTestDelegate(targetBackend, pathToTestDir, testGroupOutputDirPrefix),
         {
-            setUpDefaultDirectivesForJsBoxTest(parser)
+            setUpDefaultDirectivesForJsBoxTestCompat(parser)
             defaultDirectives {
                 +CHECK_SAME_ABI_AFTER_INLINING
             }
