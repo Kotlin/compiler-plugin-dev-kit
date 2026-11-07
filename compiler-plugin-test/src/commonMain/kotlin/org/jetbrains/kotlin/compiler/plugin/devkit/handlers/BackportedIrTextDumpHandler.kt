@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.handlers
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestInfrastructureException
 import org.jetbrains.kotlin.compiler.plugin.devkit.assertEqualsToDump
+import org.jetbrains.kotlin.compiler.plugin.devkit.irBuiltInsCompat
 import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -76,7 +77,7 @@ public class BackportedIrTextDumpHandler(
                                 .orEmpty()
                         filteredFlags
                     },
-                isHiddenDeclaration = { isHiddenDeclaration(it, info.irBuiltIns) },
+                isHiddenDeclaration = { isHiddenDeclaration(it, info.irBuiltInsCompat) },
                 stableOrder = true,
                 filePathRenderer = { _, fullPath ->
                     pathRelativizer.getRelativePath(fullPath)
@@ -116,7 +117,7 @@ public class BackportedIrTextDumpHandler(
         val classId = ClassId.fromString(externalClassId)
 
         @OptIn(InternalSymbolFinderAPI::class)
-        return irBuiltIns.symbolFinder.findClass(classId)?.owner
+        return irBuiltInsCompat.symbolFinder.findClass(classId)?.owner
             ?: throw TestInfrastructureException(
                 "Can't find a class in external dependencies: $externalClassId"
             )

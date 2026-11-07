@@ -1,16 +1,22 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
+import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.RegisteredDirectivesBuilder
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.SimpleDirective
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.StringDirective
+import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
+import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
+import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestPhase
 import org.jetbrains.kotlin.test.services.TestService
 import org.jetbrains.kotlin.test.services.TestServices
@@ -106,3 +112,11 @@ public expect object JvmCodegenDirectivesCompat : SimpleDirectivesContainer {
 
     public val REQUIRES_SEPARATE_PROCESS: SimpleDirective
 }
+
+public expect fun collectFilesForRenderingCompat(
+    module: TestModule,
+    info: FirOutputArtifact,
+    part: FirOutputPartForDependsOnModule,
+): List<FirFile>
+
+public expect val IrBackendInput.irBuiltInsCompat: IrBuiltIns

@@ -434,6 +434,22 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                                 }
                             }
                         }
+
+                        override fun groupVersionsCli(
+                            name: String,
+                            condition: (KotlinToolingVersion) -> Boolean,
+                        ) {
+                            group("cli") {
+                                group(name) {
+                                    withCompilations {
+                                        val target = it.target
+                                        target is DevKitTarget &&
+                                            !target.forIde &&
+                                            condition(target.version)
+                                    }
+                                }
+                            }
+                        }
                     }
                 )
             }

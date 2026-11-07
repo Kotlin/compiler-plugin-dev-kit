@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 import org.jetbrains.kotlin.compiler.plugin.devkit.backendTestPhase
 import org.jetbrains.kotlin.compiler.plugin.devkit.libraryProviderCtor
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
-import org.jetbrains.kotlin.js.test.runners.commonConfigurationForJsTest
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
@@ -41,7 +40,7 @@ public abstract class BackportedJsDiagnosticTestBase(
                 DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "-$it" }
             }
 
-            commonConfigurationForJsTest()
+            commonConfigurationForJsTestCompat()
             configureFirParser(parser)
 
             setupHandlersForDiagnosticTest()

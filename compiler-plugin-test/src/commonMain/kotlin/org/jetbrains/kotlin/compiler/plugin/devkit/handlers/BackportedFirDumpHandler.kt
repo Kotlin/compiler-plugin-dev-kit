@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.handlers
 import org.jetbrains.kotlin.compiler.plugin.devkit.JvmCodegenDirectivesCompat.CHECK_BYTECODE_LISTING
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives
 import org.jetbrains.kotlin.compiler.plugin.devkit.assertEqualsToDump
+import org.jetbrains.kotlin.compiler.plugin.devkit.collectFilesForRenderingCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.getClassifiedDumpFile
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
@@ -29,7 +30,6 @@ import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler.Companion.collectFilesForRendering
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.moduleStructure
@@ -58,7 +58,7 @@ public class BackportedFirDumpHandler(testServices: TestServices) :
 
             val builderForModule = dumper.builderForModule(currentModule)
 
-            val allFiles = collectFilesForRendering(module, info, part)
+            val allFiles = collectFilesForRenderingCompat(module, info, part)
             part.session.lazyDeclarationResolver.startResolvingPhase(FirResolvePhase.BODY_RESOLVE)
 
             val declarationRenderer = FirDeclarationRenderer()

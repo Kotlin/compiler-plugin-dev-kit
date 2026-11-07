@@ -127,7 +127,7 @@ internal fun String.capitalizeAsciiOnly(): String {
     else this
 }
 
-internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 20)
+internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 0)
 
 private class ProviderToString(val provider: Provider<*>) {
     override fun toString(): String = provider.orNull.toString()
