@@ -736,8 +736,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 // called
                 // - `configureSourceSets` was called first, then targets were registered
                 // in the latter case, DevKitCompilationFactory clears the directories aptly
-                // in the former case, resources.isEmpty is true, so we leave it as is
-                if (!resources.isEmpty) resources.setSrcDirs(listOf("src/$name/data"))
+                // in the former case, resources.srcDirs.isEmpty(), so we leave it as is
+                if (resources.srcDirs.isNotEmpty()) resources.setSrcDirs(listOf("src/$name/data"))
             }
         testAgainst.configureEach {
             testCompilation.apply {
