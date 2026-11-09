@@ -38,7 +38,7 @@ The DevKit supports Kotlin 2.3.20+, Gradle 9.2+, and IntelliJ 2026.1+
 
 There's a [spec](./docs/spec.md)
 
-## Attributiona
+## Attributions
 
 A significant amount of code, particularly [version resolution](./version-resolution) and [gradle plugin testing](./gradle-plugin-runtime/test-fixtures), is inspired by or copied from Metro
 
