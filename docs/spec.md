@@ -321,7 +321,9 @@ commas or whitespace. A boolean property counts as true only when its value is e
 - Has a [
   `versionHierarchy`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
   DSL:
-    - The `common`, `ide`, and `cli` groups are registered automatically.
+    - The `common`, `ide`, `cli`, and `js` groups are registered automatically. The `js` group holds the CLI versions
+      from `2.3.0` on, because the [JS test infrastructure](#js-only-code) needs that version. It covers only the
+      `testFixtures` and `test` source set trees.
     - [
       `groupVersions("name") { version -> condition }`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitHierarchyDsl.kt)
       groups the [versions](#version) that match `condition`. If the
@@ -348,21 +350,27 @@ commas or whitespace. A boolean property counts as true only when its value is e
   default `build/test-gen`:
     - The generator is the class that [
       `generateTestsClass`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
-      names, in the `generateTests` source set. The default is `<pluginPackage>.GenerateTestsKt`.
+      names, in the `generateTests*` source set. The default is `<pluginPackage>.GenerateTestsKt`.
     - The generator API, for example `generateDevKitTestsWithJUnit5`, comes from [
       `compiler-plugin-test-generator`](#compiler-plugin-test-generator). The DevKit adds it as an `api` dependency of
-      that source set.
+      the `generateTests` source set.
     - The [
       `generateTestsEnabled`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
       property turns generation off. Default is true for `compiler-plugin`, and false for `compiler-library`.
-    - Both generator compilations use the newest known Kotlin version, so the generator never compiles against
+    - All generator compilations use the newest known Kotlin version, so the generator never compiles against
       `compiler-tests-for-ide`, which has no test generator.
     - `internal-test-framework` isn't published for [IDE versions](#ide-version). The DevKit maps it to
-      `compiler-tests-for-ide`, which has no JS test infrastructure. So the generator has two compilations:
-        - `generateTestsCli`: the DevKit adds it on the first CLI target, and associates it with the `testFixtures`
-          compilation of that target. It sees the JS test infrastructure, and the classes for it in `cliTestFixtures`.
-        - `generateTestsIde`: the DevKit adds it on the first IDE target, and associates it with the `testFixtures`
-          compilation of that target. It doesn't see the JS test infrastructure.
+      `compiler-tests-for-ide`, which has no JS test infrastructure. Also, all Kotlin versions below `2.3.0` have no JS
+      test infrastructure. So the generator has 3 mutually-exclusive compilations:
+
+      | Task                    | Generates for every target that…                 | Sees the source sets…                                        | 
+      |-------------------------|--------------------------------------------------|--------------------------------------------------------------|
+      | `generateTestsCliNonJs` | is a [CLI version](#cli-version) before `2.3.0`  | `generateTests`, `generateTestsCli`, `generateTestsCliNonJs` |
+      | `generateTestsJs`       | is a [CLI version](#cli-version) from `2.3.0` on | `generateTests`, `generateTestsCli`, `generateTestsJs`       | 
+      | `generateTestsIde`      | is an [IDE version](#ide-version)                | `generateTests`, `generateTestsIde`                          |
+
+      The DevKit adds each compilation on the first matching target, and associates it with the `testFixtures`
+      compilation of that target.
     - The DevKit marks generated tests as generated sources for IDEA, so IDEA ignores them (workaround for
       [IDEA-339729](https://youtrack.jetbrains.com/issue/IDEA-339729)).
 - The resources of every test source set come from `src/<sourceSetName>/data`.
@@ -445,8 +453,8 @@ The test bases are in the package
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
 | [`DevKitJvmBoxTest`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmBoxTest.kt)               | [`BackportedFirBlackBoxCodegenTestSpecBase`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirBlackBoxCodegenTestSpecBase.kt) | `DUMP_IR`, `FIR_DUMP`, `FULL_JDK`, `IGNORE_DEXING`                    |
 | [`DevKitJvmDiagnosticTest`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJvmDiagnosticTest.kt) | [`BackportedFirPhasedDiagnosticTest`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedFirPhasedDiagnosticTest.kt)               | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`, `FULL_JDK`, `IGNORE_DEXING` |
-| [`DevKitJsBoxTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                    | [`MultiVersionJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                                                   | `DUMP_IR`, `FIR_DUMP`                                                 |
-| [`DevKitJsDiagnosticTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt)      | [`BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt)                 | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`                              |
+| [`DevKitJsBoxTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                     | [`MultiVersionJsTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt)                                                    | `DUMP_IR`, `FIR_DUMP`                                                 |
+| [`DevKitJsDiagnosticTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt)       | [`BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt)                  | `FIR_DUMP`, `DISABLE_GENERATED_FIR_TAGS`                              |
 
 #### Services
 
@@ -487,19 +495,19 @@ The services are in the package
       is then re-expanded into the proper `TestConfigurationBuilder` for this version. This doesn't affect CLI
       compilation.
 
-#### CLI-only code
+#### JS-only code
 
-[`src/cliMain`](../compiler-plugin-test/src/cliMain) compiles only for [CLI versions](#cli-version). It has the JS
-runners: [
-`BackportedJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
+[`src/jsMain`](../compiler-plugin-test/src/jsMain) compiles only for [CLI versions](#cli-version) from `2.3.0` on. It
+has the JS runners: [
+`BackportedJsTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
 [
-`MultiVersionJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+`MultiVersionJsTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
 [
-`BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt),
+`BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt),
 [
-`DevKitJsBoxTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+`DevKitJsBoxTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
 and [
-`DevKitJsDiagnosticTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt).
+`DevKitJsDiagnosticTest`](../compiler-plugin-test/src/jsMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt).
 
 IDE versions get no JS tests. The IDE uses only the JVM backend (for `Evaluate Expression`/`Show Kotlin Bytecode`), and
 Analysis API tests cover JS diagnostics better than compiler tests.

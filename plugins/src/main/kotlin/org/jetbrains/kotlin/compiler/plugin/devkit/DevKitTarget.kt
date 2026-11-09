@@ -64,7 +64,15 @@ public const val TEST_FIXTURES_COMPILATION_NAME: String =
 public const val ENTRY_POINT_COMPILATION_NAME: String = "entryPoint"
 public const val GENERATE_TESTS_COMPILATION_NAME: String = "generateTests"
 public const val GENERATE_TESTS_IDE_SOURCE_SET_NAME: String = "generateTestsIde"
+
+/** The source set shared by the `generateTestsCliNonJs` and `generateTestsJs` compilations. */
 public const val GENERATE_TESTS_CLI_SOURCE_SET_NAME: String = "generateTestsCli"
+
+/** The source set of the `generateTestsJs` compilation: the JS generator and its helpers. */
+public const val GENERATE_TESTS_JS_SOURCE_SET_NAME: String = "generateTestsJs"
+
+/** The source set of the `generateTestsCliNonJs` compilation. */
+public const val GENERATE_TESTS_CLI_NON_JS_SOURCE_SET_NAME: String = "generateTestsCliNonJs"
 
 public class DevKitTarget(
     delegate: Delegate,

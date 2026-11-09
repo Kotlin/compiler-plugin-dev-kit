@@ -6,15 +6,16 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.compiler.plugin.devkit.FirDistinctSourceElementsHandler
+import org.jetbrains.kotlin.compiler.plugin.devkit.NoIrCompilationErrorsHandlerCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.backendTestPhase
 import org.jetbrains.kotlin.compiler.plugin.devkit.handlers.BackportedFirDumpHandler
+import org.jetbrains.kotlin.compiler.plugin.devkit.registerTagsGeneratorChecker
 import org.jetbrains.kotlin.compiler.plugin.devkit.setupJvmPipelineSteps
 import org.jetbrains.kotlin.compiler.plugin.devkit.useFailureSuppressorsCompat
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor.SuppressionChecker
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
-import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.ir.IrDiagnosticsHandler
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
@@ -27,7 +28,6 @@ import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.TestPhaseDirectives.LATEST_PHASE_IN_PIPELINE
 import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
-import org.jetbrains.kotlin.test.frontend.fir.TagsGeneratorChecker
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
@@ -38,7 +38,6 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.NonSourceErrorMessagesHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.PsiLightTreeMetaInfoProcessor
 import org.jetbrains.kotlin.test.services.PhasedPipelineChecker
-import org.jetbrains.kotlin.utils.bind
 
 public abstract class BackportedFirPhasedDiagnosticTest(
     vararg config: TestConfigurationBuilder.() -> Unit,
@@ -58,14 +57,13 @@ public abstract class BackportedFirPhasedDiagnosticTest(
             configureCommonDiagnosticTestPaths()
 
             setupHandlersForDiagnosticTest()
-            configureFirHandlersStep {
-                useHandlers(::TagsGeneratorChecker, ::NoFirCompilationErrorsHandler)
-            }
+            configureFirHandlersStep { useHandlers(::NoFirCompilationErrorsHandler) }
+            registerTagsGeneratorChecker()
 
             configureIrHandlersStep {
                 useHandlers(
                     ::IrDiagnosticsHandler,
-                    ::NoIrCompilationErrorsHandler,
+                    ::NoIrCompilationErrorsHandlerCompat,
                 )
             }
 
@@ -77,7 +75,7 @@ public abstract class BackportedFirPhasedDiagnosticTest(
             useAfterAnalysisCheckers(::NonSourceErrorMessagesHandler)
             useFailureSuppressorsCompat(::PhasedPipelineChecker, ::FirFailingTestSuppressor)
             enableMetaInfoHandler()
-            useAdditionalService<SuppressionChecker>(::SuppressionChecker.bind(null, null))
+            useAdditionalService { SuppressionChecker(it, null) }
         },
         *config,
         targetBackend = TargetBackend.JVM_IR,

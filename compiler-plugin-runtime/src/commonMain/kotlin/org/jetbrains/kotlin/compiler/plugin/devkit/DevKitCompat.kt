@@ -2,7 +2,6 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
-import org.jetbrains.kotlin.KtSourceElementOffsetStrategy
 
 /** Compatibility function for [KtSourceElement.fakeElement] */
 public expect fun KtSourceElement.fakeElementCompat(

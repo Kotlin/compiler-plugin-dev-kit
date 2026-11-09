@@ -5,6 +5,8 @@
 
 package org.jetbrains.kotlin.compiler.plugin.devkit.handlers
 
+import org.jetbrains.kotlin.compiler.plugin.devkit.DISABLE_FIR_DUMP_HANDLER
+import org.jetbrains.kotlin.compiler.plugin.devkit.DisableFirDumpHandlerContainer
 import org.jetbrains.kotlin.compiler.plugin.devkit.JvmCodegenDirectivesCompat.CHECK_BYTECODE_LISTING
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives
 import org.jetbrains.kotlin.compiler.plugin.devkit.assertEqualsToDump
@@ -24,7 +26,6 @@ import org.jetbrains.kotlin.fir.renderer.FirSymbolRendererWithStaticFlag
 import org.jetbrains.kotlin.fir.symbols.lazyDeclarationResolver
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.DISABLE_TYPEALIAS_EXPANSION
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
-import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_FIR_DUMP_HANDLER
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.USE_LATEST_LANGUAGE_VERSION
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
@@ -42,7 +43,7 @@ public class BackportedFirDumpHandler(testServices: TestServices) :
     private var byteCodeListingEnabled = false
 
     override val directiveContainers: List<DirectivesContainer>
-        get() = listOf(TestDumpDirectives, FirDiagnosticsDirectives)
+        get() = listOf(TestDumpDirectives, FirDiagnosticsDirectives, DisableFirDumpHandlerContainer)
 
     override fun processModule(module: TestModule, info: FirOutputArtifact) {
         if (module.directives.shouldSkip()) return

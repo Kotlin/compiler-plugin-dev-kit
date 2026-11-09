@@ -2,9 +2,9 @@
 
 ## Kotlin version
 
-The DevKit needs Kotlin 2.3.0 or higher. Upgrade to 2.3.0 and make sure that your plugin works. Then continue with the
+The DevKit needs Kotlin 2.2.20 or higher. Upgrade to 2.2.20 and make sure that your plugin works. Then continue with the
 migration.
-You don't need a version higher than 2.3.0 for the migration.
+You don't need a version higher than 2.2.20 for the migration.
 
 ## Settings (`settings.gradle.kts`)
 
