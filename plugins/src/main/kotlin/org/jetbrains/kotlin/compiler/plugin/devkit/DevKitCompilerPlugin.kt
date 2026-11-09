@@ -459,6 +459,16 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         // Disable k2xxJar being added as friend path because it forces the task to run
         // This forces all versions to get compiled
         project.extra["kotlin.build.archivesTaskOutputAsFriendModule"] = false
+        buildConfig.sourceSets {
+            testAgainst.configureEach {
+                for (sourceSet in listOf(main, testFixtures, test)) named(sourceSet.name) {
+                    generateTask {
+                        enabled = false
+                        outputDir.unset()
+                    }
+                }
+            }
+        }
         if (!isPlugin) return
         buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
             packageName.set(pluginPackage)
@@ -718,7 +728,13 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         kotlinExtension.sourceSets
             .named { it.endsWith("Test") }
             .configureEach {
-                resources.setSrcDirs(listOf("src/$name/data"))
+                // 2 causal orderings are possible here for leaf source sets:
+                // - targets existed first, with their source sets, then `configureSourceSets` was
+                // called
+                // - `configureSourceSets` was called first, then targets were registered
+                // in the latter case, DevKitCompilationFactory clears the directories aptly
+                // in the former case, resources.isEmpty is true, so we leave it as is
+                if (!resources.isEmpty) resources.setSrcDirs(listOf("src/$name/data"))
             }
         testAgainst.configureEach {
             testCompilation.apply {
