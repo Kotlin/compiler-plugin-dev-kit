@@ -4,47 +4,7 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-import org.jetbrains.kotlin.tooling.core.isDev
 import org.jetbrains.kotlin.tooling.core.toKotlinVersion
-
-@Deprecated(
-    "Use KotlinToolingVersion directly",
-    ReplaceWith("KotlinToolingVersion", "org.jetbrains.kotlin.tooling.core.KotlinToolingVersion"),
-)
-public typealias KotlinToolingVersion = KotlinToolingVersion
-
-@Deprecated(
-    "Use KotlinToolingVersion directly",
-    ReplaceWith(
-        "KotlinToolingVersion(kotlinVersionString)",
-        "org.jetbrains.kotlin.tooling.core.KotlinToolingVersion",
-    ),
-)
-public fun KotlinToolingVersion(kotlinVersionString: String): KotlinToolingVersion =
-    KotlinToolingVersion(kotlinVersionString)
-
-@Deprecated(
-    "Use KotlinToolingVersion directly",
-    ReplaceWith(
-        "KotlinToolingVersion(kotlinVersion, classifier)",
-        "org.jetbrains.kotlin.tooling.core.KotlinToolingVersion",
-    ),
-)
-public fun KotlinToolingVersion(
-    kotlinVersion: KotlinVersion,
-    classifier: String? = null,
-): KotlinToolingVersion =
-    KotlinToolingVersion(kotlinVersion.major, kotlinVersion.minor, kotlinVersion.patch, classifier)
-
-@Deprecated(
-    "Use KotlinToolingVersion directly",
-    ReplaceWith(
-        "this.isDev",
-        "org.jetbrains.kotlin.tooling.core.isDev",
-    ),
-)
-public val KotlinToolingVersion.isDev: Boolean
-    get() = isDev
 
 public val KotlinToolingVersion.isIdeBuild: Boolean
     get() = classifier?.startsWith("ij", ignoreCase = true) == true

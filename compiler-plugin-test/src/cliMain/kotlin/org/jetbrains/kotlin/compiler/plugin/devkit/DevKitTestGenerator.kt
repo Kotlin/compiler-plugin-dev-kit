@@ -19,20 +19,6 @@ public class DevKitTestGroup(public val underlying: TestGroup, public val source
     public val testClasses: List<TestClass>
         get() = underlying.testClasses
 
-    @Deprecated(
-        DEPRECATION_MESSAGE,
-        replaceWith =
-            ReplaceWith(
-                "testClass<T>(suiteTestClassName, suiteTestClassPackage, annotations, init)"
-            ),
-    )
-    public inline fun <reified T : Any> sourceSetTestClass(
-        suiteTestClassName: String = getDefaultSuiteTestClassName(T::class.java.simpleName),
-        suiteTestClassPackage: String = suiteTestClassPackage(T::class.jvmName, sourceSetName),
-        annotations: List<AnnotationModel> = emptyList(),
-        noinline init: TestClass.() -> Unit,
-    ): Unit = testClass<T>(suiteTestClassName, suiteTestClassPackage, annotations, init)
-
     public inline fun <reified T : Any> testClass(
         suiteTestClassName: String = getDefaultSuiteTestClassName(T::class.java.simpleName),
         suiteTestClassPackage: String = suiteTestClassPackage(T::class.jvmName, sourceSetName),
@@ -94,34 +80,6 @@ public fun generateDevKitTestsWithJUnit5(
             }
         }
     }
-}
-
-internal const val DEPRECATION_MESSAGE = "Use the generateDevKitTestsWithJUnit5 api instead"
-
-@Deprecated(DEPRECATION_MESSAGE) public data class SourceSetName(val name: String)
-
-public object DevKitTestGenerator {
-    @Deprecated(
-        DEPRECATION_MESSAGE,
-        replaceWith = ReplaceWith("generateDevKitTestsWithJUnit5(block)"),
-    )
-    @Suppress("DEPRECATION")
-    public fun generate(args: Array<String>, block: context(SourceSetName) TestGroup.() -> Unit) {
-        generateDevKitTestsWithJUnit5 { block(SourceSetName(this.sourceSetName), underlying) }
-    }
-}
-
-@Deprecated(DEPRECATION_MESSAGE)
-@Suppress("DEPRECATION")
-context(name: SourceSetName)
-public inline fun <reified T : Any> TestGroup.sourceSetTestClass(
-    suiteTestClassName: String = getDefaultSuiteTestClassName(T::class.java.simpleName),
-    suiteTestClassPackage: String = suiteTestClassPackage(T::class.jvmName, name.name),
-    annotations: List<AnnotationModel> = emptyList(),
-    noinline init: TestClass.() -> Unit,
-) {
-    DevKitTestGroup(this, name.name)
-        .testClass<T>(suiteTestClassName, suiteTestClassPackage, annotations, init)
 }
 
 public fun suiteTestClassPackage(fqName: String, extra: String): String {

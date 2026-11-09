@@ -73,27 +73,6 @@ public val TEST_COMPILER_VERSION: KotlinToolingVersion by lazy {
     KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.test.kotlin-version"))
 }
 
-/** The Kotlin version the current `functionalTest<Version>` task is running against. */
-@Deprecated(
-    "Use TEST_COMPILER_VERSION",
-    replaceWith =
-        ReplaceWith(
-            $$"\"$TEST_COMPILER_VERSION\"",
-            "kotlin.compiler.plugin.devkit.test.TEST_COMPILER_VERSION",
-        ),
-)
-public fun getTestCompilerVersion(): String = "$TEST_COMPILER_VERSION"
-
-@Deprecated(
-    "Use TEST_COMPILER_VERSION",
-    replaceWith =
-        ReplaceWith(
-            "TEST_COMPILER_VERSION",
-            "kotlin.compiler.plugin.devkit.test.TEST_COMPILER_VERSION",
-        ),
-)
-public fun getTestCompilerToolingVersion(): KotlinToolingVersion = TEST_COMPILER_VERSION
-
 /** The Kotlin version that companion libraries use. */
 public val BUILD_COMPILER_VERSION: KotlinToolingVersion by lazy {
     KotlinToolingVersion(System.getProperty("kotlin.compiler.plugin.devkit.build.kotlin-version"))
