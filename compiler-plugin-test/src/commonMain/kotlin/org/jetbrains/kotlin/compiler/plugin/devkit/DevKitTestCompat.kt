@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
+import org.jetbrains.kotlin.test.model.BackendInputHandler
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestPhase
@@ -120,3 +121,15 @@ public expect fun collectFilesForRenderingCompat(
 ): List<FirFile>
 
 public expect val IrBackendInput.irBuiltInsCompat: IrBuiltIns
+
+public expect val DISABLE_FIR_DUMP_HANDLER: SimpleDirective
+public expect val DisableFirDumpHandlerContainer: SimpleDirectivesContainer
+
+public expect fun TestConfigurationBuilder.registerTagsGeneratorChecker()
+
+public expect fun NoIrCompilationErrorsHandlerCompat(
+    testServices: TestServices
+): BackendInputHandler<IrBackendInput>
+
+public expect val DISABLE_GENERATED_FIR_TAGS: SimpleDirective
+public expect val DisableGeneratedFirTagsContainer: SimpleDirectivesContainer

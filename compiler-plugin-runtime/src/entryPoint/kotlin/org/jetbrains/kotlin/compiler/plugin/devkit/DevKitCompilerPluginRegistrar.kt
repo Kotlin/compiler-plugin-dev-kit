@@ -1,10 +1,18 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
+import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
 public abstract class DevKitCompilerPluginRegistrar(registrarClass: String) :
     CompilerPluginRegistrar() {
+    // Doesn't exist before 2.3, so we re-declare it here to avoid `NoSuchMethodError`
+    /**
+     * Uniquely identifies the Kotlin compiler plugin. Must match the `pluginId` specified in
+     * [CommandLineProcessor]. The ID can be used in combination with `-Xcompiler-plugin-order` to
+     * control execution order of compiler plugins.
+     */
+    abstract override val pluginId: String
     private val versionedRegistrar by lazy {
         val loader =
             VersionedPluginClassLoading.resolve(

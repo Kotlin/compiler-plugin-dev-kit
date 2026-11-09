@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.toKotlinVersion
+
 plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
@@ -32,9 +35,19 @@ pluginDevKit {
         testAgainst(it, forIde = false)
     }
     versionHierarchy {
-        split("2.5.0-dev-5651")
+        post("2.5.0-dev-5651")
+        groupVersions("pre250Dev5651") {
+            it.toKotlinVersion() >= KotlinVersion(2, 3) &&
+                it < KotlinToolingVersion("2.5.0-dev-5651")
+        }
         split("2.4.20-dev-2793")
+        splitDev(2, 3)
     }
+}
+
+kotlin.sourceSets {
+    named("pre250Dev5651Main") { dependsOn(getByName("post23DevMain")) }
+    named("post250Dev5651Main") { dependsOn(getByName("post23DevMain")) }
 }
 
 publishing {

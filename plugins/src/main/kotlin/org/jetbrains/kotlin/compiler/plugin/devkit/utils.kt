@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 internal const val DEV_KIT_PROPERTY_PREFIX = "kotlin.compiler.plugin.devkit"
 
@@ -127,7 +128,15 @@ internal fun String.capitalizeAsciiOnly(): String {
     else this
 }
 
-internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 3, 0)
+internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 2, 20)
+
+internal val MIN_JS_TEST_INFRASTRUCTURE_VERSION = KotlinVersion(2, 3, 0)
+
+internal val DevKitTarget.supportsJsTestInfrastructure: Boolean
+    get() = !forIde && version.toKotlinVersion() >= MIN_JS_TEST_INFRASTRUCTURE_VERSION
+
+internal val DevKitTarget.isCliButNotJs: Boolean
+    get() = !forIde && !supportsJsTestInfrastructure
 
 private class ProviderToString(val provider: Provider<*>) {
     override fun toString(): String = provider.orNull.toString()

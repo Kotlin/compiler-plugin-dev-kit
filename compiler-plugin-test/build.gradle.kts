@@ -1,4 +1,10 @@
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilation
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTarget
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
+import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 
 plugins {
     kotlin("multiplatform")
@@ -52,17 +58,45 @@ pluginDevKit {
         splitDev(2, 4, 20)
         splitDev(2, 4)
         splitDev(2, 3, 20)
-        splitDevCli(2, 3, 20)
+        groupVersionsCli("pre2320DevJs") {
+            it.toKotlinVersion() >= KotlinVersion(2, 3) &&
+                it.toKotlinVersion() < KotlinVersion(2, 3, 20)
+        }
+        groupVersionsCli("post2320DevJs") { it.toKotlinVersion() >= KotlinVersion(2, 3, 20) }
+        splitDev(2, 3)
+        split("2.2.20-RC")
     }
 }
 
+fun KotlinSourceSet.targetsMatch(condition: (DevKitTarget) -> Boolean) = compilationsMatch {
+    condition(it.target)
+}
+
+fun KotlinSourceSet.compilationsMatch(condition: (DevKitCompilation) -> Boolean) =
+    (this as AbstractKotlinSourceSet).compilations.all { it is DevKitCompilation && condition(it) }
+
 kotlin.sourceSets {
-    // This exists so that the `typealias` trick for `TestConfigurationBuilder` works within this
-    // project
+    val jsMain = create("jsMain")
+    jsMain.dependsOn(getByName("cliMain"))
+
     // TODO we could do this wiring automatically, but it'd look ugly in the "actual chooser" in IDE
-    named("pre2320DevCliMain") {
-        dependsOn(getByName("pre24DevMain"))
-        dependsOn(getByName("pre2420DevMain"))
+    configureEach {
+        if (!compilationsMatch { it.name == KotlinSourceSetTree.main.name }) return@configureEach
+        if (this == jsMain) return@configureEach
+        // stops the "redundant dependsOn" warning; has no other purpose.
+        if (pluginDevKit.testAgainst.any { it.mainCompilation.defaultSourceSet == this })
+            return@configureEach
+
+        // This exists so that the `typealias` trick for `TestConfigurationBuilder` works within
+        // this project
+        if (targetsMatch { it.version.toKotlinVersion() < KotlinVersion(2, 4) }) {
+            dependsOn(getByName("pre24DevMain"))
+            dependsOn(getByName("pre2420DevMain"))
+        }
+
+        if (targetsMatch { !it.forIde && it.version.toKotlinVersion() >= KotlinVersion(2, 3) }) {
+            dependsOn(getByName("jsMain"))
+        }
     }
 }
 

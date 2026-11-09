@@ -31,7 +31,7 @@ Alternatively, for a pre-existing project, use the [Migration guide](./docs/migr
 
 ### Compatibility
 
-The DevKit supports Kotlin 2.3.0+, Gradle 9.2+, and IntelliJ 2025.3+
+The DevKit supports Kotlin 2.2.20+, Gradle 9.2+, and IntelliJ 2025.2+
 
 ## Further Info
 
