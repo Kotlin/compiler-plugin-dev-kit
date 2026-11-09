@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
-// Copied from
+// Adapted from
 // https://github.com/ZacSweers/metro/blob/ad90731d57c0d710389c20852e8844f94bce98e9/compiler-tests/src/test/kotlin/dev/zacsweers/metro/compiler/MetroTestPhaseCompat.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit
 

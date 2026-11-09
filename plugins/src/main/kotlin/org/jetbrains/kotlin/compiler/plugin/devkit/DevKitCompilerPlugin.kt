@@ -512,6 +512,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 }
             }
         }
+        // Adapted from
+        // https://github.com/infix-de/testBalloon/blob/main/testBalloon-compiler-plugin/build.gradle.kts
         mainJar {
             val includedDependencies =
                 project.configurations.resolvable("includedDependencies") {

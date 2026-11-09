@@ -1,5 +1,7 @@
 // Copyright (C) 2025 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
+// Adapted from
+// https://github.com/ZacSweers/metro/blob/d2c9a920a0632e7ce8f9678f8d9cb7b898a019b6/compiler-compat/src/main/kotlin/dev/zacsweers/metro/compiler/compat/CompatContext.kt#L125
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.nio.file.FileSystems.newFileSystem

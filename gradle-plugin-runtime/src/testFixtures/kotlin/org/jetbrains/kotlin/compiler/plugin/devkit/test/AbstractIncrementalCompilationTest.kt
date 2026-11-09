@@ -1,3 +1,5 @@
+// Adapted from
+// https://github.com/ZacSweers/metro/blob/009c44dad36e2151266bf6c6cff4fe187fc2b9db/gradle-plugin/src/functionalTest/kotlin/dev/zacsweers/metro/gradle/incremental/BaseIncrementalCompilationTest.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit.test
 
 import com.autonomousapps.kit.GradleBuilder.build

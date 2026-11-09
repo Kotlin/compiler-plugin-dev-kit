@@ -1,3 +1,5 @@
+// Adapted from
+// https://github.com/ZacSweers/metro/blob/50d2ab5de53a7bcab1a2fd3105fddea258f473e8/gradle-plugin/src/functionalTest/kotlin/dev/zacsweers/metro/gradle/GradlePlugins.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit.test
 
 import com.autonomousapps.kit.AbstractGradleProject.Companion.PLUGIN_UNDER_TEST_VERSION

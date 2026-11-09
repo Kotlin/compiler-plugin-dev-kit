@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Adapted from https://github.com/ZacSweers/metro/blob/364de142773970555cab2c3c0a4bad950c0823a6/compiler-compat/fetch-all-ide-kotlin-versions.py
+
 """Fetches recent IntelliJ IDEA and Android Studio releases and records the Kotlin
 compiler version each one bundles, as alias mappings.
 

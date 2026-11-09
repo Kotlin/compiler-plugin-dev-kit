@@ -1,4 +1,4 @@
-// Copied from Metro
+// Adapted from Metro
 // https://github.com/ZacSweers/metro/blob/f4fb09ea6b6894aa7816f02d52398d65f9be404d/compiler-compat/src/main/kotlin/dev/zacsweers/metro/compiler/compat/KotlinToolingVersion.kt
 
 package org.jetbrains.kotlin.compiler.plugin.devkit

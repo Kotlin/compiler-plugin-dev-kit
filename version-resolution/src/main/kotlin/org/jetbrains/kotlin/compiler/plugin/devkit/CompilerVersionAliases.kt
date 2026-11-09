@@ -1,5 +1,9 @@
 // Copyright (C) 2026 Zac Sweers
 // SPDX-License-Identifier: Apache-2.0
+// Adapted from
+// https://github.com/ZacSweers/metro/blob/02791af0eb95e6e8122f751ba3aa06b35f30cb6f/compiler-compat/src/main/kotlin/dev/zacsweers/metro/compiler/compat/CompilerVersionAliases.kt
+// and
+// https://github.com/Mr3zee/Kotlin-External-FIR-Support/blob/4cef960a1527d09ef3f8c95508a9ee0c6c304309/src/main/kotlin/com/github/mr3zee/kefs/KotlinVersionService.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion

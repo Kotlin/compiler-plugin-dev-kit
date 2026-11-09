@@ -1,3 +1,5 @@
+// Adapted from
+// https://github.com/ZacSweers/metro/blob/cea837e9b4df7dc637d2edf1864b69e870400090/gradle-plugin/src/functionalTest/kotlin/dev/zacsweers/metro/gradle/testUtil.kt
 package org.jetbrains.kotlin.compiler.plugin.devkit.test
 
 import com.autonomousapps.kit.Source
