@@ -30,6 +30,8 @@ include("compiler-plugin-runtime")
 
 include("compiler-plugin-test")
 
+include("compiler-plugin-test-generator")
+
 include("gradle-plugin-runtime")
 
 rootProject.name = "compiler-plugin-dev-kit"

@@ -63,6 +63,8 @@ compiler and IDE runtime.
       classes. Uses `version-resolution`.
     - [`compiler-plugin-test`](#compiler-plugin-test): compiler plugin test utilities, including
       [classified dumps](#classified-dump).
+    - [`compiler-plugin-test-generator`](#compiler-plugin-test-generator): the test generator API, for example
+      `generateDevKitTestsWithJUnit5`.
     - [`gradle-plugin-runtime`](#gradle-plugin-runtime): [Gradle support plugin](#gradle-support-plugin) utilities. Its
       test fixtures help with [functional tests](#functional-test).
 
@@ -347,6 +349,9 @@ commas or whitespace. A boolean property counts as true only when its value is e
     - The generator is the class that [
       `generateTestsClass`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
       names, in the `generateTests` source set. The default is `<pluginPackage>.GenerateTestsKt`.
+    - The generator API, for example `generateDevKitTestsWithJUnit5`, comes from [
+      `compiler-plugin-test-generator`](#compiler-plugin-test-generator). The DevKit adds it as an `api` dependency of
+      that source set.
     - The [
       `generateTestsEnabled`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
       property turns generation off. Default is true for `compiler-plugin`, and false for `compiler-library`.
@@ -484,27 +489,17 @@ The services are in the package
 
 #### CLI-only code
 
-[`src/cliMain`](../compiler-plugin-test/src/cliMain) compiles only for [CLI versions](#cli-version). It has:
-
-- The test generator API. [
-  `generateDevKitTestsWithJUnit5 { }`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestGenerator.kt)
-  calls `testGroup` for each test data directory:
-    - The `generateTests*` task gives the directories in the system property `kotlin.compiler.plugin.devkit.roots`. Its
-      value is pairs of an output directory and a comma-separated list of data directories, all separated by `;`.
-    - The generated suites need different FQNs, because otherwise the Kotlin Compiler DevKit IDE plugin can't tell them
-      apart. Each suite is in the package `<package of the test base>.<target name>{_<index>}`. The `<target name>` is
-      the [target name](#target-name) of the version that the suite tests. The generator adds `_<index>` for each data
-      directory after the first.
-- The JS runners: [
-  `BackportedJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
-  [
-  `MultiVersionJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
-  [
-  `BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt),
-  [
-  `DevKitJsBoxTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
-  and [
-  `DevKitJsDiagnosticTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt).
+[`src/cliMain`](../compiler-plugin-test/src/cliMain) compiles only for [CLI versions](#cli-version). It has the JS
+runners: [
+`BackportedJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsTest.kt),
+[
+`MultiVersionJsTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+[
+`BackportedJsDiagnosticWithBackendTestBase`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/BackportedJsDiagnosticTest.kt),
+[
+`DevKitJsBoxTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsBoxTest.kt),
+and [
+`DevKitJsDiagnosticTest`](../compiler-plugin-test/src/cliMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/runners/DevKitJsDiagnosticTest.kt).
 
 IDE versions get no JS tests. The IDE uses only the JVM backend (for `Evaluate Expression`/`Show Kotlin Bytecode`), and
 Analysis API tests cover JS diagnostics better than compiler tests.
@@ -598,6 +593,29 @@ longer listed doesn't fail the test ([#64](https://github.com/Kotlin/compiler-pl
 
 `-PupdateTestData` sets the system property `kotlin.test.update.test.data`, so the test framework writes each dump that
 doesn't match.
+
+### `compiler-plugin-test-generator`
+
+The [
+`compiler-plugin`](#plugindevkitcompiler-pluginplugindevkitcompiler-library) and [
+`compiler-library`](#plugindevkitcompiler-pluginplugindevkitcompiler-library) plugins add it as an `api` dependency of
+the `generateTests` source set. `addRuntimeDependency` gates this dependency too.
+
+It is a plain Kotlin JVM project, not a multi-version [
+`DevKitTarget`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt) project. The
+`generateTests*` compilations always run the generator on the newest known Kotlin [version](#version). The project
+compiles it once, against the `internal-test-framework` of that version.
+
+[
+`generateDevKitTestsWithJUnit5 { }`](../compiler-plugin-test-generator/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestGenerator.kt)
+calls `testGroup` for each test data directory:
+
+- The `generateTests*` task gives the directories in the system property `kotlin.compiler.plugin.devkit.roots`. Its
+  value is pairs of an output directory and a comma-separated list of data directories, all separated by `;`.
+- The generated suites need different FQNs, because otherwise the Kotlin Compiler DevKit IDE plugin can't tell them
+  apart. Each suite is in the package `<package of the test base>.<target name>{_<index>}`. The `<target name>` is
+  the [target name](#target-name) of the version that the suite tests. The generator adds `_<index>` for each data
+  directory after the first.
 
 ### `gradle-plugin-runtime`
 

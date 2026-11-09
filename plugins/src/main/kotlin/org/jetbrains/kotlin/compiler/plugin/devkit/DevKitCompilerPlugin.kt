@@ -98,7 +98,8 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         objects.directoryProperty().convention(layout.buildDirectory.dir("test-gen"))
 
     /**
-     * Whether to add an implementation dependency on `compiler-plugin-runtime`. Defaults to true
+     * Whether to add dependencies on the dev DevKit's modules: `compiler-plugin-runtime`,
+     * `compiler-plugin-test`, and `compiler-plugin-test-generator`. Defaults to true.
      */
     public val addRuntimeDependency: Property<Boolean> = objects.property(true)
 
@@ -801,6 +802,14 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             api(
                 addRuntimeDependency.ifTrue {
                     "$DEV_KIT_GROUP:compiler-plugin-test:$DEV_KIT_VERSION"
+                }
+            )
+        }
+
+        commonGenerateTests.dependencies {
+            api(
+                addRuntimeDependency.ifTrue {
+                    "$DEV_KIT_GROUP:compiler-plugin-test-generator:$DEV_KIT_VERSION"
                 }
             )
         }
