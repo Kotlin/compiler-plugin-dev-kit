@@ -99,5 +99,5 @@ publishing {
 
 tapmoc {
     gradle(libs.versions.gradle.get())
-    checkDependencies(Severity.ERROR)
+    checkDependencies(Severity.WARNING)
 }

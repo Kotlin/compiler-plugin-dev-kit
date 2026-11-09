@@ -9,6 +9,7 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.JavaExec
@@ -23,7 +24,9 @@ import org.gradle.api.tasks.options.Option
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.kotlin.dsl.withType
+import org.gradle.work.DisableCachingByDefault
 
+@CacheableTask
 public abstract class JsReplGeneratorTask : DefaultTask() {
     @get:Input @get:Optional public abstract val defaultRepl: Property<String>
 
@@ -38,6 +41,7 @@ public abstract class JsReplGeneratorTask : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "it mostly does IO, so no benefit in caching it")
 internal abstract class GenerateTestsTask : JavaExec() {
     @get:OutputDirectories abstract val generatedTestsDirs: ListProperty<Directory>
 
@@ -51,6 +55,7 @@ internal abstract class GenerateTestsTask : JavaExec() {
  * A task that scans provided testData directories and writes a list of relative .kt files into
  * build/testDataInfo/testDataFilesList.txt
  */
+@DisableCachingByDefault(because = "it only does IO, so no benefit in caching it")
 internal abstract class CollectTestDataTask : DefaultTask() {
     @get:Input abstract val rootDirPath: Property<String>
 
@@ -86,6 +91,7 @@ internal abstract class CollectTestDataTask : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "it writes simple strings to a file")
 internal abstract class GenerateServices : DefaultTask() {
     @get:OutputDirectory abstract val generatedServicesDir: DirectoryProperty
     @get:Input val services: MapProperty<String, String> = project.objects.mapProperty()
@@ -103,6 +109,7 @@ internal abstract class GenerateServices : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "This is used as a lifecycle task, so it's usually disabled")
 internal open class DefaultTestTask : DefaultTask() {
     // copied from KotlinTestsRegistry
     init {
