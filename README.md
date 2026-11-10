@@ -2,7 +2,7 @@
 
 [![Kotlin Experimental](https://kotl.in/badges/experimental.svg)](https://kotlinlang.org/docs/components-stability.html)
 ![JetBrains incubator](https://camo.githubusercontent.com/6e2750106a3263d7de756abf314657b331f94ecf58726ab8bfd413bb7bd7c545/68747470733a2f2f6a622e67672f6261646765732f696e63756261746f722d706c61737469632e737667)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.3.20+-blue.svg?logo=kotlin)](http://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.2.20+-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![GitHub License](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](http://www.apache.org/licenses/LICENSE-2.0)
 
 > [!WARNING]
