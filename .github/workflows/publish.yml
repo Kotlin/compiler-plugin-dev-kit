@@ -98,9 +98,27 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "::notice::$tag already exists; leaving it as is"
           else
+            # Every release tag sits on a commit of main's first-parent chain, so the nearest one
+            # below this commit is the previous release. `git describe` appends `-<count>-g<sha>`
+            # unless the tag is on this commit itself; strip that suffix for the bare tag name.
+            prev=$(git describe --tags --first-parent --match 'v*-dev-*' --exclude "$tag" \
+              "$GITHUB_SHA" 2>/dev/null | sed -E 's/-[0-9]+-g[0-9a-f]+$//' || true)
+            if [ -z "$prev" ]; then
+              echo "::notice::No release tag is reachable below this commit; the notes list no commits"
+            fi
+            notes="$RUNNER_TEMP/release-notes.md"
+            {
+              echo "Published \`$VERSION\` to <https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap>."
+              if [ -n "$prev" ]; then
+                echo
+                echo "Commits since \`$prev\`:"
+                echo
+                git log --first-parent --format='- %h %s' "$prev..$GITHUB_SHA"
+              fi
+            } > "$notes"
             gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
               --title "$VERSION" \
-              --notes "Published \`$VERSION\` to <https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap>."
+              --notes-file "$notes"
           fi
 
       - name: Summarize
