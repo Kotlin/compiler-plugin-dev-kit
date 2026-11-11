@@ -41,6 +41,7 @@ pluginDevKit {
                 it < KotlinToolingVersion("2.5.0-dev-5651")
         }
         split("2.4.20-dev-2793")
+        splitDev(2, 3, 20)
         splitDev(2, 3)
     }
 }
