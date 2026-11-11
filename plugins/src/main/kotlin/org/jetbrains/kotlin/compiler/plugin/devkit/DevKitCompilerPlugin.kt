@@ -785,7 +785,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 // TODO DefaultManifest is internal
                 from(DefaultManifest(null)) {
                     eachEntry {
-                        if (key == "Kotlin-Compiler-Plugin-Until-Build" && value == "null")
+                        if (
+                            (key == "Kotlin-Compiler-Plugin-Since-Build" ||
+                                key == "Kotlin-Compiler-Plugin-Until-Build") && value == "null"
+                        )
                             exclude()
                     }
                 }
