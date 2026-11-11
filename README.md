@@ -33,6 +33,12 @@ Alternatively, for a pre-existing project, use the [Migration guide](./docs/migr
 
 The DevKit supports Kotlin 2.2.20+, Gradle 9.2+, and IntelliJ 2025.2+
 
+### KEFS support
+
+We recommended using [KEFS](https://github.com/Mr3zee/Kotlin-External-FIR-Support) during plugin development since it supports hot-reloading of plugins and gracefully handles plugin exceptions.
+
+KEFS supports DevKit-based compiler plugins since 0.4.0.
+
 ## Further Info
 
 There's a [spec](./docs/spec.md)
