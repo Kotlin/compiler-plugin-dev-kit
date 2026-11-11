@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.test.frontend.fir.handlers.FirAnalysisHandler
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
 import org.jetbrains.kotlin.test.model.BackendInputHandler
 import org.jetbrains.kotlin.test.model.ServicesAndDirectivesContainer
+import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestPhase
 import org.jetbrains.kotlin.test.services.TestService
@@ -133,3 +134,5 @@ public expect fun NoIrCompilationErrorsHandlerCompat(
 
 public expect val DISABLE_GENERATED_FIR_TAGS: SimpleDirective
 public expect val DisableGeneratedFirTagsContainer: SimpleDirectivesContainer
+
+public expect val FirOutputArtifact.mainFirFilesByTestFileCompat: Map<TestFile, FirFile>

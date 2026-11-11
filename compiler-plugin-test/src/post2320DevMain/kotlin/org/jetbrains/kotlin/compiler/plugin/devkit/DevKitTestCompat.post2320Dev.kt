@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler.Companion.collectFilesForRendering
+import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.model.TestModule
 
 public actual fun collectFilesForRenderingCompat(
@@ -16,3 +17,6 @@ public actual fun collectFilesForRenderingCompat(
 
 public actual val IrBackendInput.irBuiltInsCompat: IrBuiltIns
     get() = irBuiltIns
+
+public actual val FirOutputArtifact.mainFirFilesByTestFileCompat: Map<TestFile, FirFile>
+    get() = mainFirFilesByTestFile
