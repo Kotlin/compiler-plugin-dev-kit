@@ -610,6 +610,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 }
             val includedEntryPoint =
                 project.configurations.create("includedEntryPoint") {
+                    isCanBeConsumed = false
                     val from =
                         project.configurations.getByName(
                             surrogateTarget.mainCompilation.runtimeDependencyConfigurationName
