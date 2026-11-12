@@ -7,6 +7,7 @@ plugins {
     kotlin("plugin.assignment") version libs.versions.kotlin
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.maven.publish)
+    alias(libs.plugins.plugin.publish)
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }
@@ -46,19 +47,33 @@ gradleTestKitSupport {
 }
 
 gradlePlugin {
+    website = "https://github.com/Kotlin/compiler-plugin-dev-kit"
+    vcsUrl = "https://github.com/Kotlin/compiler-plugin-dev-kit.git"
     plugins {
         create("compilerPlugin") {
             id = "$group.compiler-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: compiler plugin"
+            description =
+                "Builds, tests, and publishes a Kotlin compiler plugin for many Kotlin compiler and IDE versions from one source tree."
+            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
         create("compilerLibrary") {
             id = "$group.compiler-library"
             implementationClass =
                 "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerLibrary"
+            displayName = "Kotlin Compiler Plugin DevKit: compiler library"
+            description =
+                "Builds a library for Kotlin compiler plugins against many Kotlin compiler and IDE versions from one source tree."
+            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
         create("gradlePlugin") {
             id = "$group.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: Gradle support plugin"
+            description =
+                "Builds the Gradle support plugin of a Kotlin compiler plugin, and runs its functional tests against many Kotlin versions."
+            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
     }
 }
@@ -93,6 +108,10 @@ publishing {
             name = "devKitSpace"
             url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
             credentials(PasswordCredentials::class)
+        }
+        maven {
+            name = "devKitLocal"
+            url = uri(rootDir.resolve("../build/repo"))
         }
     }
 }

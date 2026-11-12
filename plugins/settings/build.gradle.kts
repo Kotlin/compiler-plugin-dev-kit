@@ -6,6 +6,7 @@ plugins {
     kotlin("plugin.sam.with.receiver")
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.maven.publish)
+    alias(libs.plugins.plugin.publish)
     alias(libs.plugins.tapmoc)
 }
 
@@ -27,15 +28,25 @@ dependencies {
 }
 
 gradlePlugin {
+    website = "https://github.com/Kotlin/compiler-plugin-dev-kit"
+    vcsUrl = "https://github.com/Kotlin/compiler-plugin-dev-kit.git"
     plugins {
         create("settingsPlugin") {
             id = group.toString()
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitSettingsPlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: settings plugin"
+            description =
+                "Adds the Kotlin dev, bootstrap, and IDE repositories to a Kotlin compiler plugin build, and has utilities for composite builds."
+            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
         create("functionalTestPublishing") {
             id = "$group.functional-test-publishing"
             implementationClass =
                 "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitFunctionalTestPublishingPlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: functional test publishing"
+            description =
+                "Applies com.autonomousapps.testkit without its default publication. The DevKit settings plugin applies it to every project."
+            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
     }
 }
@@ -61,6 +72,10 @@ publishing {
             name = "devKitSpace"
             url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
             credentials(PasswordCredentials::class)
+        }
+        maven {
+            name = "devKitLocal"
+            url = uri(rootDir.resolve("../build/repo"))
         }
     }
 }

@@ -57,5 +57,9 @@ publishing {
             url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
             credentials(PasswordCredentials::class)
         }
+        maven {
+            name = "devKitLocal"
+            url = uri(rootDir.resolve("build/repo"))
+        }
     }
 }
