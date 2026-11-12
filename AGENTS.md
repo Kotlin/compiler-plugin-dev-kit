@@ -65,6 +65,20 @@ for build in . plugins version-resolution; do
 done
 ```
 
+The same loop with `publishAllPublicationsToDevKitLocalRepository` writes all three builds to `build/repo` of the repo
+root. The Gradle Plugin Portal gets only the plugins, from one more invocation:
+
+```bash
+./gradlew --project-dir plugins publishPlugins   # needs GRADLE_PUBLISH_KEY / GRADLE_PUBLISH_SECRET
+```
+
+`check` runs `checkArtifacts` in each build. The task compares the publications of each project with
+`artifacts/<project>.txt` of that build. When a publication changes, regenerate the lists and commit them:
+
+```bash
+for build in . plugins version-resolution; do ./gradlew --project-dir $build dumpArtifacts; done
+```
+
 ## Conventions
 
 - **Formatting is ktfmt, `Kotlinlang` style.** Spotless is declared in the **root** build script only and covers all
@@ -108,6 +122,9 @@ done
   published commit also gets a prerelease GitHub Release tagged `v<version>`. The checked-in `-SNAPSHOT` value is what
   local and IDE builds keep using. In the root build the conventional path *already* imports the catalog, so its
   `create("libs")` must not call `from` again.
+- **A build signs its publications only when the Gradle property `libs.sign.key.private` is set**, together with
+  `libs.sign.key.id` and `libs.sign.passphrase`. Don't apply `signing` in a `plugins { }` block. With that plugin
+  applied, `com.gradle.plugin-publish` signs in every build, and a build that has no key fails.
 
 ## Recipe: support a new Kotlin version
 
@@ -121,3 +138,6 @@ done
    `expect` in the shared parent with an `actual` on each side. The `DevKitTestCompat.*.kt` files show the pattern.
 
 Version *removal* works the same way in reverse.
+
+The publications of `compiler-plugin-runtime` and `compiler-plugin-test` have the name of the first registered target,
+for example `compiler-plugin-runtime-k2220_beta1`. If the first registered version changes, run `dumpArtifacts`.

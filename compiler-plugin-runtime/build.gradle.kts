@@ -50,6 +50,44 @@ kotlin.sourceSets {
     named("post250Dev5651Main") { dependsOn(getByName("post23DevMain")) }
 }
 
+mavenPublishing {
+    pom {
+        name = "compiler-plugin-runtime"
+        description =
+            "Utilities and entry point classes for a Kotlin compiler plugin that supports many Kotlin versions."
+        url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
+        licenses {
+            license {
+                name = "Apache-2.0"
+                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+            }
+        }
+        developers {
+            developer {
+                id = "JetBrains"
+                name = "JetBrains Team"
+                organization = "JetBrains"
+                organizationUrl = "https://www.jetbrains.com"
+            }
+        }
+        scm {
+            url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
+            connection = "scm:git:https://github.com/Kotlin/compiler-plugin-dev-kit.git"
+        }
+    }
+}
+
+providers.gradleProperty("libs.sign.key.private").orNull?.let { key ->
+    mavenPublishing { signAllPublications() }
+    configure<SigningExtension> {
+        useInMemoryPgpKeys(
+            providers.gradleProperty("libs.sign.key.id").orNull,
+            key,
+            providers.gradleProperty("libs.sign.passphrase").orNull,
+        )
+    }
+}
+
 publishing {
     repositories {
         maven {
