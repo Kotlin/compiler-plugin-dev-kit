@@ -9,13 +9,11 @@ import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
-    id("com.vanniktech.maven.publish") version libs.versions.publish
+    id("devkit.publishing")
     alias(libs.plugins.tapmoc)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description = "Test utilities for a Kotlin compiler plugin that supports many Kotlin versions."
 
 tapmoc { java(8) }
 
@@ -96,58 +94,6 @@ kotlin.sourceSets {
 
         if (targetsMatch { !it.forIde && it.version.toKotlinVersion() >= KotlinVersion(2, 3) }) {
             dependsOn(getByName("jsMain"))
-        }
-    }
-}
-
-mavenPublishing {
-    pom {
-        name = "compiler-plugin-test"
-        description =
-            "Test utilities for a Kotlin compiler plugin that supports many Kotlin versions."
-        url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
-        licenses {
-            license {
-                name = "Apache-2.0"
-                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
-            }
-        }
-        developers {
-            developer {
-                id = "JetBrains"
-                name = "JetBrains Team"
-                organization = "JetBrains"
-                organizationUrl = "https://www.jetbrains.com"
-            }
-        }
-        scm {
-            url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
-            connection = "scm:git:https://github.com/Kotlin/compiler-plugin-dev-kit.git"
-        }
-    }
-}
-
-providers.gradleProperty("libs.sign.key.private").orNull?.let { key ->
-    mavenPublishing { signAllPublications() }
-    configure<SigningExtension> {
-        useInMemoryPgpKeys(
-            providers.gradleProperty("libs.sign.key.id").orNull,
-            key,
-            providers.gradleProperty("libs.sign.passphrase").orNull,
-        )
-    }
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-        maven {
-            name = "devKitLocal"
-            url = uri(rootDir.resolve("build/repo"))
         }
     }
 }

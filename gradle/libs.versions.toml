@@ -22,8 +22,6 @@ diff-utils = "4.12"
 [plugins]
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
-plugin-publish = { id = "com.gradle.plugin-publish", version.ref = "plugin-publish" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 tapmoc = { id = "com.gradleup.tapmoc", version.ref = "tapmoc" }
 testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit-plugin" }
@@ -32,7 +30,9 @@ testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit-plugin" }
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
 gradle-public-api = { group = "org.gradle.experimental", name = "gradle-public-api", version.ref = "gradle" }
+maven-publish = { group = "com.vanniktech", name = "gradle-maven-publish-plugin", version.ref = "publish" }
 node-gradle = { group = "com.github.node-gradle.node", name = "com.github.node-gradle.node.gradle.plugin", version.ref = "node-gradle" }
+plugin-publish = { group = "com.gradle.publish", name = "plugin-publish-plugin", version.ref = "plugin-publish" }
 testkit-plugin = { group = "com.autonomousapps", name = "gradle-testkit-plugin", version.ref = "testkit-plugin" }
 testkit-support = { group = "com.autonomousapps", name = "gradle-testkit-support", version.ref = "testkit-support" }
 testkit-truth = { group = "com.autonomousapps", name = "gradle-testkit-truth", version.ref = "testkit-truth" }

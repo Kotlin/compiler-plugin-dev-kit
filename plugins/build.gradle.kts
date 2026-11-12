@@ -6,15 +6,12 @@ plugins {
     kotlin("plugin.sam.with.receiver") version libs.versions.kotlin
     kotlin("plugin.assignment") version libs.versions.kotlin
     alias(libs.plugins.buildconfig)
-    alias(libs.plugins.maven.publish)
-    alias(libs.plugins.plugin.publish)
+    id("devkit.plugin-publishing")
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description = "The Gradle plugins of the Kotlin Compiler Plugin DevKit."
 
 samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
@@ -47,8 +44,6 @@ gradleTestKitSupport {
 }
 
 gradlePlugin {
-    website = "https://github.com/Kotlin/compiler-plugin-dev-kit"
-    vcsUrl = "https://github.com/Kotlin/compiler-plugin-dev-kit.git"
     plugins {
         create("compilerPlugin") {
             id = "$group.compiler-plugin"
@@ -56,7 +51,6 @@ gradlePlugin {
             displayName = "Kotlin Compiler Plugin DevKit: compiler plugin"
             description =
                 "Builds, tests, and publishes a Kotlin compiler plugin for many Kotlin compiler and IDE versions from one source tree."
-            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
         create("compilerLibrary") {
             id = "$group.compiler-library"
@@ -65,7 +59,6 @@ gradlePlugin {
             displayName = "Kotlin Compiler Plugin DevKit: compiler library"
             description =
                 "Builds a library for Kotlin compiler plugins against many Kotlin compiler and IDE versions from one source tree."
-            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
         create("gradlePlugin") {
             id = "$group.gradle-plugin"
@@ -73,7 +66,6 @@ gradlePlugin {
             displayName = "Kotlin Compiler Plugin DevKit: Gradle support plugin"
             description =
                 "Builds the Gradle support plugin of a Kotlin compiler plugin, and runs its functional tests against many Kotlin versions."
-            tags = listOf("kotlin", "compiler-plugin", "devkit")
         }
     }
 }
@@ -100,57 +92,6 @@ buildConfig {
     }
     buildConfigField("DEV_KIT_GROUP", group.toString())
     buildConfigField("DEV_KIT_VERSION", version.toString())
-}
-
-mavenPublishing {
-    pom {
-        name = "plugins"
-        description = "The Gradle plugins of the Kotlin Compiler Plugin DevKit."
-        url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
-        licenses {
-            license {
-                name = "Apache-2.0"
-                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
-            }
-        }
-        developers {
-            developer {
-                id = "JetBrains"
-                name = "JetBrains Team"
-                organization = "JetBrains"
-                organizationUrl = "https://www.jetbrains.com"
-            }
-        }
-        scm {
-            url = "https://github.com/Kotlin/compiler-plugin-dev-kit"
-            connection = "scm:git:https://github.com/Kotlin/compiler-plugin-dev-kit.git"
-        }
-    }
-}
-
-providers.gradleProperty("libs.sign.key.private").orNull?.let { key ->
-    mavenPublishing { signAllPublications() }
-    configure<SigningExtension> {
-        useInMemoryPgpKeys(
-            providers.gradleProperty("libs.sign.key.id").orNull,
-            key,
-            providers.gradleProperty("libs.sign.passphrase").orNull,
-        )
-    }
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-        maven {
-            name = "devKitLocal"
-            url = uri(rootDir.resolve("../build/repo"))
-        }
-    }
 }
 
 tapmoc {
