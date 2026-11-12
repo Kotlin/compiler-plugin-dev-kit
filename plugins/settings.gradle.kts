@@ -5,8 +5,6 @@ pluginManagement {
     }
 }
 
-plugins { id("org.jetbrains.kotlinx.artifacts-validator-plugin") version "0.0.2" }
-
 dependencyResolutionManagement {
     includeBuild("../version-resolution")
     versionCatalogs {

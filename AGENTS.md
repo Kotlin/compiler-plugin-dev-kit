@@ -72,11 +72,12 @@ root. The Gradle Plugin Portal gets only the plugins, from one more invocation:
 ./gradlew --project-dir plugins publishPlugins   # needs GRADLE_PUBLISH_KEY / GRADLE_PUBLISH_SECRET
 ```
 
-`check` runs `checkArtifacts` in each build. The task compares the publications of each project with
-`artifacts/<project>.txt` of that build. When a publication changes, regenerate the lists and commit them:
+The root build and `version-resolution` go to Maven Central, so each has the artifacts validator plugin. `plugins` goes
+to the Gradle Plugin Portal and has no validator. `check` runs `checkArtifacts`, which compares the publications of each
+project with `artifacts/<project>.txt` of its build. When a publication changes, regenerate the lists and commit them:
 
 ```bash
-for build in . plugins version-resolution; do ./gradlew --project-dir $build dumpArtifacts; done
+for build in . version-resolution; do ./gradlew --project-dir $build dumpArtifacts; done
 ```
 
 ## Conventions

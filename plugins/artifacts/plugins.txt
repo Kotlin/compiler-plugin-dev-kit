@@ -1,4 +1,0 @@
-org.jetbrains.kotlin.compiler.plugin.devkit.compiler-library:org.jetbrains.kotlin.compiler.plugin.devkit.compiler-library.gradle.plugin/.pom
-org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin:org.jetbrains.kotlin.compiler.plugin.devkit.compiler-plugin.gradle.plugin/.pom
-org.jetbrains.kotlin.compiler.plugin.devkit.gradle-plugin:org.jetbrains.kotlin.compiler.plugin.devkit.gradle-plugin.gradle.plugin/.pom
-org.jetbrains.kotlin.compiler.plugin.devkit:plugins/.jar,.module,.pom,javadoc.jar,sources.jar
