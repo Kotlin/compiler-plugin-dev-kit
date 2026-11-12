@@ -43,6 +43,10 @@ pluginDevKit {
         split("2.4.20-dev-2793")
         splitDev(2, 3, 20)
         splitDev(2, 3)
+        groupVersions("preSourcelessDiagnostics") {
+            it < KotlinToolingVersion("2.2.20-dev-6624") ||
+                it == KotlinToolingVersion("2.2.20-Beta1")
+        }
     }
 }
 
