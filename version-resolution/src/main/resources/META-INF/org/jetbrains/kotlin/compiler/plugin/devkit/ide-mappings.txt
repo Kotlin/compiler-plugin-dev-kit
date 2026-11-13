@@ -186,9 +186,12 @@
 # Android Studio Rabbit 3 | 2026.2.3 Canary 1 (canary)
 # Android Studio Rabbit 2 | 2026.2.2 Patch 1 (stable)
 # Android Studio Rabbit 3 | 2026.2.3 Canary 3 (canary)
+# Android Studio Rabbit 3 | 2026.2.3 RC 1 (beta)
 262.10968.63=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.4 (stable)
 262.11879.100=2.4.20-ij262-52
+# IntelliJ IDEA 2026.2.5 (stable)
+262.12573.28=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2 (eap)
 262.4852.50=2.4.20-dev-1435
 # IntelliJ IDEA 2026.2 (eap)
