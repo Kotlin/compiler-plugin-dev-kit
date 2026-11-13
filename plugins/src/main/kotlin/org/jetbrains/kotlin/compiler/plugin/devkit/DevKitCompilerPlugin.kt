@@ -10,6 +10,7 @@ import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Usage
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
@@ -321,6 +322,30 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
      */
     private val klibs = objects.fileCollection()
 
+    private val testArtifacts =
+        configurations.dependencyScope("testArtifacts").also {
+            dependencies {
+                it(kotlin("stdlib"))
+                it(kotlin("stdlib-jdk8"))
+                it(kotlin("reflect"))
+                it(kotlin("test"))
+                it(kotlin("script-runtime"))
+                it(kotlin("annotations-jvm"))
+                it(kotlin("stdlib-js"))
+                it(kotlin("test-js"))
+            }
+        }
+
+    private val testArtifactsWasm =
+        configurations.dependencyScope("testArtifactsWasm").also {
+            dependencies {
+                it(kotlin("stdlib-wasm-js"))
+                it(kotlin("stdlib-wasm-wasi"))
+                it(kotlin("test-wasm-js"))
+                it(kotlin("test-wasm-wasi"))
+            }
+        }
+
     /** Libraries that all test data files can use, including [COMPANION_LIBRARIES_PROPERTY]'s */
     public val testDataLibraries: DevKitTestDataLibraries =
         objects.newInstance<DevKitTestDataLibrariesImpl>(this).also {
@@ -361,7 +386,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     internal fun register(
         library: DevKitTestDataLibrary,
         name: String,
-        isTransitive: Boolean = false,
+        isTransitive: Boolean = true,
         addToBuildConfig: Boolean = true,
     ) {
         val jvmClasspath = "$name.jvm.classpath"
@@ -370,18 +395,21 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             configurations.dependencyScope(name) {
                 this.isTransitive = isTransitive
                 fromDependencyCollector(library.common)
+                excludeTestArtifacts()
             }
         val jvmConfiguration =
             configurations.resolvable("${name}Jvm") {
                 extendsFrom(configuration)
                 this.isTransitive = isTransitive
                 fromDependencyCollector(library.jvm)
+                excludeTestArtifacts()
             }
         val jsConfiguration =
             configurations.resolvable("${name}Js") {
                 extendsFrom(configuration)
                 this.isTransitive = isTransitive
                 fromDependencyCollector(library.js)
+                excludeTestArtifacts()
                 attributes {
                     attribute(
                         Usage.USAGE_ATTRIBUTE,
@@ -407,6 +435,19 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     """TestDataLibrary("$jvmClasspath", "$jsClasspath")""",
                 )
             }
+        }
+    }
+
+    /**
+     * A test data library must not add its own copies of [testArtifacts].
+     *
+     * This reads declared dependencies only, so nothing resolves.
+     */
+    private fun Configuration.excludeTestArtifacts() {
+        for (dependency in
+            listOf(testArtifacts, testArtifactsWasm).flatMap { it.get().incoming.dependencies }) {
+            val group = dependency.group ?: continue
+            exclude(mapOf("group" to group, "module" to dependency.name))
         }
     }
 
@@ -675,8 +716,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
     }
 
     internal fun configureTestTasks() {
-        val testArtifacts = configurations.dependencyScope("testArtifacts")
-        val testArtifactsWasm = configurations.dependencyScope("testArtifactsWasm")
         testAgainst.configureEach {
             testTask {
                 val testArtifacts = testArtifacts.withKotlinVersion(version, forIde)
@@ -756,21 +795,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     companionLibrariesKotlinVersion.map { it.toString() },
                 )
             }
-        }
-        dependencies {
-            testArtifacts(kotlin("stdlib"))
-            testArtifacts(kotlin("stdlib-jdk8"))
-            testArtifacts(kotlin("reflect"))
-            testArtifacts(kotlin("test"))
-            testArtifacts(kotlin("script-runtime"))
-            testArtifacts(kotlin("annotations-jvm"))
-            testArtifacts(kotlin("stdlib-js"))
-            testArtifacts(kotlin("test-js"))
-
-            testArtifactsWasm(kotlin("stdlib-wasm-js"))
-            testArtifactsWasm(kotlin("stdlib-wasm-wasi"))
-            testArtifactsWasm(kotlin("test-wasm-js"))
-            testArtifactsWasm(kotlin("test-wasm-wasi"))
         }
     }
 

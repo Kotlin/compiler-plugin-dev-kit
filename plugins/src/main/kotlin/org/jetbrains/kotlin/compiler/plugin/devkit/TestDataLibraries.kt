@@ -30,11 +30,13 @@ public interface DevKitTestDataLibraries : DevKitTestDataLibrary {
      * The library will be passed to tests under the property "[name].[jvm|js].classpath". if
      * [addToBuildConfig], it'll also be available under TestDataLibraries.[name].
      *
+     * The library resolves transitively by default.
+     *
      * This is *not* idempotent.
      */
     public fun register(
         name: String,
-        isTransitive: Boolean = false,
+        isTransitive: Boolean = true,
         addToBuildConfig: Boolean = true,
         block: DevKitTestDataLibrary.() -> Unit = {},
     ): DevKitTestDataLibrary

@@ -5,7 +5,7 @@ import java.util.Collections.emptyList
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.compiler.plugin.devkit.runners.DevKitTestInternals
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.js.config.JSConfigurationKeys
+import org.jetbrains.kotlin.js.config.libraries
 import org.jetbrains.kotlin.platform.isJs
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
@@ -54,11 +54,7 @@ public fun TestConfigurationBuilder.configureTestDataLibrary(
                     }
 
                     platform.isJs() -> {
-                        val libraries = configuration.getList(JSConfigurationKeys.LIBRARIES)
-                        configuration.put(
-                            JSConfigurationKeys.LIBRARIES,
-                            libraries + library.jsClasspath.map(File::getAbsolutePath),
-                        )
+                        configuration.libraries += library.jsClasspath.map(File::getAbsolutePath)
                     }
                 }
             }
