@@ -2,14 +2,13 @@ import tapmoc.Severity
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.maven.publish)
+    id("devkit.publishing")
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description =
+    "Picks a compatible Kotlin version, maps IDE build numbers to Kotlin versions, and parses the DevKit jar format."
 
 dependencies {
     api(kotlin("tooling-core"))
@@ -19,16 +18,6 @@ dependencies {
 kotlin {
     compilerOptions.freeCompilerArgs.add("-Xcontext-sensitive-resolution")
     explicitApi()
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-    }
 }
 
 tapmoc {

@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("../build-logic")
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -9,6 +10,8 @@ pluginManagement {
         maven("https://redirector.kotlinlang.org/maven/intellij-dependencies/")
     }
 }
+
+plugins { id("org.jetbrains.kotlinx.artifacts-validator-plugin") version "0.0.2" }
 
 dependencyResolutionManagement {
     versionCatalogs {

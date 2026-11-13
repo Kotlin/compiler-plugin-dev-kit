@@ -6,13 +6,12 @@ plugins {
     `java-library`
     `java-test-fixtures`
     kotlin("jvm")
-    alias(libs.plugins.maven.publish)
+    id("devkit.publishing")
     alias(libs.plugins.tapmoc)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description =
+    "Utilities for the Gradle support plugin of a Kotlin compiler plugin, and test fixtures for its functional tests."
 
 val minGradleVersion = libs.versions.gradle.get()
 val minKotlinVersion = tapmoc.kotlinVersionForGradle(minGradleVersion)
@@ -45,16 +44,6 @@ dependencies {
     testFixturesApi(libs.testkit.support)
     testFixturesApi(libs.testkit.truth)
     testFixturesApi(pluginDevKit("version-resolution"))
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-    }
 }
 
 tapmoc {

@@ -24,6 +24,11 @@ and rules they'd unknowingly break. Leave out anything a quick look at the files
 Three separate Gradle builds, none a subproject of another. Edits in either
 included build take effect with no publishing step. Consumers outside this repo need a publish.
 
+`build-logic` is a fourth build that isn't published. All three builds include it for its convention plugins:
+`devkit.publishing` (coordinates, POM, signing, repositories) and `devkit.plugin-publishing` (the same, and the Gradle
+Plugin Portal). It runs only on the Gradle that builds this repo, so the `tapmoc` and `gradle-public-api` rules below
+don't apply to it.
+
 ## Repo constraints
 
 - `version-resolution` must have **no** KGP dependency, because it also runs inside the compiler.
@@ -65,6 +70,21 @@ for build in . plugins version-resolution; do
 done
 ```
 
+The same loop with `publishAllPublicationsToDevKitLocalRepository` writes all three builds to `build/repo` of the repo
+root. The Gradle Plugin Portal gets only the plugins, from one more invocation:
+
+```bash
+./gradlew --project-dir plugins publishPlugins   # needs GRADLE_PUBLISH_KEY / GRADLE_PUBLISH_SECRET
+```
+
+The root build and `version-resolution` go to Maven Central, so each has the artifacts validator plugin. `plugins` goes
+to the Gradle Plugin Portal and has no validator. `check` runs `checkArtifacts`, which compares the publications of each
+project with `artifacts/<project>.txt` of its build. When a publication changes, regenerate the lists and commit them:
+
+```bash
+for build in . version-resolution; do ./gradlew --project-dir $build dumpArtifacts; done
+```
+
 ## Conventions
 
 - **Formatting is ktfmt, `Kotlinlang` style.** Spotless is declared in the **root** build script only and covers all
@@ -88,16 +108,16 @@ done
   `java-gradle-plugin` re-adding `gradleApi()`.
 - **Each build declares the Kotlin plugin version only in its root script.** Its subprojects apply the plugin with no
   version.
-- **One version catalog for the whole repo**, `gradle/libs.versions.toml`. `plugins/` and `version-resolution/` are
-  separate builds, so the conventional lookup doesn't reach them. Each opts in explicitly with
+- **One version catalog for the whole repo**, `gradle/libs.versions.toml`. `plugins/`, `version-resolution/` and `build-logic/`
+  are separate builds, so the conventional lookup doesn't reach them. Each opts in explicitly with
   `versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }` in its
   `dependencyResolutionManagement`. Don't re-add per-build catalogs.
 - **Build cache and configuration cache are enabled** (root `gradle.properties`). Gradle code must be
   configuration-cache safe: lazy `Provider`s, no `Project` access at execution time, no eager configuration resolution.
   Laziness has a limit, though. A `map { }` that touches an extension member captures the whole extension, so a provider
   that ends up serialized (buildconfig fields do) must instead close over plain values.
-- **The dev kit's own coordinates come only from `gradle/libs.versions.toml`** (`devkit-group`, `devkit-version`). Every
-  publishing project sets `group`/`version` from there. Don't put them back in a `gradle.properties`, which included
+- **The dev kit's own coordinates come only from `gradle/libs.versions.toml`** (`devkit-group`, `devkit-version`). The
+  `devkit.publishing` convention plugin sets `group`/`version` of every publishing project from there. Don't put them back in a `gradle.properties`, which included
   builds can't share. Buildconfig generates the Kotlin-side `DEV_KIT_GROUP` / `DEV_KIT_VERSION` from the project's own
   `group`/`version`, separately in `plugins` and `plugins:settings` (the latter must not depend on the former for Gradle
   classloading reasons). Both classes go into the same package, so each needs a distinct `className`.
@@ -108,6 +128,13 @@ done
   published commit also gets a prerelease GitHub Release tagged `v<version>`. The checked-in `-SNAPSHOT` value is what
   local and IDE builds keep using. In the root build the conventional path *already* imports the catalog, so its
   `create("libs")` must not call `from` again.
+- **A build signs its publications only when the Gradle property `libs.sign.key.private` is set**, together with
+  `libs.sign.key.id` and `libs.sign.passphrase`. Don't apply `signing` in a `plugins { }` block. With that plugin
+  applied, `com.gradle.plugin-publish` signs in every build, and a build that has no key fails.
+- **A publishing project applies `devkit.publishing` or `devkit.plugin-publishing` and sets `description`.** The
+  convention plugin uses the project name and that description for the POM. Don't declare
+  `com.vanniktech.maven.publish` or `com.gradle.plugin-publish` in a module. The convention plugins apply them, at the
+  catalog versions `publish` and `plugin-publish`.
 
 ## Recipe: support a new Kotlin version
 
@@ -121,3 +148,6 @@ done
    `expect` in the shared parent with an `actual` on each side. The `DevKitTestCompat.*.kt` files show the pattern.
 
 Version *removal* works the same way in reverse.
+
+The publications of `compiler-plugin-runtime` and `compiler-plugin-test` have the name of the first registered target,
+for example `compiler-plugin-runtime-k2220_beta1`. If the first registered version changes, run `dumpArtifacts`.

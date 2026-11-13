@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     includeBuild("plugins")
     repositories {
         gradlePluginPortal()
@@ -6,7 +7,10 @@ pluginManagement {
     }
 }
 
-plugins { kotlin("compiler.plugin.devkit") }
+plugins {
+    kotlin("compiler.plugin.devkit")
+    id("org.jetbrains.kotlinx.artifacts-validator-plugin") version "0.0.2"
+}
 
 dependencyResolutionManagement {
     includeBuild("version-resolution")
