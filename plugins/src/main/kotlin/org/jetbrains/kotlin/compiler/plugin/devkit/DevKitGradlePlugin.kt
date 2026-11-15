@@ -223,10 +223,16 @@ public open class GradlePluginConfigExtension(project: Project) :
                 .flatMap { view -> view.incoming.resolutionResult.allComponents }
                 .mapNotNull { component ->
                     val id = component.id as? ProjectComponentIdentifier ?: return@mapNotNull null
-                    if (!component.selectionReason.isCompositeSubstitution) return@mapNotNull null
                     val projectPath = Path.path(id.projectPath)
+                    val buildPath = Path.path(id.build.buildPath)
+                    // don't add self-dependency
+                    if (
+                        buildPath == Path.path(project.gradle.buildPath) &&
+                            projectPath == Path.path(project.path)
+                    )
+                        return@mapNotNull null
                     val build =
-                        includedBuildsByPath[Path.path(id.build.buildPath)]
+                        includedBuildsByPath[buildPath]
                             ?: error(
                                 """
                                 |Included build ${id.build.buildPath} not found,
@@ -437,7 +443,12 @@ public open class GradlePluginConfigExtension(project: Project) :
                 detectedIncludedBuildProjects().map { (build, _) ->
                     build.projectDir.resolve(FUNCTIONAL_TEST_REPO_DIR).absolutePath
                 }
-            (testKitRepos + detectedRepos).distinct().takeIf { it.isNotEmpty() }?.joinToString(",")
+            val ourRepo = project.rootDir.resolve(FUNCTIONAL_TEST_REPO_DIR).absolutePath
+            (testKitRepos + detectedRepos)
+                .toSet()
+                .minus(ourRepo)
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(",")
         }
 
     private fun configurePlugins() {

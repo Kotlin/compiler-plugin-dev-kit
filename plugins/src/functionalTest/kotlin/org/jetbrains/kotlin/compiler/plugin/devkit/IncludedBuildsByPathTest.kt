@@ -10,13 +10,20 @@ import com.autonomousapps.kit.gradle.Repository
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.gradle.testkit.runner.GradleRunner
 
 private const val DEVKIT_GROUP = "org.jetbrains.kotlin.compiler.plugin.devkit"
 
+private const val INCLUDED_BUILDS_CLASS = "$DEVKIT_GROUP.IncludedBuildsKt"
+
 private const val PROBE_TASK = "probeIncludedBuildTree"
 
 private const val PROBE_ENTRY = "included-build-tree"
+
+private const val WIRING_TASK = "probeWiring"
+
+private const val WIRING_ENTRY = "included-build-tree-wiring"
 
 class IncludedBuildsByPathTest : AbstractGradleProject() {
     // The fixtures declare included builds next to the root build by "../name" paths. This
@@ -30,7 +37,7 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
         newGradleProjectBuilder(GradleProject.DslKind.KOTLIN)
 
     @Test
-    fun `finds sibling, nested, and flat builds of the tree`() {
+    fun `finds itself, sibling, nested, and flat builds of the tree`() {
         val project =
             newGradleProjectBuilder()
                 .withRootProject {
@@ -63,6 +70,7 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
         val outer = project.getIncludedBuild("outer")
         assertEquals(
             mapOf(
+                ":" to project.rootDir.canonicalFile,
                 ":flat" to outer.getIncludedBuild("flat").rootDir.canonicalFile,
                 ":lib" to project.getIncludedBuild("lib").rootDir.canonicalFile,
                 ":outer" to outer.rootDir.canonicalFile,
@@ -102,6 +110,7 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
         val y = project.getIncludedBuild("y")
         assertEquals(
             mapOf(
+                ":" to project.rootDir.canonicalFile,
                 ":x" to x.rootDir.canonicalFile,
                 ":x:dup" to x.getIncludedBuild("dup").rootDir.canonicalFile,
                 ":y" to y.rootDir.canonicalFile,
@@ -134,6 +143,7 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
 
         assertEquals(
             mapOf(
+                ":" to project.rootDir.canonicalFile,
                 ":x" to project.getIncludedBuild("x").rootDir.canonicalFile,
                 ":y" to project.getIncludedBuild("x").getIncludedBuild("y").rootDir.canonicalFile,
             ),
@@ -173,23 +183,79 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
         val inner = b.getIncludedBuild("inner")
         assertEquals(
             mapOf(
+                ":" to project.rootDir.canonicalFile,
                 ":b" to b.rootDir.canonicalFile,
                 ":b:inner" to inner.rootDir.canonicalFile,
             ),
             probeTree(project.rootDir, "probeFromIncludedBuild"),
         )
-        assertEquals(mapOf(":inner" to inner.rootDir.canonicalFile), probeTree(b.rootDir))
+        assertEquals(
+            mapOf(
+                ":" to b.rootDir.canonicalFile,
+                ":inner" to inner.rootDir.canonicalFile,
+            ),
+            probeTree(b.rootDir),
+        )
+    }
+
+    @Test
+    fun `registers itself in a build without included builds`() {
+        val project =
+            newGradleProjectBuilder()
+                .withRootProject {
+                    withSettingsScript { rootProjectName = "root" }
+                    buildScript = probeBuildScript()
+                }
+                .write()
+
+        assertEquals(mapOf(":" to project.rootDir.canonicalFile), probeTree(project.rootDir))
+    }
+
+    @Test
+    fun `finds a same-build project's task through the self entry`() {
+        val project =
+            newGradleProjectBuilder()
+                .withRootProject {
+                    withSettingsScript { rootProjectName = "root" }
+                    buildScript =
+                        probeBuildScript(
+                            """
+                            |tasks.register("$WIRING_TASK") {
+                            |    doLast {
+                            |        val self =
+                            |            gradle.rootBuild().includedBuildsByPathUnderTest().getValue(Path.path(":"))
+                            |        self.task(":lib:installForFunctionalTest")
+                            |        println("$WIRING_ENTRY reachable")
+                            |    }
+                            |}
+                            """
+                                .trimMargin()
+                        )
+                }
+                .withSubproject("lib") {
+                    withBuildScript {
+                        withKotlin(
+                            """
+                            |tasks.register("installForFunctionalTest") {}
+                            """
+                                .trimMargin()
+                        )
+                    }
+                }
+                .write()
+
+        val output = probeOutput(project.rootDir, WIRING_TASK)
+        assertTrue(
+            output.lineSequence().any { it == "$WIRING_ENTRY reachable" },
+            "Expected '$WIRING_ENTRY reachable' in the probe output:\n$output",
+        )
     }
 
     private fun probeTree(
         projectDir: File,
         task: String = PROBE_TASK,
     ): Map<String, File> =
-        GradleRunner.create()
-            .withProjectDir(projectDir)
-            .withArguments(task)
-            .build()
-            .output
+        probeOutput(projectDir, task)
             .lineSequence()
             .filter { it.startsWith("$PROBE_ENTRY ") }
             .associate { line ->
@@ -197,14 +263,13 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
                 path to File(dir).canonicalFile
             }
 
+    private fun probeOutput(projectDir: File, task: String): String =
+        GradleRunner.create().withProjectDir(projectDir).withArguments(task).build().output
+
     private fun probeBuildScript(additions: String = ""): BuildScript =
         BuildScript.Builder()
             .apply {
-                imports =
-                    Imports.of(
-                        "org.gradle.internal.composite.IncludedBuildInternal",
-                        "org.gradle.util.Path",
-                    )
+                imports = Imports.of("org.gradle.util.Path")
                 buildscript =
                     BuildscriptBlock(
                         (Repository.FUNC_TEST_INCLUDED_BUILDS + Repository.DEFAULT_PLUGINS)
@@ -218,33 +283,20 @@ class IncludedBuildsByPathTest : AbstractGradleProject() {
                     )
                 withKotlin(
                     $$"""
-                    internal val IncludedBuild.gradle: Gradle?
-                        get() = (this as? IncludedBuildInternal)?.target?.mutableModel
-                    
-                    internal tailrec fun Gradle.root(): Gradle =
-                        when (val parent = parent) {
-                            null -> this
-                            else -> parent.root()
-                        }
-                    
-                    internal val IncludedBuild.buildPath: Path?
-                        get() = (this as? IncludedBuildInternal)?.target?.identityPath
-                    
-                    internal fun Gradle.includedBuildsByPath(): Map<Path, IncludedBuild> = buildMap {
-                        val visited = HashSet<Gradle>()
-                        val visitBuildTree = DeepRecursiveFunction { build ->
-                            if (!visited.add(build)) return@DeepRecursiveFunction
-                            for (included in build.includedBuilds) {
-                                put(included.buildPath ?: continue, included)
-                                included.gradle?.let { callRecursive(it) }
-                            }
-                        }
-                        visitBuildTree(this@includedBuildsByPath)
+                    fun Gradle.rootBuild(): Gradle = parent?.rootBuild() ?: this
+
+                    fun Gradle.includedBuildsByPathUnderTest(): Map<Path, IncludedBuild> {
+                        @Suppress("UNCHECKED_CAST")
+                        val result =
+                            Class.forName("$$INCLUDED_BUILDS_CLASS")
+                                .getDeclaredMethod("includedBuildsByPath", Gradle::class.java)
+                                .invoke(null, this) as Map<Path, IncludedBuild>
+                        return result
                     }
 
                     tasks.register("$$PROBE_TASK") {
                         doLast {
-                            for ((path, includedBuild) in gradle.root().includedBuildsByPath()) {
+                            for ((path, includedBuild) in gradle.rootBuild().includedBuildsByPathUnderTest()) {
                                 println("$$PROBE_ENTRY $path ${includedBuild.projectDir}")
                             }
                         }
