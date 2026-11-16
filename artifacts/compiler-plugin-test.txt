@@ -1,0 +1,2 @@
+org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-test-k2220_beta1/.jar,.module,.pom,javadoc.jar,sources.jar
+org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-test/.jar,.module,.pom,javadoc.jar,kotlin-tooling-metadata.json,sources.jar

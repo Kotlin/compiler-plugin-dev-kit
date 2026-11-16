@@ -9,13 +9,11 @@ import org.jetbrains.kotlin.tooling.core.toKotlinVersion
 plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
-    id("com.vanniktech.maven.publish") version libs.versions.publish
+    id("devkit.publishing")
     alias(libs.plugins.tapmoc)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description = "Test utilities for a Kotlin compiler plugin that supports many Kotlin versions."
 
 tapmoc { java(8) }
 
@@ -96,16 +94,6 @@ kotlin.sourceSets {
 
         if (targetsMatch { !it.forIde && it.version.toKotlinVersion() >= KotlinVersion(2, 3) }) {
             dependsOn(getByName("jsMain"))
-        }
-    }
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
         }
     }
 }

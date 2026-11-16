@@ -2,13 +2,11 @@ import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
     kotlin("jvm")
-    alias(libs.plugins.maven.publish)
+    id("devkit.publishing")
     alias(libs.plugins.tapmoc)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description = "The test generator API of the Kotlin Compiler Plugin DevKit."
 
 tapmoc { java(8) }
 
@@ -42,14 +40,4 @@ val generatorKotlinVersion =
 dependencies {
     api(kotlin("compiler-internal-test-framework", generatorKotlinVersion))
     api(kotlin("compiler", generatorKotlinVersion))
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-    }
 }

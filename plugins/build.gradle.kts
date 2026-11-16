@@ -6,14 +6,12 @@ plugins {
     kotlin("plugin.sam.with.receiver") version libs.versions.kotlin
     kotlin("plugin.assignment") version libs.versions.kotlin
     alias(libs.plugins.buildconfig)
-    alias(libs.plugins.maven.publish)
+    id("devkit.plugin-publishing")
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }
 
-group = libs.versions.devkit.group.get()
-
-version = libs.versions.devkit.version.get()
+description = "The Gradle plugins of the Kotlin Compiler Plugin DevKit."
 
 samWithReceiver { annotation("org.gradle.api.HasImplicitReceiver") }
 
@@ -50,15 +48,24 @@ gradlePlugin {
         create("compilerPlugin") {
             id = "$group.compiler-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: compiler plugin"
+            description =
+                "Builds, tests, and publishes a Kotlin compiler plugin for many Kotlin compiler and IDE versions from one source tree."
         }
         create("compilerLibrary") {
             id = "$group.compiler-library"
             implementationClass =
                 "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerLibrary"
+            displayName = "Kotlin Compiler Plugin DevKit: compiler library"
+            description =
+                "Builds a library for Kotlin compiler plugins against many Kotlin compiler and IDE versions from one source tree."
         }
         create("gradlePlugin") {
             id = "$group.gradle-plugin"
             implementationClass = "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitGradlePlugin"
+            displayName = "Kotlin Compiler Plugin DevKit: Gradle support plugin"
+            description =
+                "Builds the Gradle support plugin of a Kotlin compiler plugin, and runs its functional tests against many Kotlin versions."
         }
     }
 }
@@ -85,16 +92,6 @@ buildConfig {
     }
     buildConfigField("DEV_KIT_GROUP", group.toString())
     buildConfigField("DEV_KIT_VERSION", version.toString())
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "devKitSpace"
-            url = uri("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-            credentials(PasswordCredentials::class)
-        }
-    }
 }
 
 tapmoc {
