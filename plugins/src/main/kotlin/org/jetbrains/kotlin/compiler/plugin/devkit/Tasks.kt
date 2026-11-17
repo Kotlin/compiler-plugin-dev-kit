@@ -109,6 +109,25 @@ internal abstract class GenerateServices : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "it writes simple strings to files")
+internal abstract class WriteMultiVersionSourceSets : DefaultTask() {
+    @get:Input val sourceSets: MapProperty<String, List<String>> = project.objects.mapProperty()
+
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        val outputDir = outputDir.get().asFile
+        outputDir.deleteRecursively()
+        sourceSets.get().forEach { (version, sourceSetNames) ->
+            outputDir.resolve(version).apply {
+                parentFile.mkdirs()
+                writeText(sourceSetNames.joinToString("\n"))
+            }
+        }
+    }
+}
+
 @DisableCachingByDefault(because = "This is used as a lifecycle task, so it's usually disabled")
 internal open class DefaultTestTask : DefaultTask() {
     // copied from KotlinTestsRegistry

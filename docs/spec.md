@@ -746,6 +746,8 @@ The jar holds the plugin code for each version and the embedded dependencies:
 - `<plugin-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the jars
   anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
 - Each `<version>` under `versions` must be a valid [version](#version).
+- `META-INF/kotlin/plugin/<plugin-id>/sourceSets/<version>` lists the source sets that the version was compiled from. The IDE import reads the
+  list for local projects.
 - Each directory under `dependencies` must be an unpacked jar. The DevKit resolves the version of each dependency
   separately.
 
@@ -805,13 +807,15 @@ Gradle prefers a variant without an extra attribute, so it selects the surrogate
 
 During IDE import, [
 `IdeMultiVersionDependencyResolver`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/IdeMultiVersionDependencyResolver.kt)
-uses the `-mv-<version>` suffix:
+maps each dependency:
 
 - If the file of a binary dependency ends with `-mv-<version>`, the resolver sets the `sourceSetName` of its coordinates
   to the target name of that version. Without it, IDEA makes one library for each GAV, and reuses one version of it in
   unrelated modules.
 - If the resolved version isn't the requested version, the suffix doesn't match, and the resolver doesn't change the
   coordinates (known problem).
+- A project dependency that holds a multiversion jar becomes one `IdeaKotlinSourceDependency` for each source set. The version is worked out with [version resolution](#version-resolution), and the source sets are
+  the ones the jar records for that version, including its full `dependsOn` closure.
 
 ### In the compiler: plugin loading
 

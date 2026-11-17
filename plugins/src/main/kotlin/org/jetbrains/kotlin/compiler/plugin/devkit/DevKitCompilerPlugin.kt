@@ -211,6 +211,11 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             dependsOn(generateTestsCliNonJs, generateTestsJs, generateTestsIde)
         }
 
+    private val writeMultiVersionSourceSets: TaskProvider<WriteMultiVersionSourceSets> =
+        tasks.register<WriteMultiVersionSourceSets>("writeMultiVersionSourceSets") {
+            outputDir.set(layout.buildDirectory.dir("multiVersionSourceSets"))
+        }
+
     private lateinit var surrogateTarget: DevKitTarget
 
     init {
@@ -818,7 +823,20 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 }
             }
         }
+        mainJar {
+            into(pluginPackage.map { "$PLUGIN_PATH/$it/$SOURCE_SETS_PATH" }) {
+                from(writeMultiVersionSourceSets)
+            }
+        }
         testAgainst.configureEach {
+            writeMultiVersionSourceSets {
+                sourceSets.put(
+                    "$version",
+                    provider {
+                        mainCompilation.allKotlinSourceSets.map { it.name }.sorted()
+                    },
+                )
+            }
             mainJar {
                 into(pluginPackage.map { "$PLUGIN_PATH/$it/$VERSIONS_PATH/$version" }) {
                     from(mainCompilation.output.allOutputs)
