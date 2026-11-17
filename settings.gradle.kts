@@ -32,7 +32,11 @@ dependencyResolutionManagement {
 
 include("compiler-plugin-runtime")
 
+include("compiler-plugin-runtime-compat")
+
 include("compiler-plugin-test")
+
+include("compiler-plugin-test-compat")
 
 include("compiler-plugin-test-generator")
 

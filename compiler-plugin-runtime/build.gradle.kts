@@ -15,7 +15,10 @@ tapmoc { java(8) }
 
 kotlin {
     explicitApi()
-    sourceSets.commonMain.dependencies { api(pluginDevKit("version-resolution")) }
+    sourceSets.commonMain.dependencies {
+        api(pluginDevKit("version-resolution"))
+        api(project(":compiler-plugin-runtime-compat"))
+    }
     sourceSets {
         entryPoint {
             dependencies { api(pluginDevKit("version-resolution")) }
@@ -28,8 +31,6 @@ pluginDevKit {
     // This *is* compiler-plugin-runtime, so it can't depend on itself.
     addRuntimeDependency = false
 
-    // A trunk `dev` build has no for-IDE modules to resolve, unlike an `-ij` build, so the pinned
-    // version is a CLI target.
     providers.gradleProperty("kotlin.compiler.plugin.devkit.pinnedDevVersion").orNull?.let {
         testAgainst(it, forIde = false)
     }
@@ -40,12 +41,7 @@ pluginDevKit {
                 it < KotlinToolingVersion("2.5.0-dev-5651")
         }
         split("2.4.20-dev-2793")
-        splitDev(2, 3, 20)
         splitDev(2, 3)
-        groupVersions("preSourcelessDiagnostics") {
-            it < KotlinToolingVersion("2.2.20-dev-6624") ||
-                it == KotlinToolingVersion("2.2.20-Beta1")
-        }
     }
 }
 

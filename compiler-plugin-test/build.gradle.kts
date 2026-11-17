@@ -23,6 +23,7 @@ kotlin {
     sourceSets.commonMain.dependencies {
         api(pluginDevKit("version-resolution"))
         api(project(":compiler-plugin-runtime"))
+        api(project(":compiler-plugin-test-compat"))
         api(kotlin("test-junit5"))
         api(kotlin("compiler-internal-test-framework"))
         api(kotlin("compiler"))
@@ -84,13 +85,6 @@ kotlin.sourceSets {
         // stops the "redundant dependsOn" warning; has no other purpose.
         if (pluginDevKit.testAgainst.any { it.mainCompilation.defaultSourceSet == this })
             return@configureEach
-
-        // This exists so that the `typealias` trick for `TestConfigurationBuilder` works within
-        // this project
-        if (targetsMatch { it.version.toKotlinVersion() < KotlinVersion(2, 4) }) {
-            dependsOn(getByName("pre24DevMain"))
-            dependsOn(getByName("pre2420DevMain"))
-        }
 
         if (targetsMatch { !it.forIde && it.version.toKotlinVersion() >= KotlinVersion(2, 3) }) {
             dependsOn(getByName("jsMain"))

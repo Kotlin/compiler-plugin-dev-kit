@@ -60,9 +60,11 @@ compiler and IDE runtime.
       for all projects.
 - [Runtime libraries](#runtime-libraries):
     - [`compiler-plugin-runtime`](#compiler-plugin-runtime): compiler plugin utilities and [entry point](#entry-point)
-      classes. Uses `version-resolution`.
+      classes. Uses `version-resolution` and `compiler-plugin-runtime-compat`
+    - [`compiler-plugin-runtime-compat`](#compiler-plugin-runtime-compat): backported compiler plugins compatibility declarations. It does *not* use `expect/actual`, but instead preserves source compatibility for renamed/missing declarations.
     - [`compiler-plugin-test`](#compiler-plugin-test): compiler plugin test utilities, including
-      [classified dumps](#classified-dump).
+      [classified dumps](#classified-dump). Uses `compiler-plugin-test-compat`
+    - [`compiler-plugin-test-compat`](#compiler-plugin-test-compat): Like `compiler-plugin-runtime-compat`, it preserves source compatibility for renamed/missing test infrastructure declarations.
     - [`compiler-plugin-test-generator`](#compiler-plugin-test-generator): the test generator API, for example
       `generateDevKitTestsWithJUnit5`.
     - [`gradle-plugin-runtime`](#gradle-plugin-runtime): [Gradle support plugin](#gradle-support-plugin) utilities. Its
@@ -414,6 +416,11 @@ commas or whitespace. A boolean property counts as true only when its value is e
   It isn't versioned, because it runs before the version is known.
   [In the compiler: plugin loading](#in-the-compiler-plugin-loading) describes these classes.
 
+### `compiler-plugin-runtime-compat`
+
+Holds the compatibility declarations that re-expose a compiler API under the name of another
+[version](#version), always in the compiler's own package, so consumer code works across multiple versions with no import changes.
+
 ### `compiler-plugin-test`
 
 The [`compiler-plugin`](#plugindevkitcompiler-pluginplugindevkitcompiler-library) and [
@@ -484,16 +491,6 @@ The services are in the package
 - [
   `DevKitTestCompat.kt`](../compiler-plugin-test/src/commonMain/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTestCompat.kt)
   has compatibility declarations for test framework APIs that differ between [versions](#version).
-- Typealiases in `org.jetbrains.kotlin.test.builders` give every version both
-  [
-  `NonGroupingPhaseTestConfigurationBuilder`](../compiler-plugin-test/src/pre24DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt)
-  and
-  [
-  `NonGroupingStageTestConfigurationBuilder`](../compiler-plugin-test/src/pre2420DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt).
-    - They exist for the IDE: `expect/actual` with `TestConfigurationBuilder` confuses the IDE, because the IDE
-      immediately expands a `typealias` to a different class in each version. With these type aliases, the expanded type
-      is then re-expanded into the proper `TestConfigurationBuilder` for this version. This doesn't affect CLI
-      compilation.
 
 #### JS-only code
 
@@ -601,6 +598,22 @@ longer listed doesn't fail the test ([#64](https://github.com/Kotlin/compiler-pl
 
 `-PupdateTestData` sets the system property `kotlin.test.update.test.data`, so the test framework writes each dump that
 doesn't match.
+
+### `compiler-plugin-test-compat`
+
+Holds the compatibility declarations that give every [version](#version) the same test
+framework API under the name of another [version](#version), always in the test framework's own
+package.
+
+Typealiases in `org.jetbrains.kotlin.test.builders` give every version both
+  [
+  `NonGroupingPhaseTestConfigurationBuilder`](../compiler-plugin-test-compat/src/pre24DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt)
+  and
+  [
+  `NonGroupingStageTestConfigurationBuilder`](../compiler-plugin-test-compat/src/pre2420DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt).
+    - They exist for the IDE: `expect/actual` with `TestConfigurationBuilder` confuses the IDE, because the IDE
+      immediately expands a `typealias` to a different class in each version. With these type aliases, the expanded type
+      is then re-expanded into the proper `TestConfigurationBuilder` for this version. This also helps in CLI by allowing all versions to use `NonGrouping*` to refer to `TestConfigurationBuilder`
 
 ### `compiler-plugin-test-generator`
 
