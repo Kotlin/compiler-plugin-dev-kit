@@ -34,16 +34,17 @@ mavenPublishing {
         }
     }
 }
+fun signingProperty(name: String): String? = if (extra.has(name)) extra[name] as String? else providers.gradleProperty(name).orNull
 
 // The `signing` plugin is applied only with a key. With that plugin applied,
 // `com.gradle.plugin-publish` signs in every build, and a build that has no key fails.
-providers.gradleProperty("libs.sign.key.private").orNull?.let { key ->
+signingProperty("libs.sign.key.private")?.let { key ->
     mavenPublishing { signAllPublications() }
     configure<SigningExtension> {
         useInMemoryPgpKeys(
-            providers.gradleProperty("libs.sign.key.id").orNull,
+            signingProperty("libs.sign.key.id"),
             key,
-            providers.gradleProperty("libs.sign.passphrase").orNull,
+            signingProperty("libs.sign.passphrase"),
         )
     }
 }
