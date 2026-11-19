@@ -208,22 +208,27 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
             }
         }
     }
-    configureIdeImport {
-        registerDependencyResolver(
-            resolver =
-                IdeMultiVersionCompilationBinaryDependencyResolver(preferredVersionForIdeImport),
-            constraint = KotlinSourceSet::isDevKitSourceSet,
-            phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
-            priority = IdeMultiplatformImport.Priority.high,
-        )
-        registerDependencyResolver(
-            resolver =
-                IdeMultiVersionCompilationProjectDependencyResolver(preferredVersionForIdeImport),
-            constraint = KotlinSourceSet::isDevKitSourceSet,
-            phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
-            priority = IdeMultiplatformImport.Priority.high,
-        )
-    }
+    if (isSurrogate)
+        configureIdeImport {
+            registerDependencyResolver(
+                resolver =
+                    IdeMultiVersionCompilationBinaryDependencyResolver(
+                        preferredVersionForIdeImport
+                    ),
+                constraint = KotlinSourceSet::isDevKitSourceSet,
+                phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
+                priority = IdeMultiplatformImport.Priority.high,
+            )
+            registerDependencyResolver(
+                resolver =
+                    IdeMultiVersionCompilationProjectDependencyResolver(
+                        preferredVersionForIdeImport
+                    ),
+                constraint = KotlinSourceSet::isDevKitSourceSet,
+                phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,
+                priority = IdeMultiplatformImport.Priority.high,
+            )
+        }
 }
 
 private fun KotlinSourceSet.isDevKitSourceSet() =
