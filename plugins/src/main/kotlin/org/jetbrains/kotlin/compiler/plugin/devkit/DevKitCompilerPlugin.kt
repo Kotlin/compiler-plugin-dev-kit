@@ -944,17 +944,26 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 }
             )
         }
-        // kotlin-compiler-tests-for-ide
-        configurations.all {
-            exclude(group = "org.jetbrains.kotlin", module = "tests-spec")
-            exclude(group = "org.jetbrains.kotlin", module = "tests-compiler-utils")
-            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure-utils.common")
-            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure-utils")
-            exclude(group = "org.jetbrains.kotlin", module = "test-infrastructure")
-            exclude(group = "org.jetbrains.kotlin", module = "tests-common-new")
+        dependencies.components.withModule("org.jetbrains.kotlin:kotlin-compiler-tests-for-ide") {
+            allVariants {
+                withDependencies {
+                    removeAll { it.name in UNPUBLISHED_TEST_FRAMEWORK_DEPENDENCIES }
+                }
+            }
         }
     }
 }
+
+/** The POM of `kotlin-compiler-tests-for-ide` lists these, but no repository publishes them */
+private val UNPUBLISHED_TEST_FRAMEWORK_DEPENDENCIES =
+    setOf(
+        "tests-spec",
+        "tests-compiler-utils",
+        "test-infrastructure-utils.common",
+        "test-infrastructure-utils",
+        "test-infrastructure",
+        "tests-common-new",
+    )
 
 private fun IdeaModule.getOrCreateLazyGeneratedSourcesDirs(): DomainObjectSet<File> =
     generatedSourceDirs as? DomainObjectSet
