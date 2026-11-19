@@ -34,7 +34,9 @@ mavenPublishing {
         }
     }
 }
-fun signingProperty(name: String): String? = if (extra.has(name)) extra[name] as String? else providers.gradleProperty(name).orNull
+
+fun signingProperty(name: String): String? =
+    if (extra.has(name)) extra[name] as String? else providers.gradleProperty(name).orNull
 
 // The `signing` plugin is applied only with a key. With that plugin applied,
 // `com.gradle.plugin-publish` signs in every build, and a build that has no key fails.
