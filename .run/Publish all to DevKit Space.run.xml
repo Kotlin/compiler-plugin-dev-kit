@@ -11,7 +11,9 @@
       <option name="taskNames">
         <list>
           <option value="compiler-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
+          <option value="compiler-plugin-runtime-compat:publishAllPublicationsToDevKitSpaceRepository" />
           <option value="compiler-plugin-test:publishAllPublicationsToDevKitSpaceRepository" />
+          <option value="compiler-plugin-test-compat:publishAllPublicationsToDevKitSpaceRepository" />
           <option value="compiler-plugin-test-generator:publishAllPublicationsToDevKitSpaceRepository" />
           <option value="gradle-plugin-runtime:publishAllPublicationsToDevKitSpaceRepository" />
           <option value=":plugins:publishAllPublicationsToDevKitSpaceRepository" />

@@ -11,7 +11,9 @@
       <option name="taskNames">
         <list>
           <option value="compiler-plugin-runtime:publishToMavenLocal" />
+          <option value="compiler-plugin-runtime-compat:publishToMavenLocal" />
           <option value="compiler-plugin-test:publishToMavenLocal" />
+          <option value="compiler-plugin-test-compat:publishToMavenLocal" />
           <option value="compiler-plugin-test-generator:publishToMavenLocal" />
           <option value="gradle-plugin-runtime:publishToMavenLocal" />
           <option value=":plugins:publishToMavenLocal" />
