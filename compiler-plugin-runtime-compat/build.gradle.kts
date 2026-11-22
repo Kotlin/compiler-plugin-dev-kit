@@ -23,8 +23,8 @@ pluginDevKit {
         testAgainst(it, forIde = false)
     }
     versionHierarchy {
-        splitDev(2, 3, 20)
-        splitDev(2, 3)
+        preDev(2, 3, 20, "preIrAnnotationAndFirNamedFunction")
+        preDev(2, 3, "preSymbolUtils")
         groupVersions("preSourcelessDiagnostics") {
             it < KotlinToolingVersion("2.2.20-dev-6624") ||
                 it == KotlinToolingVersion("2.2.20-Beta1")
