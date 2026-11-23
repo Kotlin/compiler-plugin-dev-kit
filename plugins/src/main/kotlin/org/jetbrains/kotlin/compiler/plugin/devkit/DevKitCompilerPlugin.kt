@@ -216,10 +216,40 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             outputDir.set(layout.buildDirectory.dir("multiVersionSourceSets"))
         }
 
+    private val ideSourceSetsConfiguration =
+        configurations.resolvable("devkitIdeSourceSetsClasspath") {
+            // We use source sets' declared dependencies instead of compilation classpaths because
+            // compilation classpaths
+            // also carry file dependencies on associated compilations' outputs, which would make
+            // IDE import depend on those compilations.
+            // That causes IDE sync to be very slow, and to break when there's compilation errors
+            val compileClasspath =
+                configurations.getByName(
+                    surrogateTarget.mainCompilation.compileDependencyConfigurationName
+                )
+            attributes.addAllLater(compileClasspath.attributes)
+            kotlinExtension.sourceSets.configureEach {
+                for (configName in
+                    listOf(
+                        apiConfigurationName,
+                        implementationConfigurationName,
+                        compileOnlyConfigurationName,
+                    )) extendsFrom(configurations.named(configName))
+            }
+        }
+
     private lateinit var surrogateTarget: DevKitTarget
 
     init {
         registerSupportedVersions()
+        // Publish the source-set DAG locally as a secondary variant.
+        // This is used by IDE import to directly depend on local project's source sets.
+        surrogateTarget.apiElementsConfiguration.outgoing.variants
+            .maybeCreate("devkitIdeSourceSets")
+            .apply {
+                attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(IDE_SOURCE_SETS_USAGE))
+                artifact(writeMultiVersionSourceSets.flatMap { it.outputDir })
+            }
     }
 
     private val entryPointCompilation =
@@ -470,6 +500,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                         forIde = forIde,
                         isSurrogate = !::surrogateTarget.isInitialized,
                         preferredVersionForIdeImport = preferredVersionForSharedSourceSetsInIde,
+                        ideSourceSetsConfiguration = ideSourceSetsConfiguration,
                     )
                     .also {
                         if (!::surrogateTarget.isInitialized) surrogateTarget = it
@@ -821,11 +852,6 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                             exclude()
                     }
                 }
-            }
-        }
-        mainJar {
-            into(pluginPackage.map { "$PLUGIN_PATH/$it/$SOURCE_SETS_PATH" }) {
-                from(writeMultiVersionSourceSets)
             }
         }
         testAgainst.configureEach {

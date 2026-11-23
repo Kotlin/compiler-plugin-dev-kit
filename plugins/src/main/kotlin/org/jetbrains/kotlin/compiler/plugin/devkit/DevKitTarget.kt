@@ -161,6 +161,7 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
     forIde: Boolean,
     isSurrogate: Boolean = false,
     preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
+    ideSourceSetsConfiguration: Provider<out Configuration>,
 ) = createExternalKotlinTarget {
     if (version.toKotlinVersion() < MIN_SUPPORTED_VERSION)
         error(
@@ -222,7 +223,8 @@ internal fun KotlinMultiplatformExtension.createDevKitTarget(
             registerDependencyResolver(
                 resolver =
                     IdeMultiVersionCompilationProjectDependencyResolver(
-                        preferredVersionForIdeImport
+                        preferredVersionForIdeImport,
+                        ideSourceSetsConfiguration,
                     ),
                 constraint = KotlinSourceSet::isDevKitSourceSet,
                 phase = IdeMultiplatformImport.DependencyResolutionPhase.BinaryDependencyResolution,

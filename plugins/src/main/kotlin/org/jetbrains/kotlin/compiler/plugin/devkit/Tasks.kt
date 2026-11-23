@@ -118,13 +118,15 @@ internal abstract class WriteMultiVersionSourceSets : DefaultTask() {
     @TaskAction
     fun write() {
         val outputDir = outputDir.get().asFile
-        outputDir.deleteRecursively()
-        sourceSets.get().forEach { (version, sourceSetNames) ->
+        val sourceSets = sourceSets.get()
+        sourceSets.forEach { (version, sourceSetNames) ->
             outputDir.resolve(version).apply {
                 parentFile.mkdirs()
                 writeText(sourceSetNames.joinToString("\n"))
             }
         }
+        // clean up old files
+        outputDir.listFiles()?.forEach { if (it.name !in sourceSets.keys) it.deleteRecursively() }
     }
 }
 

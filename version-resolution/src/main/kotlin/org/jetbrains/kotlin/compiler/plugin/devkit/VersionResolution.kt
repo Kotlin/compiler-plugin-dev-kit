@@ -45,7 +45,7 @@ public object VersionResolution {
      * This ensures that a dev build like 2.3.20-dev-7791 doesn't incorrectly match 2.3.20-Beta1
      * just because beta > dev in maturity ordering.
      */
-    internal fun resolveVersion(
+    public fun resolveVersion(
         currentVersion: KotlinToolingVersion,
         versions: List<KotlinToolingVersion>,
     ): KotlinToolingVersion? {

@@ -746,8 +746,6 @@ The jar holds the plugin code for each version and the embedded dependencies:
 - `<plugin-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the jars
   anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
 - Each `<version>` under `versions` must be a valid [version](#version).
-- `META-INF/kotlin/plugin/<plugin-id>/sourceSets/<version>` lists the source sets that the version was compiled from. The IDE import reads the
-  list for local projects.
 - Each directory under `dependencies` must be an unpacked jar. The DevKit resolves the version of each dependency
   separately.
 
@@ -815,7 +813,12 @@ maps each dependency:
 - If the resolved version isn't the requested version, the suffix doesn't match, and the resolver doesn't change the
   coordinates (known problem).
 - A project dependency that holds a multiversion jar becomes one `IdeaKotlinSourceDependency` for each source set. The version is worked out with [version resolution](#version-resolution), and the source sets are
-  the ones the jar records for that version, including its full `dependsOn` closure.
+  the ones recorded for that version, including its full `dependsOn` closure.
+- The source set names come from the producing project's `devkitIdeSourceSets` variant: a secondary variant of the
+  surrogate target's `apiElements`, with a `Usage` attribute that no real resolution requests, whose artifact is the
+  `writeMultiVersionSourceSets` output. That task writes one plain file per version, holding the source set list.
+- The resolver also implements `IdeDependencyResolver.WithBuildDependencies`: IDE import and `resolveIdeDependencies`
+  run the producing projects' `writeMultiVersionSourceSets` tasks before the resolvers.
 
 ### In the compiler: plugin loading
 

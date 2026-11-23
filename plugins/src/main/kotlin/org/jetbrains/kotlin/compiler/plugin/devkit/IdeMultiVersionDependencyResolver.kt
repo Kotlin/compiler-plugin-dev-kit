@@ -4,23 +4,23 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import java.nio.file.Path
-import kotlin.io.path.div
-import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 import kotlin.io.path.readText
+import org.gradle.api.Project
+import org.gradle.api.artifacts.ArtifactCollection
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.attributes.Usage
 import org.gradle.api.provider.Provider
-import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.PLUGIN_PATH
-import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.addOverlayAndDependencies
-import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.openDirectory
+import org.gradle.kotlin.dsl.named
+import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.resolveVersion
 import org.jetbrains.kotlin.gradle.ExternalKotlinTargetApi
 import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinBinaryDependency
 import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinDependency
 import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinProjectArtifactDependency
 import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinResolvedBinaryDependency
-import org.jetbrains.kotlin.gradle.idea.tcs.extras.artifactsClasspath
 import org.jetbrains.kotlin.gradle.plugin.HasProject
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
@@ -31,7 +31,7 @@ import org.jetbrains.kotlin.gradle.plugin.ide.dependencyResolvers.IdeBinaryDepen
 import org.jetbrains.kotlin.gradle.plugin.sources.AbstractKotlinSourceSet
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
-public const val SOURCE_SETS_PATH: String = "sourceSets"
+internal const val IDE_SOURCE_SETS_USAGE = "devkit-ide-source-sets"
 
 private fun KotlinSourceSet.selectCompilation(
     preferredVersionForIdeImport: KotlinToolingVersion?
@@ -87,39 +87,49 @@ private class IdeMultiVersionBinaryDependencyResolver(
 private class IdeMultiVersionProjectDependencyResolver(
     private val resolver: IdeBinaryDependencyResolver,
     private val preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
-) : IdeDependencyResolver {
+    private val ideSourceSets: Provider<ArtifactCollection>,
+) : IdeDependencyResolver, IdeDependencyResolver.WithBuildDependencies {
     constructor(
         preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
         binaryType: String = IdeaKotlinBinaryDependency.KOTLIN_COMPILE_BINARY_TYPE,
         artifactResolutionStrategy: ArtifactResolutionStrategy =
             ArtifactResolutionStrategy.Compilation(),
+        ideSourceSets: Provider<ArtifactCollection>,
     ) : this(
         IdeBinaryDependencyResolver(binaryType, artifactResolutionStrategy),
         preferredVersionForIdeImport,
+        ideSourceSets,
     )
 
-    override fun resolve(sourceSet: KotlinSourceSet): Set<IdeaKotlinDependency> =
-        resolver
+    override fun resolve(sourceSet: KotlinSourceSet): Set<IdeaKotlinDependency> {
+        val compilation = sourceSet.selectCompilation(preferredVersionForIdeImport.orNull)
+        val version =
+            (compilation?.target as? DevKitTarget)?.version ?: return resolver.resolve(sourceSet)
+        val ideSourceSets = ideSourceSets.get().artifacts
+        return resolver
             .resolve(sourceSet)
             .flatMap { dependency ->
                 if (dependency !is IdeaKotlinProjectArtifactDependency)
                     return@flatMap listOf(dependency)
+                val origin = dependency.gradleArtifact ?: return@flatMap listOf(dependency)
 
-                val version =
-                    sourceSet.selectCompilation(preferredVersionForIdeImport.orNull)?.let {
-                        (it.target as? DevKitTarget)?.version
+                val artifact =
+                    ideSourceSets.firstOrNull { artifact ->
+                        artifact.id.componentIdentifier == origin.id.componentIdentifier
                     } ?: return@flatMap listOf(dependency)
 
                 val sourceSets =
-                    dependency.artifactsClasspath.firstNotNullOfOrNull { artifact ->
-                        findSourceSetsForVersion(artifact.toPath(), version)?.takeIf {
-                            it.isNotEmpty()
-                        }
+                    findSourceSetsForVersion(artifact.file.toPath(), version)?.takeIf {
+                        it.isNotEmpty()
                     } ?: return@flatMap listOf(dependency)
 
                 dependency.resolved(sourceSets)
             }
             .toSet()
+    }
+
+    /** Ensures that local projects' [WriteMultiVersionSourceSets] run first */
+    override fun dependencies(project: Project) = ideSourceSets.get().artifactFiles
 }
 
 context(_: HasProject)
@@ -136,7 +146,8 @@ internal fun IdeMultiVersionCompilationBinaryDependencyResolver(
 
 context(_: HasProject)
 internal fun IdeMultiVersionCompilationProjectDependencyResolver(
-    preferredVersionForIdeImport: Provider<out KotlinToolingVersion>
+    preferredVersionForIdeImport: Provider<out KotlinToolingVersion>,
+    ideSourceSetsConfiguration: Provider<out Configuration>,
 ): IdeDependencyResolver =
     IdeMultiVersionProjectDependencyResolver(
         preferredVersionForIdeImport = preferredVersionForIdeImport,
@@ -150,45 +161,31 @@ internal fun IdeMultiVersionCompilationProjectDependencyResolver(
                     attribute(KotlinCompilerVersion.attribute, KotlinCompilerVersion.noVersion)
                 },
             ),
+        ideSourceSets =
+            ideSourceSetsConfiguration.map {
+                it.incoming
+                    .artifactView {
+                        attributes {
+                            attribute(Usage.USAGE_ATTRIBUTE, objects.named(IDE_SOURCE_SETS_USAGE))
+                        }
+                        isLenient = true
+                        componentFilter { it is ProjectComponentIdentifier }
+                    }
+                    .artifacts
+            },
     )
 
+/**
+ * Reads a manifest written by [WriteMultiVersionSourceSets]: a directory with one file per version,
+ * whose names are the available versions and whose contents are the source set names.
+ */
 internal fun findSourceSetsForVersion(
     path: Path,
     version: KotlinToolingVersion,
 ): List<String>? {
+    if (!path.isDirectory()) return null
     val resolvedVersion =
-        with(DevNullList) { addOverlayAndDependencies(null, path, version) } ?: return null
-
-    path.openDirectory { root ->
-        val id =
-            (root / PLUGIN_PATH)
-                .takeIf { it.isDirectory() }
-                ?.listDirectoryEntries()
-                ?.singleOrNull()
-                ?.name ?: return@openDirectory
-
-        val sourceSetsFile = root / PLUGIN_PATH / id / SOURCE_SETS_PATH / resolvedVersion.toString()
-        return sourceSetsFile
-            .takeIf { it.exists() }
-            ?.readText()
-            .orEmpty()
-            .lines()
-            .filter {
-                it.isNotBlank()
-            }
-    }
-    return null
-}
-
-private object DevNullList : AbstractMutableList<Any?>() {
-    override val size: Int
-        get() = 0
-
-    override fun get(index: Int) = throw IndexOutOfBoundsException()
-
-    override fun set(index: Int, element: Any?) = throw IndexOutOfBoundsException()
-
-    override fun removeAt(index: Int): Any? = throw IndexOutOfBoundsException()
-
-    override fun add(index: Int, element: Any?) {}
+        resolveVersion(version, path.listDirectoryEntries().map { KotlinToolingVersion(it.name) })
+            ?: return null
+    return path.resolve(resolvedVersion.toString()).readText().lines().filter { it.isNotBlank() }
 }
