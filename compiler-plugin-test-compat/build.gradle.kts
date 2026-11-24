@@ -30,7 +30,7 @@ pluginDevKit {
     }
 
     versionHierarchy {
-        splitDev(2, 4, 20)
-        splitDev(2, 4)
+        splitDev(2, 4, 20, "NonGroupingStageTestConfigurationBuilder")
+        preDev(2, 4, "preNonGroupingPhaseTestConfigurationBuilder")
     }
 }

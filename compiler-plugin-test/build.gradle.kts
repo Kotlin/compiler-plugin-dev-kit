@@ -45,25 +45,29 @@ pluginDevKit {
     }
 
     versionHierarchy {
-        split("2.5.20-dev-3434")
-        split("250Dev8142") {
+        split("2.5.20-dev-3434", "JvmCodegenDirectives")
+        split("CodegenTestPhase") {
             it < KotlinToolingVersion("2.5.0-dev-8142") || it == KotlinToolingVersion("2.5.0-Beta1")
         }
-        split("2.5.0-dev-5676")
-        split("2420Dev7600") {
+        split("2.5.0-dev-5676", "LibraryProviderRemoval")
+        split("TestInfrastructureException") {
             it < KotlinToolingVersion("2.4.20-dev-7600") ||
                 it == KotlinToolingVersion("2.4.20-Beta1")
         }
         splitDev(2, 4, 20)
-        splitDev(2, 4)
         splitDev(2, 3, 20)
-        groupVersionsCli("pre2320DevJs") {
+        groupVersionsCli("preFirOnlyJs") {
             it.toKotlinVersion() >= KotlinVersion(2, 3) &&
                 it.toKotlinVersion() < KotlinVersion(2, 3, 20)
         }
-        groupVersionsCli("post2320DevJs") { it.toKotlinVersion() >= KotlinVersion(2, 3, 20) }
+        groupVersionsCli("postFirOnlyJs") { it.toKotlinVersion() >= KotlinVersion(2, 3, 20) }
+
         splitDev(2, 3)
-        split("2.2.20-RC")
+        val disableGeneratedFirTagsVersion = KotlinToolingVersion("2.2.20-RC")
+        groupVersions("preTagsGeneratorAsFirHandler") {
+            it >= disableGeneratedFirTagsVersion && it.toKotlinVersion() < KotlinVersion(2, 3)
+        }
+        split(disableGeneratedFirTagsVersion, "DisableGeneratedFirTags")
     }
 }
 
