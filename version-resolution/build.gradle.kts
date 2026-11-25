@@ -3,6 +3,7 @@ import tapmoc.Severity
 plugins {
     alias(libs.plugins.kotlin.jvm)
     id("devkit.publishing")
+    id("devkit.dokka")
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }

@@ -5,6 +5,7 @@ plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
     id("devkit.publishing")
+    id("devkit.dokka")
     alias(libs.plugins.tapmoc)
 }
 
@@ -48,4 +49,15 @@ pluginDevKit {
 kotlin.sourceSets {
     named("pre250Dev5651Main") { dependsOn(getByName("post23DevMain")) }
     named("post250Dev5651Main") { dependsOn(getByName("post23DevMain")) }
+}
+
+// Dokka documents the API that the newest CLI version sees. The shared source sets get the compile
+// classpath of that version, because their own metadata classpath has no compiler.
+val documentedCompilation = provider {
+    pluginDevKit.testAgainst.filter { !it.forIde }.maxBy { it.version }.mainCompilation
+}
+
+dokka.dokkaSourceSets.configureEach {
+    suppress = documentedCompilation.map { c -> c.allKotlinSourceSets.none { it.name == name } }
+    classpath.from(documentedCompilation.map { it.compileDependencyFiles })
 }

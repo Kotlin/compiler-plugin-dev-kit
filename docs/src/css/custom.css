@@ -1,0 +1,48 @@
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * The primary color is the magenta of the Kotlin gradient. The contrast with the page background
+ * is 6.1:1 in the light theme and 7.4:1 in the dark theme.
+ */
+:root {
+  --ifm-color-primary: #a50fc0;
+  --ifm-color-primary-dark: #950ead;
+  --ifm-color-primary-darker: #8c0da3;
+  --ifm-color-primary-darkest: #740a86;
+  --ifm-color-primary-light: #b610d3;
+  --ifm-color-primary-lighter: #be11dd;
+  --ifm-color-primary-lightest: #ce20ee;
+  --ifm-font-family-monospace: 'JetBrains Mono Variable', monospace;
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --devkit-gradient: linear-gradient(90deg, #7f52ff, #c711e1 50%, #e44857);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #dc8cf0;
+  --ifm-color-primary-dark: #d26aec;
+  --ifm-color-primary-darker: #cd5ae9;
+  --ifm-color-primary-darkest: #bd27e3;
+  --ifm-color-primary-light: #e6aef4;
+  --ifm-color-primary-lighter: #ebbef7;
+  --ifm-color-primary-lightest: #fbf1fd;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.navbar {
+  border-top: 3px solid transparent;
+  border-image: var(--devkit-gradient) 1;
+}
+
+.theme-doc-sidebar-menu {
+  padding-bottom: max(2rem, 30vh);
+}
+
+/* A loose list has the spacing of a tight list. */
+.theme-doc-markdown li > p:first-child {
+  margin-top: 0;
+}
+
+.theme-doc-markdown li > p:last-child {
+  margin-bottom: 0;
+}

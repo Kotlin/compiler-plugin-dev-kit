@@ -450,7 +450,7 @@ The test bases are in the package
       functions.
 - The `Backported*` bases are copies of `internal-test-framework` bases, changed to compile against every
   [version](#version) that they support. They use the DevKit dump handlers.
-  [The migration guide has a table](migration/4-compiler-plugin-tests.md#test-bases) mapping each
+  [The migration guide has a table](pages/migration/4-compiler-plugin-tests.md#test-bases) mapping each
   `internal-test-framework` base to its copy.
 - The `DevKit*Test` runners add default directives to a base. By default, they all use the LightTree parser.
     - These defaults match

@@ -58,8 +58,8 @@ public abstract class TestDumpRoot<out Self : TestDumpRoot<Self>>(public val uni
      *
      * For example, consider an OS classifier with Linux and Ubuntu(compatibleWith = Linux), and
      * only `Ubuntu` is fixed:
-     * - tests with [Ubuntu] classifier must use dump files with [Ubuntu]
-     * - tests with [Linux] classifier must use dump files with no OS classifier
+     * - tests with `Ubuntu` classifier must use dump files with `Ubuntu`
+     * - tests with `Linux` classifier must use dump files with no OS classifier
      */
     public open fun fixedClassifiers(
         directives: RegisteredDirectives

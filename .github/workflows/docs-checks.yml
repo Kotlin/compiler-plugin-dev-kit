@@ -1,0 +1,104 @@
+name: Docs checks
+
+# Builds the docs website and the Dokka API reference, and puts the API reference at `/api` of the website. A pull
+# request runs this workflow, and the Deploy docs website workflow calls it. No job requests a write permission, so a
+# pull request from a fork can run it.
+#
+# Don't make this check required. A pull request that the `paths` filter skips never gets the check.
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '!docs/spec.md'
+      - '**/src/**/*.kt'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/docs-checks.yml'
+  workflow_call:
+    inputs:
+      version:
+        description: >-
+          The release that the website documents. The job builds the tag `v<version>`. Empty builds the commit of the
+          caller, with the version in gradle/libs.versions.toml.
+        type: string
+        default: ''
+
+# A newer run of the same pull request cancels the older run. `github` is the context of the caller.
+concurrency:
+  group: docs-checks-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # The runner has 16 GB, and the Kotlin daemon is a second JVM next to Gradle's.
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvmargs=-Xmx4g
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # The website and the Gradle builds read DEVKIT_PUBLISH_VERSION. An empty value is not the same as no value for
+      # the Gradle builds, so the variable is set only for a release.
+      - name: Check the website version
+        if: inputs.version != ''
+        env:
+          WEBSITE_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$WEBSITE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev-[0-9]+)?$ ]]; then
+            echo "::error::The version must be a release, for example 0.0.4-dev-408. Got '$WEBSITE_VERSION'."
+            exit 1
+          fi
+          echo "DEVKIT_PUBLISH_VERSION=$WEBSITE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.version != '' && format('v{0}', inputs.version) || '' }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        working-directory: docs
+        run: npm ci
+
+      - name: Check the website sources
+        working-directory: docs
+        run: npm run typecheck
+
+      # Docusaurus fails on a broken link or anchor, so this is the docs check as well.
+      - name: Build the docs website
+        working-directory: docs
+        run: npm run build
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      # Dokka fails on a warning, for example a KDoc link that doesn't resolve.
+      - name: Build the API reference
+        run: ./gradlew :dokkaGenerate
+
+      - name: Add the API reference to the website
+        run: |
+          mkdir -p docs/build/api
+          cp -r build/dokka/html/. docs/build/api/
+
+      - name: Upload the website
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/build
+          retention-days: 7

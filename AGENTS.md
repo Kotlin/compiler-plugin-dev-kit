@@ -25,9 +25,13 @@ Three separate Gradle builds, none a subproject of another. Edits in either
 included build take effect with no publishing step. Consumers outside this repo need a publish.
 
 `build-logic` is a fourth build that isn't published. All three builds include it for its convention plugins:
-`devkit.publishing` (coordinates, POM, signing, repositories) and `devkit.plugin-publishing` (the same, and the Gradle
-Plugin Portal). It runs only on the Gradle that builds this repo, so the `tapmoc` and `gradle-public-api` rules below
-don't apply to it.
+`devkit.publishing` (coordinates, POM, signing, repositories), `devkit.plugin-publishing` (the same, and the Gradle
+Plugin Portal), and `devkit.dokka` (the API reference). It runs only on the Gradle that builds this repo, so the
+`tapmoc` and `gradle-public-api` rules below don't apply to it.
+
+The root settings script includes `plugins` twice. The include in `pluginManagement` gives only the plugins of that
+build. The second include lets the root project resolve the modules of `plugins`, for the aggregated Dokka publication.
+Don't remove either include.
 
 ## Repo constraints
 
@@ -85,6 +89,19 @@ project with `artifacts/<project>.txt` of its build. When a publication changes,
 for build in . version-resolution; do ./gradlew --project-dir $build dumpArtifacts; done
 ```
 
+The docs website is a Docusaurus project in `docs/`, with its pages in `docs/pages/`. `docs/spec.md` isn't a page of the
+website. The API reference is one Dokka publication of all three builds, and the docs workflows copy it to `/api` of the
+website:
+
+```bash
+(cd docs && npm ci && npm start)         # serves the website; its API Reference link goes to the deployed website
+(cd docs && npm run build)               # fails on a broken link or anchor
+./gradlew :dokkaGenerate                 # writes the API reference to build/dokka/html
+```
+
+Only a manual run of the `Deploy docs website` workflow deploys the website. The run builds the tag `v<version>` of its
+`version` input, so a docs change is live only after a release that has it.
+
 ## Conventions
 
 - **Formatting is ktfmt, `Kotlinlang` style.** Spotless is declared in the **root** build script only and covers all
@@ -135,6 +152,14 @@ for build in . version-resolution; do ./gradlew --project-dir $build dumpArtifac
   convention plugin uses the project name and that description for the POM. Don't declare
   `com.vanniktech.maven.publish` or `com.gradle.plugin-publish` in a module. The convention plugins apply them, at the
   catalog versions `publish` and `plugin-publish`.
+- **A module with API for DevKit users applies `devkit.dokka`, and the root build script has a `dokka(...)` dependency
+  on it.** Dokka fails on a warning, for example a KDoc link that doesn't resolve. In the root build and
+  `version-resolution`, the javadoc jar of a publication has the Dokka output, so a warning also fails a publish.
+  `DEVKIT_PUBLISH_VERSION` also sets the version that the website and the API reference show. With the variable set, the
+  source links of the API reference go to the tag `v<version>`.
+- **A `DevKitTarget` module with `devkit.dokka` also needs the `documentedCompilation` block** that
+  `compiler-plugin-runtime/build.gradle.kts` has. Without the block, Dokka documents the source sets of every version and
+  can't resolve the compiler classes in the shared source sets.
 
 ## Recipe: support a new Kotlin version
 

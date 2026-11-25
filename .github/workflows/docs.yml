@@ -1,0 +1,39 @@
+name: Deploy docs website
+
+# Only a manual run deploys the website. A run on a branch other than main builds the website and doesn't deploy it.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The DevKit release to document, for example 0.0.4-dev-408. The run builds the tag v<version>.'
+        required: true
+        type: string
+
+# Runs don't overlap and aren't cancelled, so a deploy to GitHub Pages never stops half way.
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/docs-checks.yml
+    with:
+      version: ${{ inputs.version }}
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
