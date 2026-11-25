@@ -23,6 +23,9 @@ The DevKit plugin applies `java-gradle-plugin`, and adds a `compileOnly` depende
   another build of a composite build.
 - `"com.example:my-compiler-plugin:1.0.0"`: explicit coordinates.
 
+The `kotlin.compiler.plugin.devkit.compilerPlugin` property takes the same values, with `:my-compiler-plugin` for a
+project.
+
 ## Write the plugin
 
 Extend `DevKitSupportPlugin` and give it the generated `PluginInfo.PLUGIN_INFO`. `PluginInfo` is in the
@@ -58,6 +61,10 @@ Override `Project.applyToCompilation` to return the options of the compiler plug
 :::note
 The users of your Gradle plugin must also add the DevKit EAP repository.
 :::
+
+A plugin that doesn't extend `DevKitSupportPlugin` can set `addRuntimeDependency = false` in `pluginDevKit { }`. The
+published plugin then has no dependency on the DevKit library. `PluginInfo` still has `PLUGIN_ID`, `PLUGIN_ARTIFACT`,
+and `COMPANION_LIBRARY_COORDINATES`.
 
 ## Functional tests
 
@@ -113,6 +120,59 @@ More fixtures:
   is the version of the test task.
 - `assertOutputContainsOnDifferentKotlinVersions(map)`: checks the build output against the text for the version of
   the test task. Use it when the output differs between Kotlin versions.
-- `AbstractIncrementalCompilationTest`: a base class for incremental compilation tests of a multiplatform build.
-
 `functionalTestProperties` in `pluginDevKit { }` adds lines to the `gradle.properties` of every test build.
+
+### Multiplatform tests
+
+`AbstractIncrementalCompilationTest` is a JUnit 4 base class for incremental compilation tests of a multiplatform
+build. Each test class runs for one `KmpTarget`:
+
+```kotlin
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.AbstractDevKitGradleProject
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.AbstractIncrementalCompilationTest
+import org.jetbrains.kotlin.compiler.plugin.devkit.test.KmpTarget
+
+open class MyMultiplatformProject : AbstractDevKitGradleProject(multiplatform = true) {
+    override val pluginUnderTest: Plugin
+        get() = Plugin("com.example.myplugin", pluginUnderTestVersion)
+}
+
+@RunWith(Parameterized::class)
+class MyIncrementalTest(target: KmpTarget) : AbstractIncrementalCompilationTest(target) {
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun targets() = KmpTarget.selectedTargets()
+    }
+
+    @Test
+    fun compiles() {
+        val project = object : MyMultiplatformProject() {
+            override fun sources() = listOf(source("fun foo() = 1"))
+        }.gradleProject
+
+        project.compileKotlin()
+    }
+}
+```
+
+`KmpTarget.selectedTargets()` reads the `kmpTarget` property:
+
+```bash
+./gradlew functionalTest -Pkotlin.compiler.plugin.devkit.gradle.test.kmpTarget=native_host
+```
+
+| Value                 | Targets                               |
+|-----------------------|---------------------------------------|
+| Not set               | `jvm`                                 |
+| `jvm`, `js`, `wasmJs` | That target.                          |
+| `native_host`         | The native target of the current OS.  |
+| `all`                 | Every target above.                   |
+
+The fixtures skip these tests:
+
+- `AbstractIncrementalCompilationTest` skips the versions below `2.3.21`, because multiplatform incremental
+  compilation doesn't work there. To run them, pass `requiresMultiplatformIc = false`.
+- A multiplatform test build doesn't run for a version below the Kotlin version of the companion libraries, because
+  KLIBs aren't forward compatible. [`companionLibrariesKotlinVersion`](testing.md#skipped-js-tests) sets that
+  version.

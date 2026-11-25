@@ -10,6 +10,10 @@ const sidebars: SidebarsConfig = {
     'compiler-plugin',
     'testing',
     'gradle-plugin',
+    'ide',
+    'publishing',
+    'ci',
+    'properties',
     {
       type: 'category',
       label: 'Migration guide',

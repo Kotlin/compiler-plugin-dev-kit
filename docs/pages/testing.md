@@ -43,7 +43,20 @@ For a test without these defaults, extend a `Backported*` base class. The
 [Migration guide](migration/4-compiler-plugin-tests.md#test-bases) maps each base class of the test framework to its
 DevKit base class.
 
+### Skipped JS tests
+
 JS tests run only for CLI versions from `2.3.0` on. IDE versions get no JS tests.
+
+The DevKit also skips the JS tests of a version below the Kotlin version of the companion libraries, because KLIBs
+aren't forward compatible. The DevKit reads that version from the klibs. To set it yourself:
+
+```kotlin title="build.gradle.kts"
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
+pluginDevKit {
+    companionLibrariesKotlinVersion = KotlinToolingVersion("2.3.0")
+}
+```
 
 ## Test generator
 
@@ -65,6 +78,44 @@ fun main() = generateDevKitTestsWithJUnit5 {
 
 By default, the DevKit runs the class `<pluginPackage>.GenerateTestsKt`. To use another class, set
 `generateTestsClass` in `pluginDevKit { }`.
+
+### JS tests in the generator
+
+The generator compiles one time for each kind of version, because only some versions have the JS test framework.
+Each compilation has `generateTests` and its own source sets:
+
+| Source set              | Versions                                                         |
+|-------------------------|------------------------------------------------------------------|
+| `generateTestsJs`       | The CLI versions from `2.3.0` on.                                |
+| `generateTestsCliNonJs` | The CLI versions before `2.3.0`.                                 |
+| `generateTestsIde`      | The IDE versions.                                                |
+| `generateTestsCli`      | Every CLI version. The first two compilations share this source set. |
+
+Register the JS tests behind an `expect` function:
+
+```kotlin title="src/generateTests/kotlin/GenerateTests.kt"
+import org.jetbrains.kotlin.compiler.plugin.devkit.DevKitTestGroup
+import org.jetbrains.kotlin.compiler.plugin.devkit.generateDevKitTestsWithJUnit5
+
+fun main() = generateDevKitTestsWithJUnit5 {
+    testClass<AbstractJvmBoxTest> {
+        model("box")
+    }
+    addJsTests()
+}
+
+expect fun DevKitTestGroup.addJsTests()
+```
+
+```kotlin title="src/generateTestsJs/kotlin/GenerateTests.js.kt"
+actual fun DevKitTestGroup.addJsTests() {
+    testClass<AbstractJsBoxTest> {
+        model("box")
+    }
+}
+```
+
+`generateTestsCliNonJs` and `generateTestsIde` each need an empty `actual`.
 
 ## Libraries in test data
 
@@ -107,6 +158,9 @@ configureTestDataLibrary(TestDataLibraries.someConditionalLibrary) { module: Tes
 ./gradlew defaultTest --tests 'Foo*'
 ```
 
+The [Kotlin Compiler DevKit](https://github.com/JetBrains/kotlin-compiler-devkit) IDE plugin runs the tests of a
+test data file from the editor.
+
 ## Dump files of different versions
 
 A dump can differ between compiler versions. The DevKit then uses a dump file with the version in its name. For the
@@ -118,11 +172,50 @@ test data file `foo.kt` and the dump extension `.fir.txt`:
 A version uses its own dump file if the file exists. Otherwise it uses the dump file of the nearest higher version
 that has one. So a version needs its own file only when its dump differs from the dump of that higher version.
 
+A new highest version takes over `foo.fir.txt`. The previous highest version then needs its own file, if its dump
+differs.
+
 To write the dump files that don't match, run the tests with `-PupdateTestData`:
 
 ```bash
 ./gradlew k2420_dev_7885Test -PupdateTestData
 ```
 
-On CI, a shard that registers one version must set the `kotlin.compiler.plugin.devkit.classifiedDumpVersions`
-property to the full list of versions. Without the property, the shard reads the dump files of the highest version.
+A CI job that registers only one version must
+[set `classifiedDumpVersions`](ci.md#one-job-for-each-version).
+
+### Dumps as diffs
+
+With `DUMP_AS_DIFF`, the dump of a version is a unified diff against `foo.fir.txt`. The file is
+`foo.2420_dev_7885.fir.patch`.
+
+```kotlin title="src/commonTestFixtures/kotlin/AbstractJvmBoxTest.kt"
+import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives.DUMP_AS_DIFF
+
+open class AbstractJvmBoxTest : DevKitJvmBoxTest({
+    configurePlugin(MyComponentRegistrar())
+    defaultDirectives { +DUMP_AS_DIFF }
+})
+```
+
+### Your own classifiers
+
+A dump can also differ for a reason other than the version. Declare a classifier, and add it in the test
+configuration:
+
+```kotlin title="src/commonTestFixtures/kotlin/AbstractJvmBoxTest.kt"
+import org.jetbrains.kotlin.compiler.plugin.devkit.SingleTestDumpClassifier
+import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives.DUMP_CLASSIFIER
+
+object Windows : SingleTestDumpClassifier<Windows>("windows")
+
+open class AbstractJvmBoxTest : DevKitJvmBoxTest({
+    configurePlugin(MyComponentRegistrar())
+    if (System.getProperty("os.name").startsWith("Windows")) {
+        defaultDirectives { DUMP_CLASSIFIER with Windows.classifier }
+    }
+})
+```
+
+The test uses `foo.windows.fir.txt` if the file exists. Otherwise it uses the dump without `windows`. For classifiers
+that fall back to each other, extend `TestDumpRoot`.

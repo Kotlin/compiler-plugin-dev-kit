@@ -74,8 +74,19 @@ without a change to the registered versions, set `ideaSinceBuild` and `ideaUntil
 
 ## Dev and bootstrap versions
 
-`useLatestDev()` and `useLatestBootstrap()` add the latest compiler build of each repository. Use them on CI to find
-a breaking change in the compiler early.
+`useLatestDev()` and `useLatestBootstrap()` add the latest compiler build of each repository. Use them
+[on CI](ci.md#a-job-for-new-compiler-builds) to find a breaking change in the compiler early.
+
+`testAgainst` registers a `-dev-` version as an IDE version. An IDE version gets no JS tests and no functional tests.
+To register a `-dev-` version as a CLI version, set `forIde`:
+
+```kotlin title="build.gradle.kts"
+pluginDevKit {
+    testAgainst("2.5.20-dev-5899", forIde = false)
+}
+```
+
+The `testAgainst` property has no such option.
 
 ## Known versions
 
