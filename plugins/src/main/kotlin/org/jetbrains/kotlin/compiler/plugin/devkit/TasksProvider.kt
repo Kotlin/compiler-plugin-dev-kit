@@ -78,16 +78,16 @@ internal inline fun <reified T : Task> TaskContainer.configureByName(
     }
 }
 
-/** Locates a task by [name] and [type], without triggering its creation or configuration. */
+/** Locates a task by [name] and type [T], without triggering its creation or configuration. */
 internal inline fun <reified T : Task> Project.locateTask(name: String): TaskProvider<T>? =
     tasks.locateTask(name)
 
-/** Locates a task by [name] and [type], without triggering its creation or configuration. */
+/** Locates a task by [name] and type [T], without triggering its creation or configuration. */
 internal inline fun <reified T : Task> TaskContainer.locateTask(name: String): TaskProvider<T>? =
     if (names.contains(name)) named(name, T::class.java) else null
 
 /**
- * Locates a task by [name] and [type], without triggering its creation or configuration or
+ * Locates a task by [name] and type [T], without triggering its creation or configuration or
  * registers new task with [name], type [T] and initialization script [body]
  */
 internal inline fun <reified T : Task> Project.locateOrRegisterTask(

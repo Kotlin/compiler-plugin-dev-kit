@@ -6,6 +6,7 @@ plugins {
     kotlin("plugin.sam.with.receiver")
     alias(libs.plugins.buildconfig)
     id("devkit.plugin-publishing")
+    id("devkit.dokka")
     alias(libs.plugins.tapmoc)
 }
 

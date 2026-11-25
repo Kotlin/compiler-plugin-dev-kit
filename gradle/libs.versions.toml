@@ -6,6 +6,8 @@ devkit-version = "0.0.4-SNAPSHOT"
 kotlin = "2.4.10"
 animal-sniffer = "2.0.1"
 buildconfig = "6.0.10"
+# https://github.com/Kotlin/dokka
+dokka = "2.3.0"
 gradle = "9.2.0"
 ktfmt = "0.64"
 node-gradle = "7.0.2"
@@ -29,6 +31,7 @@ testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit-plugin" }
 [libraries]
 animal-sniffer = { group = "ru.vyarus", name = "gradle-animalsniffer-plugin", version.ref = "animal-sniffer" }
 buildconfig = { group = "com.github.gmazzo.buildconfig", name = "plugin", version.ref = "buildconfig" }
+dokka = { group = "org.jetbrains.dokka", name = "dokka-gradle-plugin", version.ref = "dokka" }
 gradle-public-api = { group = "org.gradle.experimental", name = "gradle-public-api", version.ref = "gradle" }
 maven-publish = { group = "com.vanniktech", name = "gradle-maven-publish-plugin", version.ref = "publish" }
 node-gradle = { group = "com.github.node-gradle.node", name = "com.github.node-gradle.node.gradle.plugin", version.ref = "node-gradle" }

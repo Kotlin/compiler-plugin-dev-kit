@@ -7,6 +7,7 @@ plugins {
     `java-test-fixtures`
     kotlin("jvm")
     id("devkit.publishing")
+    id("devkit.dokka")
     alias(libs.plugins.tapmoc)
 }
 

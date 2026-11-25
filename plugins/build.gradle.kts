@@ -7,6 +7,7 @@ plugins {
     kotlin("plugin.assignment") version libs.versions.kotlin
     alias(libs.plugins.buildconfig)
     id("devkit.plugin-publishing")
+    id("devkit.dokka")
     alias(libs.plugins.tapmoc)
     alias(libs.plugins.testkit)
 }

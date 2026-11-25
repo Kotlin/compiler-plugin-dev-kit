@@ -59,7 +59,7 @@ public expect fun TestInfrastructureException(
 
 /**
  * Checks that the source elements of FIR declarations in the analyzed FIR files are distinct. See
- * [checkDistinctSourceElements] for more information.
+ * `checkDistinctSourceElements` for more information.
  *
  * The handler checks FIR files *after* analysis, which means that FIR elements have already been
  * transformed. The tree might be different compared to its raw state, so the checker might not

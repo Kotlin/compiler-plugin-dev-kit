@@ -27,7 +27,7 @@ A DevKit for Kotlin compiler plugin development
 
 Use the [compiler-plugin-template](https://github.com/Kotlin/compiler-plugin-template/tree/devkit)'s `devkit` branch.
 
-Alternatively, for a pre-existing project, use the [Migration guide](./docs/migration/)
+Alternatively, for a pre-existing project, use the [Migration guide](./docs/pages/migration/0-migration-guide.md)
 
 ### Compatibility
 

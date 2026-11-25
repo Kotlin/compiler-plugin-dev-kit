@@ -48,11 +48,6 @@ providers.gradleProperty("libs.sign.key.private").orNull?.let { key ->
     }
 }
 
-// `plugins` and `version-resolution` are builds in subdirectories, so `rootDir` isn't always the
-// root of the repository.
-val repositoryRoot =
-    generateSequence(rootDir) { it.parentFile }.first { it.resolve("build-logic").isDirectory }
-
 publishing {
     repositories {
         maven {

@@ -6,3 +6,5 @@
 build/
 out/
 local.properties
+node_modules/
+.docusaurus/

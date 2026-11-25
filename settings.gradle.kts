@@ -30,6 +30,10 @@ dependencyResolutionManagement {
     }
 }
 
+// The `pluginManagement` include gives only the plugins of this build. This include also lets the
+// root project resolve its modules, for the aggregated Dokka publication.
+includeBuild("plugins")
+
 include("compiler-plugin-runtime")
 
 include("compiler-plugin-runtime-compat")
