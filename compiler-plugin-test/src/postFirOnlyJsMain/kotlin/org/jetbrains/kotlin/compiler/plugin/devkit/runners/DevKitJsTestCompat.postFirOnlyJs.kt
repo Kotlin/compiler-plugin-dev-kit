@@ -1,3 +1,7 @@
+// The facade class that a file's top-level declarations compile into is part of the published
+// binary ABI. This file was renamed, so `@file:JvmName` keeps its pre-rename facade class.
+@file:JvmName("DevKitJsTestCompat_post2320DevCliKt")
+
 package org.jetbrains.kotlin.compiler.plugin.devkit.runners
 
 import org.jetbrains.kotlin.js.test.runners.AbstractJsBlackBoxCodegenTestBase

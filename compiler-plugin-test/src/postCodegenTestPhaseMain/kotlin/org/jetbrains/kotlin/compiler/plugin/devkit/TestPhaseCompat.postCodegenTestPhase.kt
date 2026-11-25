@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Adapted from
 // https://github.com/ZacSweers/metro/blob/ad90731d57c0d710389c20852e8844f94bce98e9/compiler-tests/src/test/kotlin/dev/zacsweers/metro/compiler/MetroTestPhaseCompat.kt
+
+// The facade class that a file's top-level declarations compile into is part of the published
+// binary ABI. This file was renamed, so `@file:JvmName` keeps its pre-rename facade class.
+@file:JvmName("TestPhaseCompat_post250Dev8142Kt")
+
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
