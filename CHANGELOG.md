@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- The DevKit supports newly released Kotlin versions, including `dev` builds up to `2.5.20-dev-6103`.
+- The DevKit supports newly released Kotlin versions, including `2.5.0-RC2`, and `dev` builds up to `2.5.20-dev-6103`.
 
 ### Changed
 

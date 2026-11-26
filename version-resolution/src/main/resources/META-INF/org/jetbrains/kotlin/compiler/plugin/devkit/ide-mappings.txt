@@ -48,6 +48,8 @@
 252.28539.13=2.2.20-ij252-24
 # IntelliJ IDEA 2025.2.6.4 (stable)
 252.28539.149=2.2.20-ij252-24
+# IntelliJ IDEA 2025.2.6.5 (stable)
+252.28539.166=2.2.20-ij252-24
 # IntelliJ IDEA 2025.2.6.1 (stable)
 252.28539.33=2.2.20-ij252-24
 # IntelliJ IDEA 2025.2.6.2 (stable)
@@ -100,6 +102,8 @@
 253.32098.37=2.3.20-ij253-119
 # IntelliJ IDEA 2025.3.5 (stable)
 253.33514.17=2.3.20-ij253-119
+# IntelliJ IDEA 2025.3.6.3 (stable)
+253.33813.120=2.3.20-ij253-119
 # IntelliJ IDEA 2025.3.6 (rc)
 253.33813.14=2.3.20-ij253-119
 # IntelliJ IDEA 2025.3.6 (stable)
@@ -163,6 +167,8 @@
 261.26222.65=2.4.0-ij261-71
 # IntelliJ IDEA 2026.1.5.1 (stable)
 261.27258.136=2.4.0-ij261-71
+# IntelliJ IDEA 2026.1.5.2 (stable)
+261.27258.169=2.4.0-ij261-71
 # IntelliJ IDEA 2026.1.5 (rc)
 261.27258.27=2.4.0-ij261-71
 # IntelliJ IDEA 2026.1.5 (stable)
@@ -187,11 +193,16 @@
 # Android Studio Rabbit 2 | 2026.2.2 Patch 1 (stable)
 # Android Studio Rabbit 3 | 2026.2.3 Canary 3 (canary)
 # Android Studio Rabbit 3 | 2026.2.3 RC 1 (beta)
+# Android Studio Rabbit 2 | 2026.2.2 Patch 3 (stable)
+# Android Studio Rabbit 2 | 2026.2.2 Patch 2 (stable)
+# Android Studio Rabbit 3 | 2026.2.3 RC 2 (beta)
 262.10968.63=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.4 (stable)
 262.11879.100=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2.5 (stable)
 262.12573.28=2.4.20-ij262-52
+# IntelliJ IDEA 2026.2.5.1 (stable)
+262.12573.58=2.4.20-ij262-52
 # IntelliJ IDEA 2026.2 (eap)
 262.4852.50=2.4.20-dev-1435
 # IntelliJ IDEA 2026.2 (eap)
@@ -248,6 +259,12 @@
 263.7307.112=2.5.0-ij263-40
 # IntelliJ IDEA 2026.3 (stable)
 # Android Studio Stingray 1 | 2026.3.1 Canary 1 (canary)
+# Android Studio Stingray 1 | 2026.3.1 Canary 3 (canary)
+# Android Studio Stingray 1 | 2026.3.1 Canary 2 (canary)
 263.7307.200=2.5.0-ij263-56
+# IntelliJ IDEA 2026.3.0.1 (stable)
+263.7307.353=2.5.0-ij263-56
 # IntelliJ IDEA 2026.3 (eap)
 263.7307.44=2.5.0-ij263-18
+# IntelliJ IDEA 2026.3.1 (eap)
+263.8311.30=2.5.0-ij263-59
