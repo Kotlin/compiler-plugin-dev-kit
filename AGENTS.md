@@ -124,10 +124,10 @@ for build in . version-resolution; do ./gradlew --project-dir $build dumpArtifac
 - **A release overrides that version through the `DEVKIT_PUBLISH_VERSION` environment variable**, which the
   `versionCatalogs { }` block of all three builds' settings scripts reads. It is an environment variable, not a
   property, because it has to reach every build no matter which one you run. `.github/workflows/publish.yml` sets it to
-  `<devkit-version without -SNAPSHOT>-dev-<first-parent commit count>` and publishes every commit on `main`. Each
-  published commit also gets a prerelease GitHub Release tagged `v<version>`. The checked-in `-SNAPSHOT` value is what
-  local and IDE builds keep using. In the root build the conventional path *already* imports the catalog, so its
-  `create("libs")` must not call `from` again.
+  `<devkit-version without -SNAPSHOT>-dev-<first-parent commit count>` and publishes every commit on `main`. Full
+  releases follow `RELEASING.md`: they are published from TeamCity by hand, and `publish.yml` covers only the
+  per-commit dev releases. The checked-in `-SNAPSHOT` value is what local and IDE builds keep using. In the root build
+  the conventional path *already* imports the catalog, so its `create("libs")` must not call `from` again.
 - **A build signs its publications only when the Gradle property `libs.sign.key.private` is set**, together with
   `libs.sign.key.id` and `libs.sign.passphrase`. Don't apply `signing` in a `plugins { }` block. With that plugin
   applied, `com.gradle.plugin-publish` signs in every build, and a build that has no key fails.

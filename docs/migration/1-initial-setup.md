@@ -8,19 +8,6 @@ You don't need a version higher than 2.2.20 for the migration.
 
 ## Settings (`settings.gradle.kts`)
 
-The DevKit is experimental. Add its EAP repository to the plugin repositories:
-
-```kotlin
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        ...
-        maven("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-    }
-}
-```
-
 Apply the settings plugin. Replace `<devkit-version>` with the latest version from the
 [Releases page](https://github.com/Kotlin/compiler-plugin-dev-kit/releases/latest):
 
@@ -30,19 +17,7 @@ plugins {
 }
 ```
 
-To resolve the DevKit dependencies, also add the repository to the dependency repositories:
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        ...
-        maven("https://packages.jetbrains.team/maven/p/compiler-plugin-dev-kit/eap")
-    }
-}
-```
-
-If you added the `dev`, `bootstrap`, or `intellij-dependencies` repositories, remove them. The settings plugin adds them.
+If you added the `dev`, `bootstrap`, or `intellij-dependencies` repositories to `dependencyResolutionManagement`, remove them. The settings plugin adds them.
 
 [comment]: # (TODO #55)
 
