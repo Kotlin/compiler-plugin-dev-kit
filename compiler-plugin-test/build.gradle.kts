@@ -63,11 +63,7 @@ pluginDevKit {
         groupVersionsCli("postFirOnlyJs") { it.toKotlinVersion() >= KotlinVersion(2, 3, 20) }
 
         splitDev(2, 3)
-        val disableGeneratedFirTagsVersion = KotlinToolingVersion("2.2.20-RC")
-        groupVersions("preTagsGeneratorAsFirHandler") {
-            it >= disableGeneratedFirTagsVersion && it.toKotlinVersion() < KotlinVersion(2, 3)
-        }
-        split(disableGeneratedFirTagsVersion, "DisableGeneratedFirTags")
+        split(KotlinToolingVersion("2.2.20-RC"), "DisableGeneratedFirTags")
     }
 }
 

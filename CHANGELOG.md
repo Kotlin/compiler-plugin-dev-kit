@@ -16,10 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The DevKit supports newly released Kotlin versions, including `2.5.0-RC2`, and `dev` builds up to `2.5.20-dev-6103`.
 
-### Changed
-
-- **Breaking**: `TagsGeneratorCheckerCompat` is removed from `2.2.20-RC..<2.3`. The class is unnecessary because that version range already supports `DISABLE_GENERATED_FIR_TAGS`. Indirectly using the class through `registerTagsGeneratorChecker` is unaffected.
-
 ### Fixed
 
 - IDE sync improvements:
@@ -30,8 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
       provided using an extra (local-only) artifact that IDE import explicitly depends on.
     - The POM of `kotlin-compiler-tests-for-ide` declares unpublished test framework modules (which it embeds anyway). These
       missing modules slowed down IDE dependency resolution, so the DevKit now excludes them (#121).
-- The `DISABLE_GENERATED_FIR_TAGS` directive now covers Kotlin `2.2.20-RC..<2.3`, so tests can disable the tags
-  generator on every supported version.
 
 ## [0.1.0] - 2026-11-20
 
