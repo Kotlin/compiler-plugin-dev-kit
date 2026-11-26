@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
 plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")
@@ -32,5 +34,10 @@ pluginDevKit {
     versionHierarchy {
         splitDev(2, 4, 20, "NonGroupingStageTestConfigurationBuilder")
         preDev(2, 4, "preNonGroupingPhaseTestConfigurationBuilder")
+
+        pre("2.2.20-dev-5747", "preTagsGeneratorChecker")
+        pre("2.2.20-dev-5541", "preFirInferenceLogger")
+        pre("2.2.20-dev-5430", "preBaselessSpecHelpersSourceFilesProvider")
+        pre("2.2.0-Beta1", "preTestPhase")
     }
 }

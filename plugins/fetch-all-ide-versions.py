@@ -41,8 +41,8 @@ HEADER_LINES = [
     "#",
 ]
 
-# 252 (2025.2) is the lowest platform we care about
-DEFAULT_MIN_PLATFORM = 252
+# 251 (2025.1) is the lowest platform we care about
+DEFAULT_MIN_PLATFORM = 251
 
 # Exit 2 once the file has changed
 EXIT_CHANGED = 2

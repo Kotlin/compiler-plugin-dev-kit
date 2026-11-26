@@ -393,8 +393,8 @@ def main():
         representative = entries[0]["ide_name"]
         major = build.split(".")[0]
 
-        # 252 is the lowest platform we support
-        if (int(major) if major.isdigit() else 0) < 252:
+        # 251 is the lowest platform we support
+        if (int(major) if major.isdigit() else 0) < 251:
             continue
 
         print(f"━━━ {representative} (build {build}) ━━━")

@@ -1,7 +1,10 @@
 package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
@@ -17,6 +20,10 @@ public actual fun collectFilesForRenderingCompat(
 
 public actual val IrBackendInput.irBuiltInsCompat: IrBuiltIns
     get() = irBuiltIns
+
+@OptIn(InternalSymbolFinderAPI::class)
+public actual fun IrBackendInput.findClassCompat(classId: ClassId): IrClassSymbol? =
+    irBuiltIns.symbolFinder.findClass(classId)
 
 public actual val FirOutputArtifact.mainFirFilesByTestFileCompat: Map<TestFile, FirFile>
     get() = mainFirFilesByTestFile

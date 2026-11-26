@@ -1,2 +1,2 @@
-org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-test-compat-k2220_beta1/.jar,.module,.pom,javadoc.jar,sources.jar
+org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-test-compat-k220_beta1/.jar,.module,.pom,javadoc.jar,sources.jar
 org.jetbrains.kotlin.compiler.plugin.devkit:compiler-plugin-test-compat/.jar,.module,.pom,javadoc.jar,kotlin-tooling-metadata.json,sources.jar
