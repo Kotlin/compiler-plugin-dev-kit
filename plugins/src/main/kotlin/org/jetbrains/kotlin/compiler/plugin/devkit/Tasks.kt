@@ -109,6 +109,40 @@ internal abstract class GenerateServices : DefaultTask() {
     }
 }
 
+@CacheableTask
+internal abstract class GenerateEntryPointSource : DefaultTask() {
+    private val templateName =
+        "META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitEntryPoint.template.kt"
+
+    @get:Input abstract val packageName: Property<String>
+    @get:Input abstract val pluginId: Property<String>
+
+    @get:Input abstract val registrarClass: Property<String>
+
+    @get:Input abstract val processorClass: Property<String>
+
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val template =
+            javaClass.classLoader.getResourceAsStream(templateName)?.reader()?.use {
+                it.readText()
+            } ?: error("Missing resource $templateName")
+        val sourceDir = outputDir.get().asFile.resolve(packageName.get().replace('.', '/'))
+        sourceDir.mkdirs()
+        sourceDir
+            .resolve("DevKitEntryPoint.kt")
+            .writeText(
+                template
+                    .replace("__PACKAGE__", packageName.get())
+                    .replace("__PLUGIN_ID__", pluginId.get())
+                    .replace("__REGISTRAR_CLASS__", registrarClass.get())
+                    .replace("__PROCESSOR_CLASS__", processorClass.get())
+            )
+    }
+}
+
 @DisableCachingByDefault(because = "it writes simple strings to files")
 internal abstract class WriteMultiVersionSourceSets : DefaultTask() {
     @get:Input val sourceSets: MapProperty<String, List<String>> = project.objects.mapProperty()

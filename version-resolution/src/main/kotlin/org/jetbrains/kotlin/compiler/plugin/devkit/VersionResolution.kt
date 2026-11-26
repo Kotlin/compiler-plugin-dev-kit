@@ -23,6 +23,7 @@ public object VersionResolution {
     public const val PLUGIN_PATH: String = "META-INF/kotlin/plugin"
     public const val VERSIONS_PATH: String = "versions"
     public const val DEPENDENCIES_PATH: String = "dependencies"
+    public const val ENTRY_POINT_PATH: String = "entryPoint"
 
     /**
      * Pick the highest compatible version.

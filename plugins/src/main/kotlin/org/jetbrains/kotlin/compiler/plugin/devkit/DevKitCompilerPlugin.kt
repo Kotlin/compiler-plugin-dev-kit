@@ -41,6 +41,7 @@ import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.gradle.plugins.ide.idea.model.IdeaModule
 import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.DEPENDENCIES_PATH
+import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.ENTRY_POINT_PATH
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.PLUGIN_PATH
 import org.jetbrains.kotlin.compiler.plugin.devkit.VersionResolution.VERSIONS_PATH
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -155,12 +156,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                         if (componentRegistrar.isPresent)
                             put(
                                 "org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar",
-                                $$"$${pluginPackage.get()}.PluginInfo$REGISTRAR_CLASS$1$Plugin",
+                                "${pluginPackage.get()}.DevKitRegistrar",
                             )
                         if (commandLineProcessor.isPresent)
                             put(
                                 "org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor",
-                                $$"$${pluginPackage.get()}.PluginInfo$PROCESSOR_CLASS$1$Plugin",
+                                "${pluginPackage.get()}.DevKitProcessor",
                             )
                     }
                 }
@@ -257,6 +258,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             defaultSourceSet.kotlin.setSrcDirs(emptyList<Any>())
             defaultSourceSet.resources.setSrcDirs(listOf(genServicesDir.get()))
             tasks.named(processResourcesTaskName) { dependsOn(generateServices) }
+            forceKotlinVersion(KnownVersions.kotlinVersions.last(), forIde = false)
         }
 
     private fun DevKitTarget.createGenerateTestsCompilation(): DevKitCompilation =
@@ -620,50 +622,28 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     }
                 }
             }
-        }
-        if (!isPlugin) return
-        buildConfig.sourceSets.named(entryPointCompilation.defaultSourceSet.name) {
-            packageName.set(pluginPackage)
-            forClass("PluginInfo") {
-                useKotlinOutput { internalVisibility = true }
-                buildConfigField("PLUGIN_ID") {
-                    type(String::class)
-                    expression(pluginPackage.map { "\"$it\"" })
-                }
-                buildConfigField("REGISTRAR_CLASS") {
-                    type("kotlin.reflect.KClass<*>")
-                    expression(
-                        componentRegistrar.map {
-                            """
-                            run {
-                               class Plugin: org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPluginRegistrar("$it") {
-                                 override val pluginId: String = PLUGIN_ID
-                               }
-                               Plugin::class
-                            }
-                        """
-                                .trimIndent()
-                        }
-                    )
-                }
-                buildConfigField("PROCESSOR_CLASS") {
-                    type("kotlin.reflect.KClass<*>")
-                    expression(
-                        commandLineProcessor.map {
-                            """
-                            run {
-                               class Plugin: org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCommandLineProcessor("$it") {
-                                 override val pluginId: String = PLUGIN_ID
-                               }
-                               Plugin::class
-                            }
-                        """
-                                .trimIndent()
-                        }
-                    )
+            named(entryPointCompilation.defaultSourceSet.name) {
+                generateTask {
+                    enabled = false
+                    outputDir.unset()
                 }
             }
         }
+        if (!isPlugin) return
+
+        val generateEntryPointSource =
+            tasks.register<GenerateEntryPointSource>("generateEntryPointSource") {
+                outputDir.set(
+                    layout.buildDirectory.dir("compiler-plugin-devkit/generated-entrypoint")
+                )
+                packageName.set(pluginPackage)
+                pluginId.set(pluginPackage)
+                registrarClass.set(componentRegistrar)
+                processorClass.set(commandLineProcessor)
+            }
+        entryPointCompilation.defaultSourceSet.kotlin.srcDir(
+            generateEntryPointSource.flatMap { it.outputDir }
+        )
         // Adapted from
         // https://github.com/infix-de/testBalloon/blob/main/testBalloon-compiler-plugin/build.gradle.kts
         mainJar {
@@ -741,12 +721,18 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                     }
                 }
             }
-            from(
-                provider {
-                    includedEntryPoint.elements().map { archiveOperations.zipTree(it.asFile) }
+            // The entry point runtime hides in the plugin's entryPoint directory, next to versions
+            // and dependencies, so its classes are not on the normal classpath. The generated
+            // DevKitEntryPoint class loads them from there.
+            into(pluginPackage.map { "$PLUGIN_PATH/$it/$ENTRY_POINT_PATH" }) {
+                from(
+                    provider {
+                        includedEntryPoint.elements().map { archiveOperations.zipTree(it.asFile) }
+                    }
+                ) {
+                    exclude("$PLUGIN_PATH/")
+                    exclude("META-INF/MANIFEST.MF")
                 }
-            ) {
-                exclude("$PLUGIN_PATH/")
             }
         }
     }

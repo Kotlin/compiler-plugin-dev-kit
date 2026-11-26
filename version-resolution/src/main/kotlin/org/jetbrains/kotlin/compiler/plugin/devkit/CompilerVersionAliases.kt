@@ -34,14 +34,12 @@ public object CompilerVersionAliases {
     // Android Studio canary builds report a fake version like "2.3.255-dev-255".
     // The real version can be found by checking the IntelliJ tag for the studio build number:
     // https://github.com/JetBrains/intellij-community/blob/idea/<intellij-version>/.idea/libraries/kotlinc_kotlin_compiler_common.xml
-    // We handle multiple `ide-mappings` on the classpath by merging them together
     public val BUILT_IN_COMPILER_VERSION_ALIASES: Map<IdeBuildNumber, KotlinToolingVersion> =
         javaClass.classLoader
-            .getResources("META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt")
-            .asSequence()
-            .map { text ->
+            .getResource("META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/ide-mappings.txt")
+            ?.runCatching {
                 buildMap {
-                    text.openStream().reader().forEachLine {
+                    openStream()?.reader()?.forEachLine {
                         if (it.isNotBlank() && !it.startsWith("#")) {
                             val (from, to) = it.split('=', limit = 2)
                             put(IdeBuildNumber(from), KotlinToolingVersion(to))
@@ -49,7 +47,7 @@ public object CompilerVersionAliases {
                     }
                 }
             }
-            .reduce { a, b -> a + b }
+            ?.getOrNull() ?: emptyMap()
 
     /**
      * Resolves a compiler version through alias mappings.

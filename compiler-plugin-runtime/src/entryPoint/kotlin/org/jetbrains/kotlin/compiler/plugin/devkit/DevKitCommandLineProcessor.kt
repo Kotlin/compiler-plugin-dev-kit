@@ -4,13 +4,16 @@ import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-public abstract class DevKitCommandLineProcessor(processorClass: String) : CommandLineProcessor {
+public class DevKitCommandLineProcessor(
+    private val anchor: Class<*>,
+    override val pluginId: String,
+    processorClass: String,
+) : CommandLineProcessor {
     private typealias ProcessOption = (AbstractCliOption, String, CompilerConfiguration) -> Any?
 
     private val versionedProcessor:
         Pair<ProcessOption, () -> Collection<AbstractCliOption>> by lazy {
-        val loader =
-            VersionedPluginClassLoading.resolve(this@DevKitCommandLineProcessor.javaClass, pluginId)
+        val loader = VersionedPluginClassLoading.resolve(anchor, pluginId)
         loader ?: return@lazy Pair({ _, _, _ -> }, { emptyList() })
         val clp = loader.loadClass(processorClass).getDeclaredConstructor().newInstance()
         val processOption =
@@ -30,10 +33,11 @@ public abstract class DevKitCommandLineProcessor(processorClass: String) : Comma
                 pluginOptions.invoke(clp) as Collection<AbstractCliOption>
             }
     }
-    final override val pluginOptions: Collection<AbstractCliOption>
+
+    override val pluginOptions: Collection<AbstractCliOption>
         get() = versionedProcessor.second()
 
-    final override fun processOption(
+    override fun processOption(
         option: AbstractCliOption,
         value: String,
         configuration: CompilerConfiguration,
