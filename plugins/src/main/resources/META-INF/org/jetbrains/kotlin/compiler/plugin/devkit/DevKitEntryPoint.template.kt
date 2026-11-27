@@ -44,7 +44,9 @@ internal class DevKitProcessor : CommandLineProcessor {
 internal object DevKitEntryPoint {
     internal const val PLUGIN_ID = "__PLUGIN_ID__"
 
-    private const val ENTRY_POINT_DIR = "META-INF/kotlin/plugin/$PLUGIN_ID/entryPoint/"
+    private const val CLASS_LOADER_ID = "__CLASS_LOADER_ID__"
+
+    private const val ENTRY_POINT_DIR = "META-INF/kotlin/plugin/$CLASS_LOADER_ID/entryPoint/"
 
     private const val REGISTRAR_CLASS =
         "org.jetbrains.kotlin.compiler.plugin.devkit.DevKitCompilerPluginRegistrar"
@@ -70,7 +72,7 @@ internal object DevKitEntryPoint {
             loader
                 .loadClass(className)
                 .getDeclaredConstructor(Class::class.java, String::class.java, String::class.java)
-                .newInstance(DevKitEntryPoint::class.java, PLUGIN_ID, userClass)
+                .newInstance(DevKitEntryPoint::class.java, CLASS_LOADER_ID, userClass)
         } catch (_: ClassNotFoundException) {
             error("Malformed JAR! Missing DevKit entry point class $className")
         }

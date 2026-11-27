@@ -463,13 +463,13 @@ public open class GradlePluginConfigExtension(project: Project) :
         }
 
         buildConfig {
-            packageName.convention(pluginPackage)
+            packageName.convention(generatedClassesPackage)
             forClass("PluginInfo") {
                 useKotlinOutput { topLevelConstants = false }
-                val pluginId =
+                val pluginIdField =
                     buildConfigField("PLUGIN_ID") {
                         type(String::class)
-                        expression(pluginPackage.map { "\"$it\"" })
+                        expression(pluginId.map { "\"$it\"" })
                     }
                 val pluginArtifact =
                     buildConfigField("PLUGIN_ARTIFACT") {
@@ -513,7 +513,7 @@ public open class GradlePluginConfigExtension(project: Project) :
                             )
                                 """
                                 |DevKitPluginInfo(
-                                |  id = ${pluginId.name},
+                                |  id = ${pluginIdField.name},
                                 |  artifact = ${pluginArtifact.name},
                                 |  companionLibraryCoordinates = ${companionLibraryCoordinates.name},
                                 |)

@@ -52,8 +52,24 @@ public const val DEFAULT_TEST_VERSION_PROPERTY: String =
 public const val CLASSIFIED_DUMP_VERSIONS_PROPERTY: String =
     "kotlin.compiler.plugin.devkit.classifiedDumpVersions"
 
-/** Gradle property holding the plugin package, and with it the plugin ID. */
+/**
+ * **Deprecated**: Gradle property holding the plugin package, and with it the plugin ID. Please use
+ * [PLUGIN_ID_PROPERTY] instead.
+ *
+ * @see DevKitPropertiesDsl.pluginPackage
+ */
 public const val PLUGIN_PACKAGE_PROPERTY: String = "kotlin.compiler.plugin.devkit.pluginPackage"
+
+/**
+ * Gradle property holding the plugin ID
+ *
+ * @see DevKitPropertiesDsl.pluginId
+ */
+public const val PLUGIN_ID_PROPERTY: String = "kotlin.compiler.plugin.devkit.pluginId"
+
+/** @see DevKitPropertiesDsl.generatedClassesPackage */
+public const val GENERATED_CLASSES_PACKAGE_PROPERTY: String =
+    "kotlin.compiler.plugin.devkit.generatedClassesPackage"
 
 /** Gradle property holding the path of the compiler-plugin project a Gradle plugin applies. */
 public const val COMPILER_PLUGIN_PROPERTY: String = "kotlin.compiler.plugin.devkit.compilerPlugin"
@@ -61,9 +77,7 @@ public const val COMPILER_PLUGIN_PROPERTY: String = "kotlin.compiler.plugin.devk
 /**
  * Gradle property listing the libraries a plugin ships for its users, separated by commas or
  * whitespace. An entry starting with `:` is a project path in this build, published under that
- * project's own `group`, `name` and `version`; an entry starting with `.` or `/` is considered an
- * included build, which will automatically be included if the settings plugin is applied, and will
- * be used as a library with the project's `group` and `version`; anything else is used as-is as a
+ * project's `name` with this project's `group` and `version`; anything else is used as-is as a
  * `group:artifact:version` coordinate.
  */
 public const val COMPANION_LIBRARIES_PROPERTY: String =

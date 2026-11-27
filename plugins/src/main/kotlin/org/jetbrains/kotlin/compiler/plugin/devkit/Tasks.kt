@@ -115,7 +115,10 @@ internal abstract class GenerateEntryPointSource : DefaultTask() {
         "META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitEntryPoint.template.kt"
 
     @get:Input abstract val packageName: Property<String>
+
     @get:Input abstract val pluginId: Property<String>
+
+    @get:Input abstract val classLoaderId: Property<String>
 
     @get:Input abstract val registrarClass: Property<String>
 
@@ -137,6 +140,7 @@ internal abstract class GenerateEntryPointSource : DefaultTask() {
                 template
                     .replace("__PACKAGE__", packageName.get())
                     .replace("__PLUGIN_ID__", pluginId.get())
+                    .replace("__CLASS_LOADER_ID__", classLoaderId.get())
                     .replace("__REGISTRAR_CLASS__", registrarClass.get())
                     .replace("__PROCESSOR_CLASS__", processorClass.get())
             )

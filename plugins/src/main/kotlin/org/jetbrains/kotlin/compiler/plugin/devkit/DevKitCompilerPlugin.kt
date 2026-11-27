@@ -94,10 +94,10 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
 
     /**
      * The name of the class that the `generateTests*` tasks run. The default is
-     * `<pluginPackage>.GenerateTestsKt`
+     * `<generatedClassesPackage>.GenerateTestsKt`
      */
     public val generateTestsClass: Property<String> =
-        objects.property(pluginPackage.map { "$it.GenerateTestsKt" })
+        objects.property(generatedClassesPackage.map { "$it.GenerateTestsKt" })
 
     /** The directory where generated tests are placed. Defaults to build/test-gen */
     public val generatedTestsDir: DirectoryProperty =
@@ -145,6 +145,13 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             classifiedDumpVersions.convention(versions.map(::KotlinToolingVersion))
     }
 
+    /**
+     * The directory inside `META-INF/kotlin/plugin/` that holds this plugin's code, dependencies,
+     * and entry point runtime, for classloader isolation. Only the generated entry point classes
+     * read it. Defaults to [pluginId].
+     */
+    public val classLoaderId: Property<String> = objects.property<String>(pluginId)
+
     private val genServicesDir =
         layout.buildDirectory.dir("compiler-plugin-devkit/generated-resources")
     private val generateServices =
@@ -156,12 +163,12 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                         if (componentRegistrar.isPresent)
                             put(
                                 "org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar",
-                                "${pluginPackage.get()}.DevKitRegistrar",
+                                "${generatedClassesPackage.get()}.DevKitRegistrar",
                             )
                         if (commandLineProcessor.isPresent)
                             put(
                                 "org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor",
-                                "${pluginPackage.get()}.DevKitProcessor",
+                                "${generatedClassesPackage.get()}.DevKitProcessor",
                             )
                     }
                 }
@@ -465,7 +472,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
         buildConfig.sourceSets.named(commonTestFixtures.name) {
             if (!addToBuildConfig) return@named
             forClass("TestDataLibraries") {
-                packageName.set(pluginPackage)
+                packageName.set(generatedClassesPackage)
                 buildConfigField(
                     "org.jetbrains.kotlin.compiler.plugin.devkit.services.TestDataLibrary",
                     name,
@@ -636,8 +643,9 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 outputDir.set(
                     layout.buildDirectory.dir("compiler-plugin-devkit/generated-entrypoint")
                 )
-                packageName.set(pluginPackage)
-                pluginId.set(pluginPackage)
+                packageName.set(generatedClassesPackage)
+                pluginId.set(this@DevKitCompilerConfigExtension.pluginId)
+                classLoaderId.set(this@DevKitCompilerConfigExtension.classLoaderId)
                 registrarClass.set(componentRegistrar)
                 processorClass.set(commandLineProcessor)
             }
@@ -687,7 +695,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 includedEntryPoint("$DEV_KIT_GROUP:compiler-plugin-runtime:$DEV_KIT_VERSION")
             }
 
-            into(pluginPackage.map { "$PLUGIN_PATH/$it/$DEPENDENCIES_PATH" }) {
+            into(classLoaderId.map { "$PLUGIN_PATH/$it/$DEPENDENCIES_PATH" }) {
                 from(
                     provider {
                         includedDependencies().elements().map {
@@ -724,7 +732,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
             // The entry point runtime hides in the plugin's entryPoint directory, next to versions
             // and dependencies, so its classes are not on the normal classpath. The generated
             // DevKitEntryPoint class loads them from there.
-            into(pluginPackage.map { "$PLUGIN_PATH/$it/$ENTRY_POINT_PATH" }) {
+            into(classLoaderId.map { "$PLUGIN_PATH/$it/$ENTRY_POINT_PATH" }) {
                 from(
                     provider {
                         includedEntryPoint.elements().map { archiveOperations.zipTree(it.asFile) }
@@ -850,7 +858,7 @@ internal constructor(project: Project, private val isPlugin: Boolean) :
                 )
             }
             mainJar {
-                into(pluginPackage.map { "$PLUGIN_PATH/$it/$VERSIONS_PATH/$version" }) {
+                into(classLoaderId.map { "$PLUGIN_PATH/$it/$VERSIONS_PATH/$version" }) {
                     from(mainCompilation.output.allOutputs)
                 }
             }

@@ -42,7 +42,8 @@ To migrate your `KotlinCompilerPluginSupportPlugin`, do these steps:
 
 1. Find your support plugin. Its fully qualified name is in `gradlePlugin.plugins.create(...).implementationClass`.
 2. Replace `: KotlinCompilerPluginSupportPlugin` with `: DevKitSupportPlugin(PluginInfo.PLUGIN_INFO)`. `PluginInfo` is
-   in the `pluginPackage` that you set in [Initial setup](1-initial-setup.md).
+   in the `pluginId` that you set in [Initial setup](1-initial-setup.md), but you can override it by setting
+   `generatedClassesPackage`
 3. If you override `isApplicable` to return `true`, remove the override.
 4. Remove `getCompilerPluginId` and `getPluginArtifact`.
 5. If your Gradle extension has a `shouldAddRuntimeDependency` property, override `shouldAddRuntimeDependency` to read

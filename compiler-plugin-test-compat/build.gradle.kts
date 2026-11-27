@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
-
 plugins {
     kotlin("multiplatform")
     pluginDevKit("compiler-library")

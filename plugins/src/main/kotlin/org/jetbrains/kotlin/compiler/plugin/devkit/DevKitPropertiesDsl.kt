@@ -189,12 +189,32 @@ internal constructor(final override val project: Project, targetClass: KClass<Ta
     }
 
     /**
-     * The package used by convention for BuildConfig generation. It's also assumed to be the plugin
-     * ID. Defaults to [PLUGIN_PACKAGE_PROPERTY], else [Project.getGroup]
+     * The package, plugin ID, and classloader isolation directory that [pluginId] and
+     * [generatedClassesPackage] override. Defaults to [PLUGIN_PACKAGE_PROPERTY], else
+     * [Project.getGroup]
      */
+    @Deprecated(
+        message = "Use pluginId instead. classLoaderId and generatedClassesPackage default to it.",
+        replaceWith = ReplaceWith("pluginId"),
+    )
     public val pluginPackage: Property<String> =
         objects.property(
             gradleProperty(PLUGIN_PACKAGE_PROPERTY).orElse(provider { project.group.toString() })
+        )
+
+    /** Defaults to [PLUGIN_ID_PROPERTY], else [pluginPackage] */
+    @Suppress("DEPRECATION")
+    public val pluginId: Property<String> =
+        objects.property<String>(gradleProperty(PLUGIN_ID_PROPERTY).orElse(pluginPackage))
+
+    /**
+     * The package of the classes that the DevKit generates: the buildConfig classes and the entry
+     * point classes. Defaults to [GENERATED_CLASSES_PACKAGE_PROPERTY], else [pluginId]. This should
+     * be unique among plugins because the generated entry points classes use it.
+     */
+    public val generatedClassesPackage: Property<String> =
+        objects.property<String>(
+            gradleProperty(GENERATED_CLASSES_PACKAGE_PROPERTY).orElse(pluginId)
         )
 
     /**

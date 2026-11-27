@@ -125,7 +125,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
 | `ideaVersions(min, max, includeRc, includeEap)` | `minIdeaVersion`, `maxIdeaVersion`, `includeIdeaRc`, `includeIdeaEap` |
 | `useLatestDev()`, `useLatestBootstrap()`        | `useLatestDev`, `useLatestBootstrap`                                  |
 | `defaultTestVersion("2.x.y")`                   | `defaultTestVersion`                                                  |
-| `pluginPackage = "foo.bar"`                     | `pluginPackage`                                                       |
+| `pluginId = "foo.bar"`                          | `pluginId`                                                            |
+| `generatedClassesPackage = "foo.bar"`           | `generatedClassesPackage`                                             |
 | `companionLibrary(...)`                         | `companionLibraries`                                                  |
 
 - [
@@ -188,10 +189,15 @@ commas or whitespace. A boolean property counts as true only when its value is e
 - If none of the properties above add a [version](#version), the DevKit adds the `kotlinToolingVersion` of KGP as a
   [CLI version](#cli-version). So the build always has at least 1 [version](#version).
 - [
-  `pluginPackage = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
-  sets the plugin ID, the package for buildconfig generation, and the classloader isolation ID (needs a
-  split, [#55](https://github.com/Kotlin/compiler-plugin-dev-kit/issues/55)).
+  `pluginId = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  sets the plugin ID: the ID that the [entry point](#entry-point) classes report to the compiler, and the ID that the
+  [Gradle support plugin](#gradle-support-plugin) reports to Gradle.
     - The default is the `group` of the project.
+- [
+  `generatedClassesPackage = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
+  sets the package of the classes that the DevKit generates: the buildConfig classes and the
+  [entry point](#entry-point) classes.
+  - The default is `pluginId`.
 - [
   `companionLibrary(notation)`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitPropertiesDsl.kt)
   adds a [companion library](#companion-library).
@@ -248,8 +254,8 @@ commas or whitespace. A boolean property counts as true only when its value is e
       `com.autonomousapps.plugin-under-test.repos-included` property.
       The [gradle plugin test runtime](#gradle-plugin-runtime) reads the property, and adds the repository to the test
       build.
-- Generates a `PluginInfo` object with `buildconfig`. The object has the plugin ID, the plugin coordinates, and
-  the [companion library](#companion-library) coordinates.
+- Generates a `PluginInfo` object with `buildconfig`, in the package of `generatedClassesPackage`. The object has the
+  plugin ID, the plugin coordinates, and the [companion library](#companion-library) coordinates.
 - Has these properties beyond the [shared properties](#shared-properties):
     - [
       `functionalTestProperties`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitGradlePlugin.kt):
@@ -285,12 +291,12 @@ commas or whitespace. A boolean property counts as true only when its value is e
       [
       `DevKitEntryPoint.template.kt`](../plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitEntryPoint.template.kt).
       See [In the compiler: plugin loading](#in-the-compiler-plugin-loading).
-    - Embeds the dependencies into `META-INF/kotlin/plugin/<plugin-id>/dependencies`. It unpacks each jar into its own
-      subdirectory.
+    - Embeds the dependencies into `META-INF/kotlin/plugin/<classloader-id>/dependencies`. It unpacks each jar into its
+      own subdirectory.
     - Embeds the [entry point](#entry-point) runtime and [version resolution](#version-resolution) into
-      `META-INF/kotlin/plugin/<plugin-id>/entryPoint`. Nothing DevKit-related stays on the normal classpath except the
-      generated [entry point](#entry-point) classes, so plugins can safely use different DevKit versions. Their package
-      comes from the plugin ID, so they don't clash either.
+      `META-INF/kotlin/plugin/<classloader-id>/entryPoint`. Nothing DevKit-related stays on the normal classpath except
+      the generated [entry point](#entry-point) classes, so plugins can safely use different DevKit versions. Their
+      package comes from `generatedClassesPackage`, so it should be kept unique
 - Registers a [`DevKitTarget`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitTarget.kt)
   for each [version](#version):
     - The target name is the [target name](#target-name) of the [version](#version), for example `k2420_dev_7885`.
@@ -344,7 +350,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
       share test fixtures and tests exactly like main code.
 - Publishes everything in one jar with a "surrogate target":
     - The surrogate target is the first registered target. Its jar and its publications get the classes of all versions
-      in `META-INF/kotlin/plugin/<plugin-id>/versions/`.
+      in `META-INF/kotlin/plugin/<classloader-id>/versions/`.
     - The manifest has the `Kotlin-Compiler-Plugin-Multi-Release` attribute. For IDE support, it also has
       `Kotlin-Compiler-Plugin-Since-Build` and `Kotlin-Compiler-Plugin-Until-Build`.
     - The DevKit generates the [entry point classes](#entry-point) into a separate `entry-point` compilation of the
@@ -354,7 +360,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
   default `build/test-gen`:
     - The generator is the class that [
       `generateTestsClass`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
-      names, in the `generateTests*` source set. The default is `<pluginPackage>.GenerateTestsKt`.
+      names, in the `generateTests*` source set. The default is `<generatedClassesPackage>.GenerateTestsKt`.
     - The generator API, for example `generateDevKitTestsWithJUnit5`, comes from [
       `compiler-plugin-test-generator`](#compiler-plugin-test-generator). The DevKit adds it as an `api` dependency of
       the `generateTests` source set.
@@ -377,6 +383,11 @@ commas or whitespace. A boolean property counts as true only when its value is e
       compilation of that target.
     - The DevKit marks generated tests as generated sources for IDEA, so IDEA ignores them (workaround for
       [IDEA-339729](https://youtrack.jetbrains.com/issue/IDEA-339729)).
+- [
+  `classLoaderId = "foo.bar"`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
+  sets the directory inside `META-INF/kotlin/plugin/` that holds the plugin's code, dependencies, and entry point
+  runtime, so its classloaders don't see other plugins'. Only the [entry point](#entry-point) classes read it.
+  - The default is `pluginId`.
 - The resources of every test source set come from `src/<sourceSetName>/data`.
 - Supports [companion libraries](#companion-library), and "conditional" libraries through the [
   `testDataLibraries`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
@@ -750,29 +761,29 @@ selects a version at Gradle build time and at compiler and IDE runtime. Both pat
 
 The jar holds the plugin code for each version and the embedded dependencies:
 
-- Plugin code is in `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`. Dependencies are in
-  `META-INF/kotlin/plugin/<plugin-id>/dependencies`. The [entry point](#entry-point) runtime is in
-  `META-INF/kotlin/plugin/<plugin-id>/entryPoint`.
-- `<plugin-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the jars
-  anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
+- Plugin code is in `META-INF/kotlin/plugin/<classloader-id>/versions/<version>`. Dependencies are in
+  `META-INF/kotlin/plugin/<classloader-id>/dependencies`. The [entry point](#entry-point) runtime is in
+  `META-INF/kotlin/plugin/<classloader-id>/entryPoint`.
+- `<classloader-id>` in the path tells compiler plugins apart without an inspection of each jar. The DevKit inspects the
+  jars anyway, but the path lets a custom `ClassLoader` find a plugin with `getResourceAsStream`.
 - Each `<version>` under `versions` must be a valid [version](#version).
 - Each directory under `dependencies` must be an unpacked jar. The DevKit resolves the version of each dependency
   separately.
 
 [
 `addOverlayAndDependencies`](../version-resolution/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionResolution.kt)
-rebuilds the classpath of a plugin from its resolved version and its dependencies. It takes a plugin ID, a jar path, and
-the `currentVersion`. It adds the classpath roots to a list, and returns the resolved version, or null when the jar has
-none:
+rebuilds the classpath of a plugin from its resolved version and its dependencies. It takes a classloader isolation ID,
+a jar path, and the `currentVersion`. It adds the classpath roots to a list, and returns the resolved version, or null
+when the jar has none:
 
 1. If the jar doesn't have the `Kotlin-Compiler-Plugin-Multi-Release` attribute, return null.
-2. List the versions in `META-INF/kotlin/plugin/<plugin-id>/versions`. If the directory is empty or missing, return
+2. List the versions in `META-INF/kotlin/plugin/<classloader-id>/versions`. If the directory is empty or missing, return
    null.
 3. Resolve the [version](#version) with the version resolution function above.
 4. Add the classpath roots of each dependency, recursively, with no ID: each dependency uses the only directory under
    its own `META-INF/kotlin/plugin`. If a dependency has no version to select, the whole dependency directory is one
    classpath root.
-5. Add `META-INF/kotlin/plugin/<plugin-id>/versions/<version>`.
+5. Add `META-INF/kotlin/plugin/<classloader-id>/versions/<version>`.
 6. Add the jar root.
 
 ### In Gradle: artifact transform
@@ -802,7 +813,7 @@ Two more cases get the original artifacts:
 
 The transform:
 
-1. Runs the `addOverlayAndDependencies` function with no plugin ID, so it uses the only directory under
+1. Runs the `addOverlayAndDependencies` function with no ID, so it uses the only directory under
    `META-INF/kotlin/plugin`.
 2. Returns the artifact unchanged if the function returns no version. So the transform changes only multi-version jars,
    and every other dependency passes through.
@@ -834,35 +845,36 @@ maps each dependency:
 
 ### In the compiler: plugin loading
 
-For a `compiler-plugin`, the `generateEntryPointSource` task generates the file `<pluginPackage>/DevKitEntryPoint.kt` in
-the `entryPoint` compilation of the surrogate target, from
+For a `compiler-plugin`, the `generateEntryPointSource` task generates the file
+`<generatedClassesPackage>/DevKitEntryPoint.kt` in the `entryPoint` compilation of the surrogate target, from
 [
 `DevKitEntryPoint.template.kt`](../plugins/src/main/resources/META-INF/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitEntryPoint.template.kt).
 
 [
 `generateServices`](../plugins/src/main/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/DevKitCompilerPlugin.kt)
 writes the `META-INF/services` files for `CompilerPluginRegistrar` and `CommandLineProcessor`. They name the classes
-`<pluginPackage>.DevKitRegistrar` and `<pluginPackage>.DevKitProcessor`. These names depend on the shape of the
-template. If the template changes them, `generateServices` must change too.
+`<generatedClassesPackage>.DevKitRegistrar` and `<generatedClassesPackage>.DevKitProcessor`. These names depend on the
+shape of the template. If the template changes them, `generateServices` must change too.
 
 On the first call to `registerExtensions`, `processOption`, or `pluginOptions`, the entry point loads the plugin:
 
 1. `DevKitEntryPoint` builds its own class loader. Its parent is the **parent** of the class loader of the generated
    class. Thus, the DevKit classes see the compiler, but no other plugin. The loader reads every class and resource as a
-   resource of the plugin's class loader, with `META-INF/kotlin/plugin/<plugin-id>/entryPoint/` prepended.
-2. `DevKitEntryPoint` loads `DevKitCompilerPluginRegistrar` or `DevKitCommandLineProcessor` from that class loader.
+   resource of the plugin's class loader, with `META-INF/kotlin/plugin/<classloader-id>/entryPoint/` prepended.
+2. `DevKitEntryPoint` loads `DevKitCompilerPluginRegistrar` or `DevKitCommandLineProcessor` from that class loader, with
+   the classloader isolation ID.
 3. The DevKit class calls [
    `VersionedPluginClassLoading.resolve`](../compiler-plugin-runtime/src/entryPoint/kotlin/org/jetbrains/kotlin/compiler/plugin/devkit/VersionedPluginClassLoading.kt)
-   with the plugin ID. `resolve` finds the current version (see below), and the URLs of the class loader. For a class
-   loader that isn't a `URLClassLoader`, it calls a public `getUrls()` method with reflection. The IntelliJ
+   with the classloader isolation ID. `resolve` finds the current version (see below), and the URLs of the class loader.
+   For a class loader that isn't a `URLClassLoader`, it calls a public `getUrls()` method with reflection. The IntelliJ
    `UrlClassLoader` has one.
 4. If the version or the URLs are unknown, `resolve` returns null, and the plugin doesn't load.
-5. Otherwise, `resolve` runs the `addOverlayAndDependencies` function on each URL, with the plugin ID. `resolve` ignores
-   a jar that doesn't match that ID, so other plugins don't interfere with this one.
+5. Otherwise, `resolve` runs the `addOverlayAndDependencies` function on each URL, with the classloader isolation ID.
+   `resolve` ignores a jar that doesn't match that ID, so other plugins don't interfere with this one.
 6. `resolve` makes a `URLClassLoader` over the result. Its parent is the **parent** of the class loader of the entry
    point. Thus, the plugin sees the compiler and its own classpath only. It doesn't see other plugins.
-7. `resolve` caches the class loader for each plugin ID. `CommandLineProcessor` and `ComponentRegistrar` then exchange
-   the same classes through `CompilerConfiguration`.
+7. `resolve` caches the class loader for each classloader isolation ID. `CommandLineProcessor` and `ComponentRegistrar`
+   then exchange the same classes through `CompilerConfiguration`.
 8. The DevKit class loads the `componentRegistrar` or `commandLineProcessor` class from that class loader, makes an
    instance, and calls it with reflection.
 

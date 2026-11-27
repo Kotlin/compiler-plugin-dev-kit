@@ -19,13 +19,11 @@ plugins {
 
 If you added the `dev`, `bootstrap`, or `intellij-dependencies` repositories to `dependencyResolutionManagement`, remove them. The settings plugin adds them.
 
-[comment]: # (TODO #55)
-
 Find your plugin ID. In the pre-DevKit template, the `build-config` setup passes the plugin ID explicitly. Set the plugin
 ID in `gradle.properties`:
 
 ```properties
-kotlin.compiler.plugin.devkit.pluginPackage=my.plugin.id
+kotlin.compiler.plugin.devkit.pluginId=my.plugin.id
 ```
 
 The DevKit uses this value as the plugin ID and as the package of the classes that it generates. If you don't set it,

@@ -100,8 +100,8 @@ fun main() = generateDevKitTestsWithJUnit5 {
 }
 ```
 
-By default, the DevKit runs the test generator class `<pluginPackage>.GenerateTestsKt`. To use another class, set
-`pluginDevKit { generateTestsClass = "my.generator.ClassKt" }`.
+By default, the DevKit runs the test generator class `<generatedClassesPackage>.GenerateTestsKt`. To use another class,
+set `pluginDevKit { generateTestsClass = "my.generator.ClassKt" }`.
 
 Run the compiler plugin tests, for example with `check` or `:my-compiler-plugin:allTests`. Make sure that all tests
 pass.

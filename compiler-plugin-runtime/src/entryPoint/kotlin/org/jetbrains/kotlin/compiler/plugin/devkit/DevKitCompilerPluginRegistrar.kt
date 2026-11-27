@@ -5,11 +5,13 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 
 public class DevKitCompilerPluginRegistrar(
     private val anchor: Class<*>,
-    override val pluginId: String,
+    classLoaderId: String,
     registrarClass: String,
 ) : CompilerPluginRegistrar() {
+    override val pluginId: String = classLoaderId
+
     private val versionedRegistrar by lazy {
-        val loader = VersionedPluginClassLoading.resolve(anchor, pluginId)
+        val loader = VersionedPluginClassLoading.resolve(anchor, classLoaderId)
         loader ?: return@lazy { _, _ -> }
         val registrar = loader.loadClass(registrarClass).getDeclaredConstructor().newInstance()
         val method =
