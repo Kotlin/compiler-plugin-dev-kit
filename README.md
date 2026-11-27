@@ -53,6 +53,9 @@ KEFS supports DevKit-based compiler plugins since 0.4.0.
 
 There's a [spec](./docs/spec.md)
 
+The [multiversioning guide](./docs/multiversioning/0-multiversioning.md) tells how to widen the range of versions that a
+plugin supports
+
 ## Attributions
 
 A significant amount of code, particularly [version resolution](./version-resolution) and
