@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit.handlers
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestDumpDirectives
 import org.jetbrains.kotlin.compiler.plugin.devkit.TestInfrastructureException
 import org.jetbrains.kotlin.compiler.plugin.devkit.assertEqualsToDump
+import org.jetbrains.kotlin.compiler.plugin.devkit.findClassCompat
 import org.jetbrains.kotlin.compiler.plugin.devkit.irBuiltInsCompat
-import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrField
@@ -116,8 +116,7 @@ public class BackportedIrTextDumpHandler(
     private fun IrBackendInput.findExternalClass(externalClassId: String): IrClass {
         val classId = ClassId.fromString(externalClassId)
 
-        @OptIn(InternalSymbolFinderAPI::class)
-        return irBuiltInsCompat.symbolFinder.findClass(classId)?.owner
+        return findClassCompat(classId)?.owner
             ?: throw TestInfrastructureException(
                 "Can't find a class in external dependencies: $externalClassId"
             )

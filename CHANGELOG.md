@@ -15,6 +15,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - The DevKit supports newly released Kotlin versions, including `2.5.0-RC2`, and `dev` builds up to `2.5.20-dev-6103`.
+- The DevKit supports Kotlin 2.2.0+ and IDE 2025.1+, including backported declarations:
+    - `SessionHolder` and `ScopeAndSessionHolder` interfaces, with `fullyExpandedType` contextual overloads
+    - `K1Deprecation` and `DirectDeclarationAccess` opt-in annotations
+    - `KtDiagnosticsContainer`, `KtDiagnosticFactory` overloads, and `KtDiagnosticFactoryToRendererMap`
+    - `context` and `contextOf` stdlib functions
+    - `DiagnosticReporter.reportOn` contextual overloads
+    - Compatibility subtypes of `FirDeclarationChecker` and `FirTypeChecker`, to consistently use contextual `check`
+      method
+    - No-op versions of `TagsGeneratorChecker` and `FirInferenceLogger`
+    - `SpecHelpersSourceFilesProvider` constructor without `baseDir`
+    - `TestPhase` type alias
 
 ### Fixed
 

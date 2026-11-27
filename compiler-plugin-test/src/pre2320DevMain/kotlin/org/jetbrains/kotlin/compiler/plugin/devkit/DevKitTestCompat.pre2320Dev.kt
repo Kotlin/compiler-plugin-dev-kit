@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.fir.backend.utils.createFilesWithGeneratedDeclaratio
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.moduleData
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
@@ -30,6 +32,10 @@ public actual fun collectFilesForRenderingCompat(
 
 public actual val IrBackendInput.irBuiltInsCompat: IrBuiltIns
     get() = irPluginContext.irBuiltIns
+
+// Copied from https://github.com/JetBrains/kotlin/commit/382f3bb0f34cb9f7ca62e11023efd0aac5d9a5e2
+public actual fun IrBackendInput.findClassCompat(classId: ClassId): IrClassSymbol? =
+    irPluginContext.referenceClass(classId)
 
 public actual val FirOutputArtifact.mainFirFilesByTestFileCompat: Map<TestFile, FirFile>
     get() = mainFirFiles

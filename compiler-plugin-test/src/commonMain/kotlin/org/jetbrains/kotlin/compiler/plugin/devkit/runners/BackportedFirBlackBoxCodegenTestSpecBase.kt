@@ -16,7 +16,6 @@ import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirective
 import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
 import org.jetbrains.kotlin.test.services.PackageNamePreprocessor
 import org.jetbrains.kotlin.test.services.sourceProviders.SpecHelpersSourceFilesProvider
-import org.jetbrains.kotlin.utils.bind
 
 public abstract class BackportedFirBlackBoxCodegenTestSpecBase(
     vararg config: TestConfigurationBuilder.() -> Unit,
@@ -31,7 +30,7 @@ public abstract class BackportedFirBlackBoxCodegenTestSpecBase(
                 +FULL_JDK
             }
             useSourcePreprocessor(::PackageNamePreprocessor)
-            useAdditionalSourceProviders(::SpecHelpersSourceFilesProvider.bind("codegen/box"))
+            useAdditionalSourceProviders({ SpecHelpersSourceFilesProvider(it, "codegen/box") })
             useFailureSuppressorsCompat(
                 ::FirFailingTestSuppressor,
                 ::BlackBoxCodegenSuppressor,

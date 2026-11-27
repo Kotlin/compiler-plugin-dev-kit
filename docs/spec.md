@@ -61,7 +61,9 @@ compiler and IDE runtime.
 - [Runtime libraries](#runtime-libraries):
     - [`compiler-plugin-runtime`](#compiler-plugin-runtime): compiler plugin utilities and [entry point](#entry-point)
       classes. Uses `version-resolution` and `compiler-plugin-runtime-compat`
-    - [`compiler-plugin-runtime-compat`](#compiler-plugin-runtime-compat): backported compiler plugins compatibility declarations. It does *not* use `expect/actual`, but instead preserves source compatibility for renamed/missing declarations.
+    - [`compiler-plugin-runtime-compat`](#compiler-plugin-runtime-compat): backported compiler plugins compatibility
+      declarations. It avoids using `expect/actual`, instead preserving source compatibility for renamed/missing
+      declarations.
     - [`compiler-plugin-test`](#compiler-plugin-test): compiler plugin test utilities, including
       [classified dumps](#classified-dump). Uses `compiler-plugin-test-compat`
     - [`compiler-plugin-test-compat`](#compiler-plugin-test-compat): Like `compiler-plugin-runtime-compat`, it preserves source compatibility for renamed/missing test infrastructure declarations.
@@ -423,6 +425,7 @@ commas or whitespace. A boolean property counts as true only when its value is e
 
 Holds the compatibility declarations that re-expose a compiler API under the name of another
 [version](#version), always in the compiler's own package, so consumer code works across multiple versions with no import changes.
+`expect/actual` *can* be used to avoid code duplication
 
 ### `compiler-plugin-test`
 
@@ -610,13 +613,16 @@ package.
 
 Typealiases in `org.jetbrains.kotlin.test.builders` give every version both
   [
-  `NonGroupingPhaseTestConfigurationBuilder`](../compiler-plugin-test-compat/src/pre24DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt)
+  `NonGroupingPhaseTestConfigurationBuilder`](../compiler-plugin-test-compat/src/preNonGroupingPhaseTestConfigurationBuilderMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingPhaseTestConfigurationBuilder.kt)
   and
   [
-  `NonGroupingStageTestConfigurationBuilder`](../compiler-plugin-test-compat/src/pre2420DevMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt).
+  `NonGroupingStageTestConfigurationBuilder`](../compiler-plugin-test-compat/src/preNonGroupingStageTestConfigurationBuilderMain/kotlin/org/jetbrains/kotlin/test/builders/NonGroupingStageTestConfigurationBuilder.kt).
     - They exist for the IDE: `expect/actual` with `TestConfigurationBuilder` confuses the IDE, because the IDE
       immediately expands a `typealias` to a different class in each version. With these type aliases, the expanded type
       is then re-expanded into the proper `TestConfigurationBuilder` for this version. This also helps in CLI by allowing all versions to use `NonGrouping*` to refer to `TestConfigurationBuilder`
+
+A typealias in `org.jetbrains.kotlin.test.services` gives the 2.2.0 [IDE versions](#ide-version) the [`TestPhase`](../compiler-plugin-test-compat/src/preTestPhaseMain/kotlin/org/jetbrains/kotlin/test/services/TestPhase.kt)
+  name, which their compiler spells `TestPhaseLabel`.
 
 ### `compiler-plugin-test-generator`
 

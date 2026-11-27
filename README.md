@@ -2,7 +2,7 @@
 
 [![Kotlin Experimental](https://kotl.in/badges/experimental.svg)](https://kotlinlang.org/docs/components-stability.html)
 ![JetBrains incubator](https://jb.gg/badges/incubator-plastic.svg)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.2.20+-blue.svg?logo=kotlin)](http://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.2.0+-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![GitHub License](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](http://www.apache.org/licenses/LICENSE-2.0)
 
 > [!WARNING]
@@ -40,7 +40,7 @@ Alternatively, for a pre-existing project, use the [Migration guide](./docs/migr
 
 ### Compatibility
 
-The DevKit supports Kotlin 2.2.20+, Gradle 9.2+, and IntelliJ 2025.2+
+The DevKit supports Kotlin 2.2.0+, Gradle 9.2+, and IntelliJ 2025.1+
 
 ### KEFS support
 

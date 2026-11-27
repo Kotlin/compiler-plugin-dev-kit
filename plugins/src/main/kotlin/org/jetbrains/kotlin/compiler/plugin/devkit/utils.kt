@@ -124,7 +124,7 @@ internal fun String.capitalizeAsciiOnly(): String {
     else this
 }
 
-internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 2, 20)
+internal val MIN_SUPPORTED_VERSION = KotlinVersion(2, 2, 0)
 
 internal val MIN_JS_TEST_INFRASTRUCTURE_VERSION = KotlinVersion(2, 3, 0)
 

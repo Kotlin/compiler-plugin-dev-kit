@@ -2,6 +2,8 @@ package org.jetbrains.kotlin.compiler.plugin.devkit
 
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
@@ -122,6 +124,8 @@ public expect fun collectFilesForRenderingCompat(
 ): List<FirFile>
 
 public expect val IrBackendInput.irBuiltInsCompat: IrBuiltIns
+
+public expect fun IrBackendInput.findClassCompat(classId: ClassId): IrClassSymbol?
 
 public expect val DISABLE_FIR_DUMP_HANDLER: SimpleDirective
 public expect val DisableFirDumpHandlerContainer: SimpleDirectivesContainer
