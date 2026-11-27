@@ -147,7 +147,7 @@ kotlin-gradle-plugin-model=UNSUPPORTED
 kotlin-gradle-plugins-bom=kotlin-gradle-plugins-bom
 kotlin-gradle-statistics=kotlin-gradle-statistics-for-ide
 kotlin-gradle-statistics-for-ide=kotlin-gradle-statistics-for-ide
-// Check later if it lands on intellij-dependencies or not
+# Check later if it lands on intellij-dependencies or not
 kotlin-ic-event-report=kotlin-ic-event-report
 # Check later, but it seems this is for IDE, but also published in -dev
 kotlin-import-models=kotlin-import-models
